@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Minesweeper — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation;
+         -webkit-user-select: none; user-select: none; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #hud { display: flex; justify-content: center; gap: 24px; margin: 8px 0; font-size: 1.1rem; }
+  #hud span { color: #ffe600; }
+  #board { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; width: min(94vw, 380px);
+           margin: 0 auto; background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; padding: 6px; }
+  .cell { aspect-ratio: 1; background: #2a2a4a; border-radius: 3px; display: flex; align-items: center;
+          justify-content: center; font-weight: 700; font-size: clamp(.8rem, 4vw, 1rem); cursor: pointer; }
+  .cell.open { background: #1a1a30; cursor: default; }
+  .cell.boom { background: #ff2d95; }
+  #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+  .hint { color: #8a8aa8; font-size: .8rem; margin-top: 6px; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>💣 Minesweeper</h1>
+<div id="hud"><div>💣 <span id="flags">10</span></div><div>⏱️ <span id="time">0</span>s</div></div>
+<div id="board"></div>
+<div id="msg"></div>
+<button id="start">New Game</button>
+<div class="hint">click/tap = reveal · right-click / long-press = flag</div>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const SIZE = 9, MINES = 10;
+  const boardEl = document.getElementById("board");
+  const flagsEl = document.getElementById("flags"), timeEl = document.getElementById("time");
+  const msgEl = document.getElementById("msg");
+  const NCOLOR = ["", "#00e5ff", "#2ecc71", "#ff2d95", "#9b59b6", "#e67e22", "#00e5ff", "#e8e8f0", "#8a8aa8"];
+  let mines, open, flagged, started, dead, won, t0, tick, flagMode;
+
+  function reset() {
+    mines = null; open = 0; flagged = 0; started = false; dead = false; won = false;
+    clearInterval(tick);
+    flagsEl.textContent = MINES; timeEl.textContent = "0"; msgEl.textContent = "";
+    boardEl.innerHTML = "";
+    for (let i = 0; i < SIZE * SIZE; i++) {
+      const d = document.createElement("div");
+      d.className = "cell"; d.dataset.i = i;
+      boardEl.appendChild(d);
+    }
+  }
+  function plant(first) {
+    mines = new Set();
+    while (mines.size < MINES) {
+      const i = (Math.random() * SIZE * SIZE) | 0;
+      if (i !== first) mines.add(i);
+    }
+  }
+  function neighbors(i) {
+    const x = i % SIZE, y = (i / SIZE) | 0, r = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < SIZE && ny < SIZE) r.push(ny * SIZE + nx);
+    }
+    return r;
+  }
+  function count(i) {
+    return neighbors(i).filter(function (n) { return mines.has(n); }).length;
+  }
+  function cell(i) { return boardEl.children[i]; }
+  function reveal(i) {
+    const c = cell(i);
+    if (c.classList.contains("open") || c.dataset.flag) return;
+    if (!started) {
+      started = true; plant(i);
+      t0 = Date.now();
+      tick = setInterval(function () {
+        timeEl.textContent = ((Date.now() - t0) / 1000) | 0;
+      }, 250);
+    }
+    if (mines.has(i)) return boom(i);
+    flood(i);
+    checkWin();
+  }
+  function flood(i) {
+    const stack = [i];
+    while (stack.length) {
+      const j = stack.pop(), c = cell(j);
+      if (c.classList.contains("open") || c.dataset.flag) continue;
+      c.classList.add("open"); open++;
+      const n = count(j);
+      if (n) { c.textContent = n; c.style.color = NCOLOR[n]; }
+      else neighbors(j).forEach(function (k) {
+        if (!cell(k).classList.contains("open")) stack.push(k);
+      });
+    }
+  }
+  function toggleFlag(i) {
+    const c = cell(i);
+    if (c.classList.contains("open") || dead || won) return;
+    if (c.dataset.flag) { delete c.dataset.flag; c.textContent = ""; flagged--; }
+    else if (flagged < MINES) { c.dataset.flag = "1"; c.textContent = "🚩"; flagged++; }
+    flagsEl.textContent = MINES - flagged;
+  }
+  function boom(i) {
+    dead = true; clearInterval(tick);
+    mines.forEach(function (m) {
+      const c = cell(m);
+      c.classList.add("open");
+      if (m === i) c.classList.add("boom");
+      c.textContent = "💣";
+    });
+    const secs = ((Date.now() - t0) / 1000) | 0;
+    msgEl.textContent = "💥 Boom! " + secs + "s survived.";
+    Arcade.saveScore("minesweeper", Arcade.playerName(), Math.max(0, 10000 - secs));
+  }
+  function checkWin() {
+    if (open === SIZE * SIZE - MINES) {
+      won = true; clearInterval(tick);
+      const secs = ((Date.now() - t0) / 1000) | 0;
+      msgEl.textContent = "🏆 Cleared in " + secs + "s!";
+      Arcade.saveScore("minesweeper", Arcade.playerName(), Math.max(0, 10000 - secs));
+    }
+  }
+  boardEl.addEventListener("click", function (e) {
+    const t = e.target.closest(".cell");
+    if (!t || dead || won) return;
+    reveal(+t.dataset.i);
+  });
+  boardEl.addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+    const t = e.target.closest(".cell");
+    if (t) toggleFlag(+t.dataset.i);
+  });
+  // long-press = flag on touch
+  let lpTimer = null;
+  boardEl.addEventListener("touchstart", function (e) {
+    const t = e.target.closest(".cell");
+    if (!t) return;
+    lpTimer = setTimeout(function () { toggleFlag(+t.dataset.i); lpTimer = "fired"; }, 450);
+  }, { passive: true });
+  boardEl.addEventListener("touchend", function (e) {
+    if (lpTimer === "fired") { e.preventDefault(); }
+    clearTimeout(lpTimer); lpTimer = null;
+  });
+  document.getElementById("start").addEventListener("click", reset);
+  reset();
+})();
+</script>
+</body>
+</html>
