@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Breakout — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #hud { display: flex; justify-content: center; gap: 28px; margin: 8px 0; font-size: 1.05rem; }
+  #hud span { color: #ffe600; font-weight: 700; }
+  canvas { background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; max-width: 94vw; }
+  #msg { min-height: 1.6em; margin: 8px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+  .hint { color: #8a8aa8; font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>🧱 Breakout</h1>
+<div id="hud"><div>Score <span id="score">0</span></div><div>Lives <span id="lives">3</span></div></div>
+<canvas id="c" width="480" height="400"></canvas>
+<div id="msg"></div>
+<button id="start">Start</button>
+<div class="hint">← → keys or drag to move the paddle</div>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  const scoreEl = document.getElementById("score"), livesEl = document.getElementById("lives");
+  const msgEl = document.getElementById("msg");
+  const W = cv.width, H = cv.height;
+  const PW = 80, PH = 12, BR = 7;
+  const BCOLORS = ["#ff2d95", "#ff2d95", "#e67e22", "#e67e22", "#ffe600", "#ffe600", "#2ecc71"];
+  let px, bx, by, bvx, bvy, bricks, score, lives, raf, running, stuck;
+
+  function buildBricks() {
+    bricks = [];
+    const cols = 8, bw = (W - 20) / cols;
+    for (let r = 0; r < 5; r++) for (let c = 0; c < cols; c++)
+      bricks.push({ x: 10 + c * bw, y: 40 + r * 26, w: bw - 4, h: 20, c: BCOLORS[r], on: true });
+  }
+  function reset() {
+    px = W / 2 - PW / 2; score = 0; lives = 3; running = true; stuck = true;
+    buildBricks();
+    scoreEl.textContent = "0"; livesEl.textContent = "3"; msgEl.textContent = "";
+    serve();
+    cancelAnimationFrame(raf);
+    loop();
+  }
+  function serve() {
+    stuck = true;
+    bx = px + PW / 2; by = H - 40;
+    bvx = 3.5; bvy = -3.5;
+  }
+  function loseLife() {
+    lives--; livesEl.textContent = lives;
+    if (lives <= 0) return end(false);
+    serve();
+  }
+  function end(wonAll) {
+    running = false;
+    cancelAnimationFrame(raf);
+    msgEl.textContent = wonAll ? "🏆 You cleared every brick! Score: " + score
+                              : "Game over! Score: " + score;
+    Arcade.saveScore("breakout", Arcade.playerName(), score);
+  }
+  function loop() {
+    if (!running) return;
+    if (!stuck) {
+      bx += bvx; by += bvy;
+      if (bx < BR || bx > W - BR) bvx *= -1;
+      if (by < BR) bvy *= -1;
+      // paddle
+      if (by > H - 30 - BR && by < H - 18 && bx > px - BR && bx < px + PW + BR && bvy > 0) {
+        const rel = (bx - px) / PW - 0.5;
+        bvx = rel * 8; bvy = -Math.abs(bvy);
+        by = H - 30 - BR;
+      }
+      // bricks
+      for (let i = 0; i < bricks.length; i++) {
+        const b = bricks[i];
+        if (!b.on) continue;
+        if (bx > b.x - BR && bx < b.x + b.w + BR && by > b.y - BR && by < b.y + b.h + BR) {
+          b.on = false;
+          score += 10;
+          scoreEl.textContent = score;
+          bvy *= -1;
+          break;
+        }
+      }
+      if (bricks.every(function (b) { return !b.on; })) return end(true);
+      if (by > H + 20) loseLife();
+    } else {
+      bx = px + PW / 2; by = H - 40;
+    }
+    // draw
+    ctx.fillStyle = "#14142a"; ctx.fillRect(0, 0, W, H);
+    bricks.forEach(function (b) {
+      if (!b.on) return;
+      ctx.fillStyle = b.c; ctx.fillRect(b.x, b.y, b.w, b.h);
+    });
+    ctx.fillStyle = "#00e5ff"; ctx.fillRect(px, H - 30, PW, PH);
+    ctx.fillStyle = "#ffe600";
+    ctx.beginPath(); ctx.arc(bx, by, BR, 0, 7); ctx.fill();
+    raf = requestAnimationFrame(loop);
+  }
+  function moveTo(clientX) {
+    const r = cv.getBoundingClientRect();
+    px = ((clientX - r.left) / r.width) * W - PW / 2;
+    px = Math.max(0, Math.min(W - PW, px));
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { px = Math.max(0, px - 22); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { px = Math.min(W - PW, px + 22); e.preventDefault(); }
+    else if ((e.key === " " || e.key === "ArrowUp") && stuck) { stuck = false; e.preventDefault(); }
+  });
+  cv.addEventListener("mousemove", function (e) { moveTo(e.clientX); });
+  cv.addEventListener("touchmove", function (e) {
+    moveTo(e.changedTouches[0].clientX); e.preventDefault();
+  }, { passive: false });
+  cv.addEventListener("click", function () { if (stuck && running) stuck = false; });
+  document.getElementById("start").addEventListener("click", reset);
+  // attract
+  buildBricks(); px = W / 2 - PW / 2; bx = W / 2; by = H - 40;
+  ctx.fillStyle = "#14142a"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#8a8aa8"; ctx.font = "20px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("press start", W / 2, H / 2);
+})();
+</script>
+</body>
+</html>
