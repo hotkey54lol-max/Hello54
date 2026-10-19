@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Asteroids — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #hud { display: flex; justify-content: center; gap: 28px; margin: 8px 0; font-size: 1.05rem; }
+  #hud span { color: #ffe600; font-weight: 700; }
+  canvas { background: #05050c; border: 2px solid #2a2a4a; border-radius: 8px; max-width: 96vw; }
+  #msg { min-height: 1.6em; margin: 8px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 24px; font-size: 1rem; cursor: pointer; margin: 4px; }
+  button:active { transform: scale(.96); }
+  #pad { display: flex; justify-content: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  #pad button { padding: 12px 18px; font-size: 1.1rem; }
+  .hint { color: #8a8aa8; font-size: .8rem; margin-top: 6px; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>🚀 Asteroids</h1>
+<div id="hud"><div>Score <span id="score">0</span></div><div>Lives <span id="lives">3</span></div><div>Wave <span id="wave">1</span></div></div>
+<canvas id="c" width="520" height="420"></canvas>
+<div id="msg"></div>
+<button id="start">Start</button>
+<div id="pad">
+  <button data-k="left">◀</button><button data-k="thrust">🔥</button><button data-k="right">▶</button>
+  <button data-k="fire">💥 FIRE</button>
+</div>
+<div class="hint">arrows: ← → rotate · ↑ thrust · space fire</div>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  const scoreEl = document.getElementById("score"), livesEl = document.getElementById("lives"),
+        waveEl = document.getElementById("wave"), msgEl = document.getElementById("msg");
+  const W = cv.width, H = cv.height;
+  const TAU = Math.PI * 2;
+  let ship, rocks, bullets, score, lives, wave, raf, running, keys, invuln;
+
+  function wrap(o) {
+    if (o.x < -30) o.x += W + 60; if (o.x > W + 30) o.x -= W + 60;
+    if (o.y < -30) o.y += H + 60; if (o.y > H + 30) o.y -= H + 60;
+  }
+  function dist(a, b) {
+    const dx = a.x - b.x, dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function makeRock(x, y, r, waveN) {
+    const a = Math.random() * TAU, sp = 0.5 + Math.random() * (0.6 + waveN * 0.15);
+    return { x: x, y: y, r: r, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+             rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 0.06,
+             verts: rockShape() };
+  }
+  function rockShape() {
+    const v = [], n = 9 + ((Math.random() * 4) | 0);
+    for (let i = 0; i < n; i++) v.push(0.75 + Math.random() * 0.4);
+    return v;
+  }
+  function spawnWave() {
+    rocks = [];
+    const n = 3 + wave;
+    for (let i = 0; i < n; i++) {
+      let x, y;
+      do { x = Math.random() * W; y = Math.random() * H; }
+      while (dist({ x: x, y: y }, ship) < 120);
+      rocks.push(makeRock(x, y, 34, wave));
+    }
+    waveEl.textContent = wave;
+  }
+  function reset() {
+    ship = { x: W / 2, y: H / 2, vx: 0, vy: 0, a: -Math.PI / 2 };
+    bullets = []; score = 0; lives = 3; wave = 1; invuln = 0;
+    keys = {};
+    scoreEl.textContent = "0"; livesEl.textContent = "3";
+    msgEl.textContent = "";
+    running = true;
+    spawnWave();
+    cancelAnimationFrame(raf);
+    loop();
+  }
+  function fire() {
+    if (bullets.length > 8) return;
+    bullets.push({ x: ship.x + Math.cos(ship.a) * 14, y: ship.y + Math.sin(ship.a) * 14,
+                   vx: Math.cos(ship.a) * 7 + ship.vx, vy: Math.sin(ship.a) * 7 + ship.vy, life: 60 });
+  }
+  function killShip() {
+    lives--; livesEl.textContent = lives;
+    if (lives <= 0) {
+      running = false;
+      cancelAnimationFrame(raf);
+      msgEl.textContent = "💥 Game over! Score: " + score;
+      Arcade.saveScore("asteroids", Arcade.playerName(), score);
+      return;
+    }
+    ship.x = W / 2; ship.y = H / 2; ship.vx = ship.vy = 0;
+    invuln = 120;
+  }
+  function splitRock(r) {
+    // returns points; spawns children
+    if (r.r > 26) { addKids(r, 2, 20); return 20; }
+    if (r.r > 15) { addKids(r, 2, 12); return 50; }
+    return 100;
+  }
+  function addKids(r, n, nr) {
+    for (let i = 0; i < n; i++) {
+      const k = makeRock(r.x, r.y, nr, wave);
+      k.vx = r.vx + (Math.random() - 0.5) * 3;
+      k.vy = r.vy + (Math.random() - 0.5) * 3;
+      rocks.push(k);
+    }
+  }
+  function loop() {
+    if (!running) return;
+    // ship physics
+    if (keys.left) ship.a -= 0.09;
+    if (keys.right) ship.a += 0.09;
+    if (keys.thrust) {
+      ship.vx += Math.cos(ship.a) * 0.22;
+      ship.vy += Math.sin(ship.a) * 0.22;
+    }
+    ship.vx *= 0.99; ship.vy *= 0.99;
+    ship.x += ship.vx; ship.y += ship.vy;
+    wrap(ship);
+    if (invuln > 0) invuln--;
+
+    // bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx; b.y += b.vy; b.life--;
+      wrap(b);
+      let hit = false;
+      for (let j = rocks.length - 1; j >= 0; j--) {
+        if (dist(b, rocks[j]) < rocks[j].r) {
+          score += splitRock(rocks[j]);
+          scoreEl.textContent = score;
+          rocks.splice(j, 1);
+          hit = true;
+          break;
+        }
+      }
+      if (hit || b.life <= 0) bullets.splice(i, 1);
+    }
+    // rocks move + collide with ship
+    rocks.forEach(function (r) {
+      r.x += r.vx; r.y += r.vy; r.rot += r.vr; wrap(r);
+    });
+    if (invuln === 0) {
+      for (let j = 0; j < rocks.length; j++) {
+        if (dist(ship, rocks[j]) < rocks[j].r * 0.85) { killShip(); break; }
+      }
+    }
+    if (rocks.length === 0 && running) { wave++; spawnWave(); }
+
+    draw();
+    raf = requestAnimationFrame(loop);
+  }
+  function drawRock(r) {
+    ctx.save();
+    ctx.translate(r.x, r.y); ctx.rotate(r.rot);
+    ctx.strokeStyle = "#8a8aa8"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < r.verts.length; i++) {
+      const a = (i / r.verts.length) * TAU, rr = r.r * r.verts[i];
+      if (!i) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  }
+  function draw() {
+    ctx.fillStyle = "#05050c"; ctx.fillRect(0, 0, W, H);
+    rocks.forEach(drawRock);
+    ctx.fillStyle = "#ffe600";
+    bullets.forEach(function (b) {
+      ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, 7); ctx.fill();
+    });
+    // ship (blink while invulnerable)
+    if (invuln % 20 < 10) {
+      ctx.save();
+      ctx.translate(ship.x, ship.y); ctx.rotate(ship.a);
+      ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(14, 0); ctx.lineTo(-10, -10); ctx.lineTo(-6, 0); ctx.lineTo(-10, 10);
+      ctx.closePath(); ctx.stroke();
+      if (keys.thrust) {
+        ctx.fillStyle = "#ff2d95";
+        ctx.beginPath(); ctx.moveTo(-6, -5); ctx.lineTo(-16 - Math.random() * 8, 0); ctx.lineTo(-6, 5);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { keys.left = true; e.preventDefault(); }
+    else if (e.key === "ArrowRight") { keys.right = true; e.preventDefault(); }
+    else if (e.key === "ArrowUp") { keys.thrust = true; e.preventDefault(); }
+    else if (e.code === "Space") { fire(); e.preventDefault(); }
+  });
+  document.addEventListener("keyup", function (e) {
+    if (e.key === "ArrowLeft") keys.left = false;
+    else if (e.key === "ArrowRight") keys.right = false;
+    else if (e.key === "ArrowUp") keys.thrust = false;
+  });
+  document.querySelectorAll("#pad button").forEach(function (b) {
+    const k = b.dataset.k;
+    b.addEventListener("pointerdown", function (e) {
+      e.preventDefault();
+      if (k === "fire") fire();
+      else keys[k] = true;
+    });
+    b.addEventListener("pointerup", function () { if (k !== "fire") keys[k] = false; });
+    b.addEventListener("pointerleave", function () { if (k !== "fire") keys[k] = false; });
+  });
+  document.getElementById("start").addEventListener("click", reset);
+  // attract
+  ctx.fillStyle = "#05050c"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#8a8aa8"; ctx.font = "20px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("press start", W / 2, H / 2);
+})();
+</script>
+</body>
+</html>
