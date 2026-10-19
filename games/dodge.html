@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dodge — Neon Arcade</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#05051a radial-gradient(ellipse at top,#101040 0%,#05051a 70%);color:#dfe6ff;font-family:'Courier New',Courier,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
+.back{align-self:flex-start;color:#0ff;text-decoration:none;border:1px solid #0ff;border-radius:6px;padding:6px 12px;margin-bottom:10px;box-shadow:0 0 8px #0ff3;font-size:.9rem}
+.back:hover{background:#0ff;color:#001}
+h1{color:#0ff;text-shadow:0 0 12px #0ff,0 0 40px #0ff8;margin:6px 0 12px;font-size:1.7rem;letter-spacing:2px;text-align:center}
+.scorebar{display:flex;gap:22px;margin-bottom:14px;font-size:1.15rem;flex-wrap:wrap;justify-content:center}
+.scorebar b{color:#ffe14d;text-shadow:0 0 8px #ffe14d}
+button{font-family:inherit;background:transparent;color:#0ff;border:2px solid #0ff;border-radius:8px;padding:10px 22px;font-size:1rem;cursor:pointer;text-shadow:0 0 6px #0ff;box-shadow:0 0 10px #0ff4,inset 0 0 8px #0ff2;transition:all .15s;margin:4px}
+button:hover:not(:disabled){background:#0ff;color:#001;text-shadow:none;box-shadow:0 0 22px #0ff}
+button:disabled{opacity:.35;cursor:default}
+.msg{min-height:1.6em;margin:10px;color:#ff7bff;text-shadow:0 0 8px #f0f;text-align:center}
+#gameover{background:#0a0a24;border:2px solid #f0f;border-radius:12px;padding:20px 30px;text-align:center;box-shadow:0 0 24px #f0f6;margin-top:14px}
+#gameover h2{color:#f0f;text-shadow:0 0 12px #f0f;margin-bottom:8px}
+.hidden{display:none!important}
+.leaderboard{margin-top:18px;width:min(420px,92vw);border:1px solid #334;border-radius:10px;padding:12px 16px;background:#080818}
+.leaderboard h3{color:#ffe14d;font-size:1rem;margin-bottom:8px;text-shadow:0 0 8px #ffe14d88}
+.leaderboard ol{margin-left:20px;font-size:.95rem}
+.leaderboard li{margin:3px 0}
+.hint{color:#889;font-size:.85rem;margin-top:10px;text-align:center;max-width:480px}
+#cv{border:2px solid #0ff;border-radius:10px;box-shadow:0 0 22px #0ff4;background:#030312;touch-action:none;cursor:crosshair;max-width:92vw}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← HUB</a>
+<h1>🚀 DODGE</h1>
+<div class="scorebar"><span>Score: <b id="score">0</b></span><span>Time: <b id="time">0.0</b>s</span></div>
+<canvas id="cv" width="420" height="560"></canvas>
+<div class="msg" id="msg">Move with mouse, ← → keys, or touch. Don't get hit!</div>
+<button id="startBtn">▶ Start</button>
+<div id="gameover" class="hidden">
+  <h2>💥 CRASHED!</h2>
+  <p>Survived <b id="finalTime" style="color:#ffe14d">0</b>s — score: <b id="finalScore" style="color:#ffe14d">0</b></p>
+  <p style="margin-top:6px;color:#889">Saved to leaderboard as <span id="who"></span></p>
+  <button id="againBtn" style="margin-top:12px">↻ Play Again</button>
+</div>
+<div class="leaderboard"><h3>🏆 TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
+<p class="hint">Score = seconds survived × 10. Blocks fall faster the longer you last.</p>
+<script src="../js/arcade.js"></script>
+<script>
+if(!window.Arcade){window.Arcade={SUPABASE_URL:'',SUPABASE_ANON:'',playerName:()=>'Player',saveScore(){},getScores:async()=>[]};}
+const GAME_ID='dodge';
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d');
+const W=420,H=560;
+let shipX=W/2,keys={},running=false,blocks=[],startT=0,lastT=0,spawnAcc=0,elapsed=0,raf=null;
+const SHIP_W=42,SHIP_H=26,SHIP_Y=H-50;
+function reset(){shipX=W/2;blocks=[];elapsed=0;spawnAcc=0;$('score').textContent='0';$('time').textContent='0.0';}
+function spawnBlock(){const w=28+Math.random()*46;blocks.push({x:Math.random()*(W-w),y:-40,w:w,h:26+Math.random()*22,v:220+elapsed*9+Math.random()*60,c:['#f0f','#ff5fa2','#b14dff'][Math.floor(Math.random()*3)]});}
+function update(dt){
+  if(keys.left)shipX-=380*dt;if(keys.right)shipX+=380*dt;
+  shipX=Math.max(SHIP_W/2,Math.min(W-SHIP_W/2,shipX));
+  spawnAcc+=dt;const iv=Math.max(0.26,0.85-elapsed*0.012);
+  if(spawnAcc>iv){spawnAcc=0;spawnBlock();}
+  for(const b of blocks){b.y+=b.v*dt;}
+  blocks=blocks.filter(b=>b.y<H+60);
+  const sx=shipX-SHIP_W/2,sy=SHIP_Y;
+  for(const b of blocks){if(sx<b.x+b.w&&sx+SHIP_W>b.x&&sy<b.y+b.h&&sy+SHIP_H>b.y){return true;}}
+  return false;
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#0ff2';ctx.lineWidth=1;
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  for(const b of blocks){ctx.fillStyle=b.c;ctx.shadowColor=b.c;ctx.shadowBlur=12;ctx.fillRect(b.x,b.y,b.w,b.h);ctx.shadowBlur=0;}
+  ctx.fillStyle='#0ff';ctx.shadowColor='#0ff';ctx.shadowBlur=16;
+  ctx.beginPath();ctx.moveTo(shipX,SHIP_Y);ctx.lineTo(shipX-SHIP_W/2,SHIP_Y+SHIP_H);ctx.lineTo(shipX+SHIP_W/2,SHIP_Y+SHIP_H);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle='#ff7bff';ctx.fillRect(shipX-3,SHIP_Y+SHIP_H,6,10);
+}
+function loop(t){
+  if(!running)return;
+  const dt=Math.min(0.05,(t-lastT)/1000);lastT=t;
+  elapsed=(t-startT)/1000;
+  const hit=update(dt);
+  $('score').textContent=Math.floor(elapsed*10);
+  $('time').textContent=elapsed.toFixed(1);
+  draw();
+  if(hit){end();return;}
+  raf=requestAnimationFrame(loop);
+}
+function start(){reset();running=true;$('gameover').classList.add('hidden');$('startBtn').disabled=true;$('msg').textContent='Dodge!';startT=performance.now();lastT=startT;raf=requestAnimationFrame(loop);}
+function end(){running=false;cancelAnimationFrame(raf);const sc=Math.floor(elapsed*10);$('finalTime').textContent=elapsed.toFixed(1);$('finalScore').textContent=sc;$('who').textContent=Arcade.playerName();$('gameover').classList.remove('hidden');$('startBtn').disabled=false;$('msg').textContent='';try{Arcade.saveScore(GAME_ID,Arcade.playerName(),sc);}catch(e){}loadScores();}
+$('startBtn').addEventListener('click',start);
+$('againBtn').addEventListener('click',start);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.left=true;if(e.key==='ArrowRight')keys.right=true;});
+document.addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.left=false;if(e.key==='ArrowRight')keys.right=false;});
+cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();shipX=(e.clientX-r.left)*(W/r.width);});
+cv.addEventListener('touchmove',e=>{e.preventDefault();const r=cv.getBoundingClientRect();shipX=(e.touches[0].clientX-r.left)*(W/r.width);},{passive:false});
+async function loadScores(){try{const s=await Arcade.getScores(GAME_ID);const ol=$('scores');ol.innerHTML='';s.slice(0,10).forEach(r=>{const li=document.createElement('li');li.textContent=(r.player_name||r.playerName||r.name||'???')+' — '+r.score;ol.appendChild(li);});if(!s.length)ol.innerHTML='<li>No scores yet. Be the first!</li>';}catch(e){$('scores').innerHTML='<li>Leaderboard unavailable</li>';}}
+loadScores();draw();
+</script>
+</body>
+</html>
