@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pong — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #score { font-size: 1.6rem; margin: 8px 0; letter-spacing: 8px; }
+  #score span { color: #ffe600; }
+  canvas { background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; max-width: 94vw; }
+  #msg { min-height: 1.6em; margin: 8px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+  .hint { color: #8a8aa8; font-size: .8rem; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>🏓 Pong</h1>
+<div id="score"><span id="you">0</span>:<span id="ai">0</span></div>
+<canvas id="c" width="480" height="320"></canvas>
+<div id="msg">First to 7 wins</div>
+<button id="start">Start</button>
+<div class="hint">move mouse / drag finger to move your paddle (left)</div>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  const youEl = document.getElementById("you"), aiEl = document.getElementById("ai");
+  const msgEl = document.getElementById("msg");
+  const W = cv.width, H = cv.height, PH = 70, PW = 10, WIN = 7;
+  let py, ay, bx, by, bvx, bvy, you, ai, raf, running, scored;
+
+  function serve(dir) {
+    bx = W / 2; by = H / 2;
+    const a = (Math.random() * 0.6 - 0.3);
+    bvx = dir * 5; bvy = Math.sin(a) * 5;
+  }
+  function reset() {
+    py = ay = H / 2 - PH / 2; you = 0; ai = 0; running = true;
+    youEl.textContent = "0"; aiEl.textContent = "0";
+    msgEl.textContent = "First to 7 wins";
+    serve(Math.random() < 0.5 ? 1 : -1);
+    cancelAnimationFrame(raf);
+    loop();
+  }
+  function point(winner) {
+    if (winner === "you") { you++; youEl.textContent = you; }
+    else { ai++; aiEl.textContent = ai; }
+    scored = you + ai;
+    if (you >= WIN || ai >= WIN) return end(you >= WIN);
+    serve(winner === "you" ? -1 : 1);
+  }
+  function end(playerWon) {
+    running = false;
+    cancelAnimationFrame(raf);
+    msgEl.textContent = playerWon ? "🏆 You win " + you + "-" + ai + "!" : "🤖 AI wins " + ai + "-" + you + ".";
+    // score = player's points (higher is better)
+    Arcade.saveScore("pong", Arcade.playerName(), you * 100 + (playerWon ? 50 : 0));
+  }
+  function loop() {
+    if (!running) return;
+    // AI tracks ball with limited speed + slight error
+    const target = by - PH / 2 + Math.sin(Date.now() / 700) * 14;
+    ay += Math.max(-4.2, Math.min(4.2, target - ay));
+    ay = Math.max(0, Math.min(H - PH, ay));
+
+    bx += bvx; by += bvy;
+    if (by < 6 || by > H - 6) bvy *= -1;
+    // player paddle (left)
+    if (bx < PW + 6 && by > py && by < py + PH && bvx < 0) {
+      const rel = (by - py) / PH - 0.5;
+      bvx = Math.abs(bvx) * 1.05 + 0.2;
+      bvy = rel * 7;
+      bx = PW + 7;
+    }
+    // ai paddle (right)
+    if (bx > W - PW - 6 && by > ay && by < ay + PH && bvx > 0) {
+      const rel = (by - ay) / PH - 0.5;
+      bvx = -(Math.abs(bvx) * 1.05 + 0.2);
+      bvy = rel * 7;
+      bx = W - PW - 7;
+    }
+    if (bx < 0) point("ai");
+    else if (bx > W) point("you");
+
+    // draw
+    ctx.fillStyle = "#14142a"; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "#2a2a4a"; ctx.setLineDash([8, 8]);
+    ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#00e5ff"; ctx.fillRect(0, py, PW, PH);
+    ctx.fillStyle = "#ff2d95"; ctx.fillRect(W - PW, ay, PW, PH);
+    ctx.fillStyle = "#ffe600";
+    ctx.beginPath(); ctx.arc(bx, by, 6, 0, 7); ctx.fill();
+    raf = requestAnimationFrame(loop);
+  }
+  function moveTo(clientY) {
+    const r = cv.getBoundingClientRect();
+    py = ((clientY - r.top) / r.height) * H - PH / 2;
+    py = Math.max(0, Math.min(H - PH, py));
+  }
+  cv.addEventListener("mousemove", function (e) { moveTo(e.clientY); });
+  cv.addEventListener("touchmove", function (e) {
+    moveTo(e.changedTouches[0].clientY); e.preventDefault();
+  }, { passive: false });
+  document.getElementById("start").addEventListener("click", reset);
+  // idle attract screen
+  ctx.fillStyle = "#14142a"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#8a8aa8"; ctx.font = "20px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("press start", W / 2, H / 2);
+})();
+</script>
+</body>
+</html>
