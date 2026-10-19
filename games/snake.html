@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Snake — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #score { font-size: 1.2rem; color: #ffe600; margin: 8px 0; }
+  canvas { background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; max-width: 94vw; }
+  #msg { min-height: 1.6em; margin: 8px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>🐍 Snake</h1>
+<div id="score">Score: 0</div>
+<canvas id="c" width="400" height="400"></canvas>
+<div id="msg"></div>
+<button id="start">Start</button>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  const scoreEl = document.getElementById("score"), msgEl = document.getElementById("msg");
+  const startBtn = document.getElementById("start");
+  const N = 20, CELL = cv.width / N;
+  let snake, dir, nextDir, food, score, timer, speed, alive;
+
+  function place() {
+    while (true) {
+      const p = { x: (Math.random() * N) | 0, y: (Math.random() * N) | 0 };
+      if (!snake.some(function (s) { return s.x === p.x && s.y === p.y; })) return p;
+    }
+  }
+  function reset() {
+    snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    dir = nextDir = { x: 1, y: 0 };
+    score = 0; speed = 140; alive = true;
+    food = place();
+    scoreEl.textContent = "Score: 0"; msgEl.textContent = "";
+  }
+  function step() {
+    dir = nextDir;
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    if (head.x < 0 || head.y < 0 || head.x >= N || head.y >= N ||
+        snake.some(function (s) { return s.x === head.x && s.y === head.y; })) {
+      return die();
+    }
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      score += 10;
+      scoreEl.textContent = "Score: " + score;
+      food = place();
+      if (speed > 60) { speed -= 4; restartTimer(); }
+    } else {
+      snake.pop();
+    }
+    draw();
+  }
+  function die() {
+    alive = false;
+    clearInterval(timer);
+    msgEl.textContent = "Game over! Score: " + score;
+    Arcade.saveScore("snake", Arcade.playerName(), score);
+  }
+  function restartTimer() { clearInterval(timer); timer = setInterval(step, speed); }
+  function draw() {
+    ctx.fillStyle = "#14142a"; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = "#ff2d95";
+    ctx.fillRect(food.x * CELL + 2, food.y * CELL + 2, CELL - 4, CELL - 4);
+    snake.forEach(function (s, i) {
+      ctx.fillStyle = i === 0 ? "#00e5ff" : "#00b3cc";
+      ctx.fillRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2);
+    });
+  }
+  function turn(x, y) {
+    if (dir.x === -x && dir.y === -y) return; // no 180s
+    nextDir = { x: x, y: y };
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowUp") { turn(0, -1); e.preventDefault(); }
+    else if (e.key === "ArrowDown") { turn(0, 1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { turn(-1, 0); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { turn(1, 0); e.preventDefault(); }
+  });
+  // touch swipe
+  let tx = 0, ty = 0;
+  cv.addEventListener("touchstart", function (e) {
+    const t = e.changedTouches[0]; tx = t.clientX; ty = t.clientY;
+  }, { passive: true });
+  cv.addEventListener("touchend", function (e) {
+    const t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+    if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
+    else turn(0, dy > 0 ? 1 : -1);
+    e.preventDefault();
+  }, { passive: false });
+  startBtn.addEventListener("click", function () { reset(); draw(); restartTimer(); });
+  reset(); draw();
+})();
+</script>
+</body>
+</html>
