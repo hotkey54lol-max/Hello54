@@ -1,0 +1,4 @@
+node_modules/
+netlify/functions/node_modules/
+*.log
+.DS_Store
