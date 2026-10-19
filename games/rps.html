@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rock Paper Scissors — Neon Arcade</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#05051a radial-gradient(ellipse at top,#101040 0%,#05051a 70%);color:#dfe6ff;font-family:'Courier New',Courier,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
+.back{align-self:flex-start;color:#0ff;text-decoration:none;border:1px solid #0ff;border-radius:6px;padding:6px 12px;margin-bottom:10px;box-shadow:0 0 8px #0ff3;font-size:.9rem}
+.back:hover{background:#0ff;color:#001}
+h1{color:#0ff;text-shadow:0 0 12px #0ff,0 0 40px #0ff8;margin:6px 0 12px;font-size:1.7rem;letter-spacing:2px;text-align:center}
+.scorebar{display:flex;gap:18px;margin-bottom:14px;font-size:1.05rem;flex-wrap:wrap;justify-content:center}
+.scorebar b{color:#ffe14d;text-shadow:0 0 8px #ffe14d}
+button{font-family:inherit;background:transparent;color:#0ff;border:2px solid #0ff;border-radius:8px;padding:10px 22px;font-size:1rem;cursor:pointer;text-shadow:0 0 6px #0ff;box-shadow:0 0 10px #0ff4,inset 0 0 8px #0ff2;transition:all .15s;margin:4px}
+button:hover:not(:disabled){background:#0ff;color:#001;text-shadow:none;box-shadow:0 0 22px #0ff}
+button:disabled{opacity:.35;cursor:default}
+.msg{min-height:1.6em;margin:10px;color:#ff7bff;text-shadow:0 0 8px #f0f;text-align:center;font-size:1.1rem}
+#gameover{background:#0a0a24;border:2px solid #f0f;border-radius:12px;padding:20px 30px;text-align:center;box-shadow:0 0 24px #f0f6;margin-top:14px}
+#gameover h2{color:#f0f;text-shadow:0 0 12px #f0f;margin-bottom:8px}
+.hidden{display:none!important}
+.leaderboard{margin-top:18px;width:min(420px,92vw);border:1px solid #334;border-radius:10px;padding:12px 16px;background:#080818}
+.leaderboard h3{color:#ffe14d;font-size:1rem;margin-bottom:8px;text-shadow:0 0 8px #ffe14d88}
+.leaderboard ol{margin-left:20px;font-size:.95rem}
+.leaderboard li{margin:3px 0}
+.hint{color:#889;font-size:.85rem;margin-top:10px;text-align:center;max-width:480px}
+#arena{display:flex;gap:26px;align-items:center;margin:12px 0}
+.fighter{font-size:4rem;background:#0a0a24;border:2px solid #335;border-radius:14px;width:120px;height:120px;display:flex;align-items:center;justify-content:center}
+.fighter.you{border-color:#0ff;box-shadow:0 0 16px #0ff4}
+.fighter.cpu{border-color:#f0f;box-shadow:0 0 16px #f0f4}
+.vs{font-size:1.6rem;color:#ffe14d;text-shadow:0 0 10px #ffe14d}
+#choices{display:flex;gap:12px;margin:8px 0}
+#choices button{font-size:2.2rem;padding:10px 18px}
+#log{max-width:440px;margin-top:6px;font-size:.9rem;color:#99a;text-align:center;min-height:2.2em}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← HUB</a>
+<h1>✂️ ROCK PAPER SCISSORS</h1>
+<div class="scorebar"><span>Round <b id="round">0</b>/5</span><span>Wins <b id="w">0</b></span><span>Losses <b id="l">0</b></span><span>Ties <b id="t">0</b></span></div>
+<div id="arena">
+  <div><div class="fighter you" id="youPick">❔</div><div style="text-align:center;color:#0ff;margin-top:4px">YOU</div></div>
+  <div class="vs">VS</div>
+  <div><div class="fighter cpu" id="cpuPick">❔</div><div style="text-align:center;color:#f0f;margin-top:4px">CPU</div></div>
+</div>
+<div id="choices">
+  <button data-c="rock" title="Rock">🪨</button>
+  <button data-c="paper" title="Paper">📄</button>
+  <button data-c="scissors" title="Scissors">✂️</button>
+</div>
+<div class="msg" id="msg">Best of 5 — pick your weapon!</div>
+<div id="log"></div>
+<div id="gameover" class="hidden">
+  <h2 id="endTitle">MATCH OVER</h2>
+  <p><b id="finalWL" style="color:#ffe14d"></b></p>
+  <p>Score: <b id="finalScore" style="color:#ffe14d">0</b> <span style="color:#889;font-size:.85rem">(wins×100 + ties×10)</span></p>
+  <p style="margin-top:6px;color:#889">Saved to leaderboard as <span id="who"></span></p>
+  <button id="againBtn" style="margin-top:12px">↻ Play Again</button>
+</div>
+<div class="leaderboard"><h3>🏆 TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
+<p class="hint">Win = 100 pts, tie = 10 pts. The CPU is gloriously random.</p>
+<script src="../js/arcade.js"></script>
+<script>
+if(!window.Arcade){window.Arcade={SUPABASE_URL:'',SUPABASE_ANON:'',playerName:()=>'Player',saveScore(){},getScores:async()=>[]};}
+const GAME_ID='rps';
+const $=id=>document.getElementById(id);
+const EMOJI={rock:'🪨',paper:'📄',scissors:'✂️'};
+const BEATS={rock:'scissors',paper:'rock',scissors:'paper'};
+let round=0,w=0,l=0,t=0,over=false;
+function upd(){$('round').textContent=Math.min(round,5);$('w').textContent=w;$('l').textContent=l;$('t').textContent=t;}
+function setBtns(on){document.querySelectorAll('#choices button').forEach(b=>b.disabled=!on);}
+function play(choice){
+  if(over||round>=5)return;
+  const cpu=['rock','paper','scissors'][Math.floor(Math.random()*3)];
+  $('youPick').textContent=EMOJI[choice];$('cpuPick').textContent=EMOJI[cpu];
+  round++;let res;
+  if(choice===cpu){t++;res='tie 🤝';}
+  else if(BEATS[choice]===cpu){w++;res='you win! 🎉';}
+  else{l++;res='CPU wins 😤';}
+  $('msg').textContent='Round '+round+': '+res;
+  $('log').textContent='You: '+choice+' — CPU: '+cpu;
+  upd();
+  if(round>=5)end();
+}
+function end(){over=true;setBtns(false);const score=w*100+t*10;
+  $('endTitle').textContent=w>l?'🏆 YOU WIN THE MATCH!':(w<l?'🤖 CPU TAKES IT':'🤝 DEAD EVEN');
+  $('finalWL').textContent=w+'W – '+l+'L – '+t+'T';$('finalScore').textContent=score;
+  $('who').textContent=Arcade.playerName();$('gameover').classList.remove('hidden');
+  try{Arcade.saveScore(GAME_ID,Arcade.playerName(),score);}catch(e){}loadScores();}
+function start(){round=0;w=0;l=0;t=0;over=false;upd();setBtns(true);$('youPick').textContent='❔';$('cpuPick').textContent='❔';$('msg').textContent='Best of 5 — pick your weapon!';$('log').textContent='';$('gameover').classList.add('hidden');}
+document.querySelectorAll('#choices button').forEach(b=>b.addEventListener('click',()=>play(b.dataset.c)));
+$('againBtn').addEventListener('click',start);
+async function loadScores(){try{const s=await Arcade.getScores(GAME_ID);const ol=$('scores');ol.innerHTML='';s.slice(0,10).forEach(r=>{const li=document.createElement('li');li.textContent=(r.player_name||r.playerName||r.name||'???')+' — '+r.score;ol.appendChild(li);});if(!s.length)ol.innerHTML='<li>No scores yet. Be the first!</li>';}catch(e){$('scores').innerHTML='<li>Leaderboard unavailable</li>';}}
+start();loadScores();
+</script>
+</body>
+</html>
