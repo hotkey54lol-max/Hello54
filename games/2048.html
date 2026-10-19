@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>2048 — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #score { font-size: 1.2rem; color: #ffe600; margin: 8px 0; }
+  #board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: min(92vw, 400px);
+           margin: 0 auto; background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; padding: 8px; }
+  .cell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+          font-weight: 800; font-size: clamp(1.1rem, 6vw, 1.6rem); background: #23233d; color: #e8e8f0; }
+  #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>🔢 2048</h1>
+<div id="score">Score: 0</div>
+<div id="board"></div>
+<div id="msg"></div>
+<button id="start">New Game</button>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const boardEl = document.getElementById("board");
+  const scoreEl = document.getElementById("score"), msgEl = document.getElementById("msg");
+  const COLORS = { 2: "#3a3a5c", 4: "#4a4a6c", 8: "#f2b179", 16: "#f59563", 32: "#f67c5f",
+    64: "#f65e3b", 128: "#edcf72", 256: "#edcc61", 512: "#edc850", 1024: "#edc53f", 2048: "#edc22e" };
+  let grid, score, over, won;
+
+  function empty() { const g = []; for (let i = 0; i < 16; i++) g.push(0); return g; }
+  function reset() {
+    grid = empty(); score = 0; over = false; won = false;
+    msgEl.textContent = ""; scoreEl.textContent = "Score: 0";
+    spawn(); spawn(); render();
+  }
+  function empties() {
+    const r = [];
+    grid.forEach(function (v, i) { if (!v) r.push(i); });
+    return r;
+  }
+  function spawn() {
+    const e = empties();
+    if (!e.length) return;
+    grid[e[(Math.random() * e.length) | 0]] = Math.random() < 0.9 ? 2 : 4;
+  }
+  function slide(row) {
+    const a = row.filter(function (v) { return v; });
+    let gained = 0;
+    for (let i = 0; i < a.length - 1; i++) {
+      if (a[i] === a[i + 1]) { a[i] *= 2; gained += a[i]; a.splice(i + 1, 1); }
+    }
+    while (a.length < 4) a.push(0);
+    return { row: a, gained: gained };
+  }
+  function move(dx, dy) {
+    if (over) return;
+    let moved = false, gained = 0;
+    for (let l = 0; l < 4; l++) {
+      let idx = [];
+      for (let k = 0; k < 4; k++) idx.push(dy ? k * 4 + l : l * 4 + k);
+      if (dx > 0 || dy > 0) idx.reverse();
+      const before = idx.map(function (i) { return grid[i]; });
+      const r = slide(before);
+      gained += r.gained;
+      r.row.forEach(function (v, k) {
+        if (grid[idx[k]] !== v) moved = true;
+        grid[idx[k]] = v;
+      });
+    }
+    if (!moved) return;
+    score += gained;
+    scoreEl.textContent = "Score: " + score;
+    spawn(); render();
+    if (!won && grid.some(function (v) { return v >= 2048; })) {
+      won = true; msgEl.textContent = "🎉 You hit 2048! Keep going!";
+    }
+    if (!canMove()) {
+      over = true;
+      msgEl.textContent = "Game over! Final score: " + score;
+      Arcade.saveScore("2048", Arcade.playerName(), score);
+    }
+  }
+  function canMove() {
+    if (empties().length) return true;
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      const v = grid[y * 4 + x];
+      if (x < 3 && grid[y * 4 + x + 1] === v) return true;
+      if (y < 3 && grid[(y + 1) * 4 + x] === v) return true;
+    }
+    return false;
+  }
+  function render() {
+    boardEl.innerHTML = "";
+    grid.forEach(function (v) {
+      const d = document.createElement("div");
+      d.className = "cell";
+      d.textContent = v || "";
+      d.style.background = COLORS[v] || "#3c3a32";
+      if (v > 4) d.style.color = "#fff";
+      boardEl.appendChild(d);
+    });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { move(-1, 0); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { move(1, 0); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { move(0, -1); e.preventDefault(); }
+    else if (e.key === "ArrowDown") { move(0, 1); e.preventDefault(); }
+  });
+  let tx = 0, ty = 0;
+  document.addEventListener("touchstart", function (e) {
+    const t = e.changedTouches[0]; tx = t.clientX; ty = t.clientY;
+  }, { passive: true });
+  document.addEventListener("touchend", function (e) {
+    const t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
+    if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1, 0);
+    else move(0, dy > 0 ? 1 : -1);
+  }, { passive: true });
+  document.getElementById("start").addEventListener("click", reset);
+  reset();
+})();
+</script>
+</body>
+</html>
