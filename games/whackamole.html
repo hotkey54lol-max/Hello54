@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whack-a-Mole — Neon Arcade</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#05051a radial-gradient(ellipse at top,#101040 0%,#05051a 70%);color:#dfe6ff;font-family:'Courier New',Courier,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
+.back{align-self:flex-start;color:#0ff;text-decoration:none;border:1px solid #0ff;border-radius:6px;padding:6px 12px;margin-bottom:10px;box-shadow:0 0 8px #0ff3;font-size:.9rem}
+.back:hover{background:#0ff;color:#001}
+h1{color:#0ff;text-shadow:0 0 12px #0ff,0 0 40px #0ff8;margin:6px 0 12px;font-size:1.7rem;letter-spacing:2px;text-align:center}
+.scorebar{display:flex;gap:22px;margin-bottom:14px;font-size:1.15rem;flex-wrap:wrap;justify-content:center}
+.scorebar b{color:#ffe14d;text-shadow:0 0 8px #ffe14d}
+#time.low{color:#f66;text-shadow:0 0 10px #f66}
+button{font-family:inherit;background:transparent;color:#0ff;border:2px solid #0ff;border-radius:8px;padding:10px 22px;font-size:1rem;cursor:pointer;text-shadow:0 0 6px #0ff;box-shadow:0 0 10px #0ff4,inset 0 0 8px #0ff2;transition:all .15s;margin:4px}
+button:hover:not(:disabled){background:#0ff;color:#001;text-shadow:none;box-shadow:0 0 22px #0ff}
+button:disabled{opacity:.35;cursor:default}
+.msg{min-height:1.6em;margin:10px;color:#ff7bff;text-shadow:0 0 8px #f0f;text-align:center}
+#gameover{background:#0a0a24;border:2px solid #f0f;border-radius:12px;padding:20px 30px;text-align:center;box-shadow:0 0 24px #f0f6;margin-top:14px}
+#gameover h2{color:#f0f;text-shadow:0 0 12px #f0f;margin-bottom:8px}
+.hidden{display:none!important}
+.leaderboard{margin-top:18px;width:min(420px,92vw);border:1px solid #334;border-radius:10px;padding:12px 16px;background:#080818}
+.leaderboard h3{color:#ffe14d;font-size:1rem;margin-bottom:8px;text-shadow:0 0 8px #ffe14d88}
+.leaderboard ol{margin-left:20px;font-size:.95rem}
+.leaderboard li{margin:3px 0}
+.hint{color:#889;font-size:.85rem;margin-top:10px;text-align:center;max-width:480px}
+#grid{display:grid;grid-template-columns:repeat(3,96px);gap:12px;margin:8px 0}
+.hole{width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 50% 35%,#1a1a3a,#05051a);border:2px solid #335;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden}
+.hole:hover{border-color:#0ff8}
+.mole{font-size:2.6rem;animation:pop .18s ease-out;cursor:pointer;user-select:none;line-height:1}
+.mole.golden{filter:drop-shadow(0 0 10px #ffe14d)}
+@keyframes pop{from{transform:translateY(60%) scale(.6)}to{transform:translateY(0) scale(1)}}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← HUB</a>
+<h1>🐹 WHACK-A-MOLE</h1>
+<div class="scorebar"><span>Score: <b id="score">0</b></span><span>Time: <b id="time">30</b>s</span></div>
+<div id="grid"></div>
+<div class="msg" id="msg">Whack the moles! 🐹 = 10 pts, 🌟 = 30 pts</div>
+<button id="startBtn">▶ Start (30s)</button>
+<div id="gameover" class="hidden">
+  <h2>TIME'S UP!</h2>
+  <p>Final score: <b id="finalScore" style="color:#ffe14d">0</b></p>
+  <p style="margin-top:6px;color:#889">Saved to leaderboard as <span id="who"></span></p>
+  <button id="againBtn" style="margin-top:12px">↻ Play Again</button>
+</div>
+<div class="leaderboard"><h3>🏆 TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
+<p class="hint">30 seconds on the clock. Moles get faster as time runs out!</p>
+<script src="../js/arcade.js"></script>
+<script>
+if(!window.Arcade){window.Arcade={SUPABASE_URL:'',SUPABASE_ANON:'',playerName:()=>'Player',saveScore(){},getScores:async()=>[]};}
+const GAME_ID='whackamole';
+const $=id=>document.getElementById(id);
+const grid=$('grid');
+for(let i=0;i<9;i++){const d=document.createElement('div');d.className='hole';grid.appendChild(d);}
+const holes=[...grid.children];
+let score=0,timeLeft=30,tickTimer=null,spawnTimer=null,playing=false;
+function upd(){$('score').textContent=score;$('time').textContent=timeLeft;$('time').classList.toggle('low',timeLeft<=10);}
+function spawn(){if(!playing)return;const free=holes.filter(h=>!h.querySelector('.mole'));if(free.length){const hole=free[Math.floor(Math.random()*free.length)];const golden=Math.random()<0.12;const m=document.createElement('div');m.className='mole'+(golden?' golden':'');m.textContent=golden?'🌟':'🐹';m.addEventListener('pointerdown',e=>{e.stopPropagation();if(!playing)return;score+=golden?30:10;upd();m.remove();},{once:true});hole.appendChild(m);const vis=Math.max(450,850-(30-timeLeft)*12);setTimeout(()=>m.remove(),vis);}const next=Math.max(320,680-(30-timeLeft)*10);spawnTimer=setTimeout(spawn,next);}
+function start(){score=0;timeLeft=30;playing=true;holes.forEach(h=>h.innerHTML='');$('gameover').classList.add('hidden');$('startBtn').disabled=true;upd();$('msg').textContent='Go go go!';spawn();tickTimer=setInterval(()=>{timeLeft--;upd();if(timeLeft<=0)end();},1000);}
+function end(){playing=false;clearInterval(tickTimer);clearTimeout(spawnTimer);holes.forEach(h=>h.innerHTML='');$('finalScore').textContent=score;$('who').textContent=Arcade.playerName();$('gameover').classList.remove('hidden');$('startBtn').disabled=false;$('msg').textContent='';try{Arcade.saveScore(GAME_ID,Arcade.playerName(),score);}catch(e){}loadScores();}
+$('startBtn').addEventListener('click',start);
+$('againBtn').addEventListener('click',start);
+async function loadScores(){try{const s=await Arcade.getScores(GAME_ID);const ol=$('scores');ol.innerHTML='';s.slice(0,10).forEach(r=>{const li=document.createElement('li');li.textContent=(r.player_name||r.playerName||r.name||'???')+' — '+r.score;ol.appendChild(li);});if(!s.length)ol.innerHTML='<li>No scores yet. Be the first!</li>';}catch(e){$('scores').innerHTML='<li>Leaderboard unavailable</li>';}}
+loadScores();
+</script>
+</body>
+</html>
