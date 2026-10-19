@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tetris — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #hud { display: flex; justify-content: center; gap: 28px; margin: 8px 0; font-size: 1.05rem; }
+  #hud span { color: #ffe600; font-weight: 700; }
+  canvas { background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; max-height: 62vh; }
+  #msg { min-height: 1.6em; margin: 8px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+  #pad { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; justify-content: center; margin-top: 8px; }
+  #pad button { padding: 12px 0; font-size: 1.2rem; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>🧱 Tetris</h1>
+<div id="hud"><div>Score <span id="score">0</span></div><div>Level <span id="level">1</span></div><div>Lines <span id="lines">0</span></div></div>
+<canvas id="c" width="240" height="480"></canvas>
+<div id="msg"></div>
+<button id="start">Start</button>
+<div id="pad">
+  <button data-k="left">◀</button><button data-k="rot">⟳</button><button data-k="right">▶</button>
+  <button data-k="down" style="grid-column: 2">▼</button>
+</div>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  const COLS = 10, ROWS = 20, S = 24;
+  const scoreEl = document.getElementById("score"), levelEl = document.getElementById("level"),
+        linesEl = document.getElementById("lines"), msgEl = document.getElementById("msg");
+  const SHAPES = [
+    { m: [[1,1,1,1]], c: "#00e5ff" },
+    { m: [[1,1],[1,1]], c: "#ffe600" },
+    { m: [[0,1,0],[1,1,1]], c: "#9b59b6" },
+    { m: [[0,1,1],[1,1,0]], c: "#2ecc71" },
+    { m: [[1,1,0],[0,1,1]], c: "#ff2d95" },
+    { m: [[1,0,0],[1,1,1]], c: "#3498db" },
+    { m: [[0,0,1],[1,1,1]], c: "#e67e22" },
+  ];
+  let grid, cur, score, lines, level, timer, alive;
+
+  function reset() {
+    grid = [];
+    for (let y = 0; y < ROWS; y++) grid.push(new Array(COLS).fill(0));
+    score = 0; lines = 0; level = 1; alive = true;
+    msgEl.textContent = "";
+    update();
+    spawn();
+    restartTimer();
+  }
+  function update() {
+    scoreEl.textContent = score; linesEl.textContent = lines; levelEl.textContent = level;
+  }
+  function spawn() {
+    const s = SHAPES[(Math.random() * SHAPES.length) | 0];
+    cur = { m: s.m.map(function (r) { return r.slice(); }), c: s.c,
+            x: ((COLS - s.m[0].length) / 2) | 0, y: 0 };
+    if (collide(cur.m, cur.x, cur.y)) die();
+  }
+  function collide(m, px, py) {
+    for (let y = 0; y < m.length; y++) for (let x = 0; x < m[y].length; x++) {
+      if (!m[y][x]) continue;
+      const gx = px + x, gy = py + y;
+      if (gx < 0 || gx >= COLS || gy >= ROWS) return true;
+      if (gy >= 0 && grid[gy][gx]) return true;
+    }
+    return false;
+  }
+  function merge() {
+    cur.m.forEach(function (row, y) { row.forEach(function (v, x) {
+      if (v && cur.y + y >= 0) grid[cur.y + y][cur.x + x] = cur.c;
+    }); });
+  }
+  function clearLines() {
+    let n = 0;
+    for (let y = ROWS - 1; y >= 0; y--) {
+      if (grid[y].every(Boolean)) {
+        grid.splice(y, 1);
+        grid.unshift(new Array(COLS).fill(0));
+        n++; y++;
+      }
+    }
+    if (n) {
+      lines += n;
+      score += [0, 100, 300, 500, 800][n] * level;
+      const nl = ((lines / 10) | 0) + 1;
+      if (nl !== level) { level = nl; restartTimer(); }
+      update();
+    }
+  }
+  function drop() {
+    if (!cur) return;
+    if (!collide(cur.m, cur.x, cur.y + 1)) cur.y++;
+    else { merge(); clearLines(); spawn(); }
+    draw();
+  }
+  function rot() {
+    const m = cur.m, rows = m.length, cols = m[0].length;
+    const out = [];
+    for (let x = 0; x < cols; x++) {
+      const row = [];
+      for (let y = rows - 1; y >= 0; y--) row.push(m[y][x]);
+      out.push(row);
+    }
+    // wall kick attempts
+    const kicks = [0, -1, 1, -2, 2];
+    for (let k = 0; k < kicks.length; k++) {
+      if (!collide(out, cur.x + kicks[k], cur.y)) { cur.m = out; cur.x += kicks[k]; draw(); return; }
+    }
+  }
+  function restartTimer() {
+    clearInterval(timer);
+    timer = setInterval(drop, Math.max(80, 800 - (level - 1) * 70));
+  }
+  function die() {
+    alive = false; clearInterval(timer);
+    msgEl.textContent = "Game over! Score: " + score;
+    Arcade.saveScore("tetris", Arcade.playerName(), score);
+  }
+  function draw() {
+    ctx.fillStyle = "#14142a"; ctx.fillRect(0, 0, cv.width, cv.height);
+    function block(x, y, c) {
+      ctx.fillStyle = c; ctx.fillRect(x * S + 1, y * S + 1, S - 2, S - 2);
+    }
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++)
+      if (grid[y][x]) block(x, y, grid[y][x]);
+    if (cur) cur.m.forEach(function (row, y) { row.forEach(function (v, x) {
+      if (v && cur.y + y >= 0) block(cur.x + x, cur.y + y, cur.c);
+    }); });
+  }
+  function key(k) {
+    if (!alive || !cur) return;
+    if (k === "left" && !collide(cur.m, cur.x - 1, cur.y)) cur.x--;
+    else if (k === "right" && !collide(cur.m, cur.x + 1, cur.y)) cur.x++;
+    else if (k === "down") drop();
+    else if (k === "rot") rot();
+    else return;
+    draw();
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { key("left"); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { key("right"); e.preventDefault(); }
+    else if (e.key === "ArrowDown") { key("down"); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { key("rot"); e.preventDefault(); }
+  });
+  document.getElementById("pad").addEventListener("click", function (e) {
+    const b = e.target.closest("button");
+    if (b) key(b.dataset.k);
+  });
+  document.getElementById("start").addEventListener("click", reset);
+  reset(); draw();
+})();
+</script>
+</body>
+</html>
