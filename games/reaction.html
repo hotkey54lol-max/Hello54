@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reaction Test — Neon Arcade</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#05051a radial-gradient(ellipse at top,#101040 0%,#05051a 70%);color:#dfe6ff;font-family:'Courier New',Courier,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
+.back{align-self:flex-start;color:#0ff;text-decoration:none;border:1px solid #0ff;border-radius:6px;padding:6px 12px;margin-bottom:10px;box-shadow:0 0 8px #0ff3;font-size:.9rem}
+.back:hover{background:#0ff;color:#001}
+h1{color:#0ff;text-shadow:0 0 12px #0ff,0 0 40px #0ff8;margin:6px 0 12px;font-size:1.7rem;letter-spacing:2px;text-align:center}
+.scorebar{display:flex;gap:22px;margin-bottom:14px;font-size:1.15rem;flex-wrap:wrap;justify-content:center}
+.scorebar b{color:#ffe14d;text-shadow:0 0 8px #ffe14d}
+button{font-family:inherit;background:transparent;color:#0ff;border:2px solid #0ff;border-radius:8px;padding:10px 22px;font-size:1rem;cursor:pointer;text-shadow:0 0 6px #0ff;box-shadow:0 0 10px #0ff4,inset 0 0 8px #0ff2;transition:all .15s;margin:4px}
+button:hover:not(:disabled){background:#0ff;color:#001;text-shadow:none;box-shadow:0 0 22px #0ff}
+button:disabled{opacity:.35;cursor:default}
+#gameover{background:#0a0a24;border:2px solid #f0f;border-radius:12px;padding:20px 30px;text-align:center;box-shadow:0 0 24px #f0f6;margin-top:14px}
+#gameover h2{color:#f0f;text-shadow:0 0 12px #f0f;margin-bottom:8px}
+.hidden{display:none!important}
+.leaderboard{margin-top:18px;width:min(420px,92vw);border:1px solid #334;border-radius:10px;padding:12px 16px;background:#080818}
+.leaderboard h3{color:#ffe14d;font-size:1rem;margin-bottom:8px;text-shadow:0 0 8px #ffe14d88}
+.leaderboard ol{margin-left:20px;font-size:.95rem}
+.leaderboard li{margin:3px 0}
+.hint{color:#889;font-size:.85rem;margin-top:10px;text-align:center;max-width:480px}
+#pad{width:min(420px,92vw);height:240px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;text-align:center;cursor:pointer;user-select:none;margin:8px 0;border:3px solid #334;background:#101024;transition:background .1s;padding:16px}
+#pad.waiting{background:#3a0a0a;border-color:#f66;color:#fcc}
+#pad.ready{background:#0a3a0a;border-color:#0f0;color:#cfc;box-shadow:0 0 30px #0f06}
+#rounds{display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;justify-content:center}
+.rchip{border:1px solid #448;border-radius:8px;padding:6px 12px;font-size:.9rem;background:#0a0a20}
+.rchip b{color:#ffe14d}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← HUB</a>
+<h1>⚡ REACTION TEST</h1>
+<div class="scorebar"><span>Round: <b id="round">0</b>/5</span><span>Best: <b id="best">—</b></span></div>
+<div id="pad">Press START, then click when it turns GREEN</div>
+<div id="rounds"></div>
+<button id="startBtn">▶ Start</button>
+<div id="gameover" class="hidden">
+  <h2>RESULTS</h2>
+  <p>Best reaction: <b id="finalMs" style="color:#ffe14d">—</b> ms</p>
+  <p>Score: <b id="finalScore" style="color:#ffe14d">0</b> <span style="color:#889;font-size:.85rem">(10000 − ms)</span></p>
+  <p style="margin-top:6px;color:#889">Saved to leaderboard as <span id="who"></span></p>
+  <button id="againBtn" style="margin-top:12px">↻ Try Again</button>
+</div>
+<div class="leaderboard"><h3>🏆 TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
+<p class="hint">5 rounds. Click too early = 0 for that round. Score = 10000 − your best ms.</p>
+<script src="../js/arcade.js"></script>
+<script>
+if(!window.Arcade){window.Arcade={SUPABASE_URL:'',SUPABASE_ANON:'',playerName:()=>'Player',saveScore(){},getScores:async()=>[]};}
+const GAME_ID='reaction';
+const $=id=>document.getElementById(id);
+const pad=$('pad');
+let state='idle',t0=0,timer=null,round=0,results=[];
+function setPad(cls,txt){pad.className=cls;pad.textContent=txt;}
+function renderRounds(){const d=$('rounds');d.innerHTML='';results.forEach((r,i)=>{const c=document.createElement('div');c.className='rchip';c.innerHTML='R'+(i+1)+': '+(r>0?'<b>'+r+'ms</b>':'<b style="color:#f66">foul</b>');d.appendChild(c);});}
+function nextRound(){if(round>=5){finish();return;}$('round').textContent=round+1;state='waiting';setPad('waiting','Wait for GREEN…');timer=setTimeout(()=>{state='ready';setPad('ready','CLICK NOW!');t0=performance.now();},1500+Math.random()*2500);}
+function start(){round=0;results=[];renderRounds();$('gameover').classList.add('hidden');$('startBtn').disabled=true;$('best').textContent='—';nextRound();}
+pad.addEventListener('click',()=>{
+  if(state==='waiting'){clearTimeout(timer);results.push(0);round++;renderRounds();setPad('','Too soon! Foul.');setTimeout(nextRound,900);}
+  else if(state==='ready'){const ms=Math.round(performance.now()-t0);const pts=Math.max(0,10000-ms);results.push(pts);round++;renderRounds();const best=Math.max(...results);$('best').textContent=(10000-best)+'ms';setPad('',ms+' ms — '+(pts>0?pts+' pts':'foul'));setTimeout(nextRound,1100);}
+});
+function finish(){state='idle';setPad('','Done!');const best=Math.max(...results,0);const bestMs=best>0?(10000-best):0;$('finalMs').textContent=best>0?bestMs:'—';$('finalScore').textContent=best;$('who').textContent=Arcade.playerName();$('gameover').classList.remove('hidden');$('startBtn').disabled=false;try{Arcade.saveScore(GAME_ID,Arcade.playerName(),best);}catch(e){}loadScores();}
+$('startBtn').addEventListener('click',start);
+$('againBtn').addEventListener('click',start);
+async function loadScores(){try{const s=await Arcade.getScores(GAME_ID);const ol=$('scores');ol.innerHTML='';s.slice(0,10).forEach(r=>{const li=document.createElement('li');li.textContent=(r.player_name||r.playerName||r.name||'???')+' — '+r.score;ol.appendChild(li);});if(!s.length)ol.innerHTML='<li>No scores yet. Be the first!</li>';}catch(e){$('scores').innerHTML='<li>Leaderboard unavailable</li>';}}
+loadScores();
+</script>
+</body>
+</html>
