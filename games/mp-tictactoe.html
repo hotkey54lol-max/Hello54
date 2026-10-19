@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Online Tic-Tac-Toe — Neon Arcade</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#05051a radial-gradient(ellipse at top,#101040 0%,#05051a 70%);color:#dfe6ff;font-family:'Courier New',Courier,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
+.back{align-self:flex-start;color:#0ff;text-decoration:none;border:1px solid #0ff;border-radius:6px;padding:6px 12px;margin-bottom:10px;box-shadow:0 0 8px #0ff3;font-size:.9rem}
+.back:hover{background:#0ff;color:#001}
+h1{color:#f0f;text-shadow:0 0 12px #f0f,0 0 40px #f0f8;margin:6px 0 12px;font-size:1.7rem;letter-spacing:2px;text-align:center}
+.badge{display:inline-block;background:#f0f;color:#001;font-weight:bold;border-radius:20px;padding:2px 12px;font-size:.75rem;margin-bottom:8px;box-shadow:0 0 14px #f0f}
+button{font-family:inherit;background:transparent;color:#0ff;border:2px solid #0ff;border-radius:8px;padding:10px 22px;font-size:1rem;cursor:pointer;text-shadow:0 0 6px #0ff;box-shadow:0 0 10px #0ff4,inset 0 0 8px #0ff2;transition:all .15s;margin:4px}
+button:hover:not(:disabled){background:#0ff;color:#001;text-shadow:none;box-shadow:0 0 22px #0ff}
+button:disabled{opacity:.35;cursor:default}
+button.pink{color:#f0f;border-color:#f0f;text-shadow:0 0 6px #f0f;box-shadow:0 0 10px #f0f4,inset 0 0 8px #f0f2}
+button.pink:hover:not(:disabled){background:#f0f;color:#001;box-shadow:0 0 22px #f0f}
+.msg{min-height:1.6em;margin:10px;color:#ff7bff;text-shadow:0 0 8px #f0f;text-align:center;max-width:480px}
+.msg.ok{color:#0f0;text-shadow:0 0 8px #0f0}
+.msg.err{color:#f66;text-shadow:0 0 8px #f66}
+.hidden{display:none!important}
+.hint{color:#889;font-size:.85rem;margin-top:10px;text-align:center;max-width:480px}
+#lobby{background:#0a0a24;border:1px solid #335;border-radius:12px;padding:22px 26px;text-align:center;max-width:440px;width:94vw}
+#lobby h2{color:#0ff;margin-bottom:12px;font-size:1.1rem}
+#joinrow{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+input{font-family:inherit;font-size:1.2rem;background:#05051a;color:#ffe14d;border:2px solid #0ff;border-radius:8px;padding:8px 12px;width:120px;text-align:center;text-transform:uppercase;letter-spacing:4px;box-shadow:0 0 10px #0ff3}
+input:focus{outline:none;box-shadow:0 0 18px #0ff8}
+#roominfo{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;font-size:1rem}
+#roominfo b{color:#ffe14d}
+#codebig{font-size:1.6rem;letter-spacing:6px;color:#ffe14d;text-shadow:0 0 12px #ffe14d}
+#tboard{display:grid;grid-template-columns:repeat(3,96px);gap:10px;margin:10px 0}
+.tcell{width:96px;height:96px;border-radius:12px;background:#0a0a24;border:2px solid #335;display:flex;align-items:center;justify-content:center;font-size:3rem;cursor:pointer;transition:all .12s;user-select:none}
+.tcell:hover:empty{border-color:#0ff;box-shadow:0 0 12px #0ff5}
+.tcell.X{color:#0ff;text-shadow:0 0 14px #0ff;border-color:#0ff6}
+.tcell.O{color:#f0f;text-shadow:0 0 14px #f0f;border-color:#f0f6}
+.tcell.win{border-color:#0f0;box-shadow:0 0 18px #0f0}
+#turnbar{font-size:1.15rem;margin:8px 0;min-height:1.6em}
+#conn{font-size:.8rem;color:#889;margin-top:8px}
+#conn .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f66;margin-right:6px}
+#conn.live .dot{background:#0f0;box-shadow:0 0 8px #0f0}
+.stateline{color:#889;font-size:.9rem;margin-top:10px}
+.stateline b{color:#ffe14d}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← HUB</a>
+<div class="badge">🌐 ONLINE MULTIPLAYER</div>
+<h1>TIC-TAC-TOE</h1>
+
+<div id="lobby">
+  <h2>Play against a human, live.</h2>
+  <button id="createBtn" class="pink">＋ Create Room</button>
+  <div class="msg" style="margin:14px 0 4px">— or —</div>
+  <div id="joinrow">
+    <input id="codeIn" maxlength="4" placeholder="CODE" autocomplete="off">
+    <button id="joinBtn">Join Room →</button>
+  </div>
+  <div class="msg" id="lobbymsg"></div>
+  <p class="stateline">Your online wins: <b id="wins">0</b></p>
+</div>
+
+<div id="game" class="hidden">
+  <div id="roominfo">
+    <span>Room <b id="codebig">----</b></span>
+    <span>You are <b id="yousym">?</b></span>
+  </div>
+  <div id="turnbar"></div>
+  <div id="tboard"></div>
+  <div class="msg" id="msg"></div>
+  <div>
+    <button id="rematchBtn" class="pink">↻ Rematch</button>
+    <button id="leaveBtn">Leave</button>
+  </div>
+  <div id="conn"><span class="dot"></span><span id="conntxt">connecting…</span></div>
+</div>
+
+<p class="hint">Share the 4-letter room code with a friend. First to three in a row wins. If live updates stall, the game re-syncs every 3 seconds.</p>
+
+<script src="../js/arcade.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+if(!window.Arcade){window.Arcade={SUPABASE_URL:'',SUPABASE_ANON:'',playerName:()=>'Player',saveScore(){},getScores:async()=>[]};}
+const GAME_ID='mp-tictactoe';
+const SUPABASE_URL="https://enwfbvktwxcgintcapep.supabase.co";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVud2Zidmt0d3hjZ2ludGNhcGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzNTg2ODcsImV4cCI6MjEwNzkzNDY4N30.jeIMyCpX7mCTqs_XTdZficaun2sIDveOo8t1oP5FsyU";
+const $=id=>document.getElementById(id);
+let supabase=null,code=null,mySym=null,row=null,chan=null,pollTimer=null;
+let wins=parseInt(localStorage.getItem('mp-ttt-wins')||'0',10)||0;
+$('wins').textContent=wins;
+try{supabase=createClient(SUPABASE_URL,SUPABASE_ANON);}catch(e){$('lobbymsg').textContent='Could not init online client.';$('lobbymsg').className='msg err';}
+const LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function checkWin(b){for(const L of LINES){if(b[L[0]]!=='-'&&b[L[0]]===b[L[1]]&&b[L[1]]===b[L[2]])return{who:b[L[0]],line:L};}return null;}
+function randCode(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ';let s='';for(let i=0;i<4;i++)s+=A[Math.floor(Math.random()*A.length)];return s;}
+function setConn(live,txt){$('conn').classList.toggle('live',live);$('conntxt').textContent=txt;}
+async function createRoom(){
+  if(!supabase)return;
+  $('lobbymsg').textContent='Creating room…';$('lobbymsg').className='msg';
+  code=randCode();mySym='X';
+  try{
+    const {error}=await supabase.from('mp_rooms').insert({code:code,board:'---------',turn:'X',status:'waiting',winner:null});
+    if(error)throw error;
+    enterRoom();
+  }catch(e){$('lobbymsg').textContent='Create failed: '+(e.message||e);$('lobbymsg').className='msg err';}
+}
+async function joinRoom(){
+  if(!supabase)return;
+  const c=$('codeIn').value.trim().toUpperCase();
+  if(!/^[A-Z]{4}$/.test(c)){$('lobbymsg').textContent='Enter a 4-letter code.';$('lobbymsg').className='msg err';return;}
+  $('lobbymsg').textContent='Joining…';$('lobbymsg').className='msg';
+  try{
+    const {data,error}=await supabase.from('mp_rooms').select('*').eq('code',c).single();
+    if(error||!data)throw new Error('Room not found');
+    if(data.status==='done')throw new Error('That game already finished');
+    code=c;mySym='O';
+    if(data.status==='waiting'){await supabase.from('mp_rooms').update({status:'playing'}).eq('code',code);}
+    enterRoom();
+  }catch(e){$('lobbymsg').textContent='Join failed: '+(e.message||e);$('lobbymsg').className='msg err';}
+}
+function enterRoom(){
+  $('lobby').classList.add('hidden');$('game').classList.remove('hidden');
+  $('codebig').textContent=code;$('yousym').textContent=mySym;
+  buildBoard();subscribe();fetchRow(true);
+  pollTimer=setInterval(()=>fetchRow(false),3000);
+}
+function buildBoard(){const t=$('tboard');t.innerHTML='';for(let i=0;i<9;i++){const d=document.createElement('div');d.className='tcell';d.dataset.i=i;d.addEventListener('click',()=>cellClick(i));t.appendChild(d);}}
+async function fetchRow(loud){
+  if(!supabase||!code)return;
+  try{const {data,error}=await supabase.from('mp_rooms').select('*').eq('code',code).single();
+    if(!error&&data){row=data;render();setConn(true,'live');}
+    else if(loud){$('msg').textContent='Could not load room.';$('msg').className='msg err';}
+  }catch(e){setConn(false,'reconnecting…');}
+}
+function subscribe(){
+  try{
+    chan=supabase.channel('mp-ttt-'+code)
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'mp_rooms',filter:'code=eq.'+code},p=>{row=p.new;render();setConn(true,'live');})
+      .subscribe(st=>{setConn(st==='SUBSCRIBED','live');});
+  }catch(e){setConn(false,'realtime unavailable — polling');}
+}
+function render(){
+  if(!row)return;
+  const cells=[...$('tboard').children];
+  const w=row.winner&&row.winner!=='D'?checkWin(row.board):null;
+  cells.forEach((d,i)=>{const v=row.board[i];d.textContent=v==='-'?'':v;d.className='tcell'+(v==='-'?'':' '+v);if(w&&w.line.includes(i))d.classList.add('win');});
+  const tb=$('turnbar');
+  if(row.status==='waiting'){tb.innerHTML='Waiting for opponent… share code <b style="color:#ffe14d">'+code+'</b>';$('msg').textContent='';$('msg').className='msg';}
+  else if(row.status==='done'){
+    if(row.winner==='D'){tb.textContent="It's a draw!";$('msg').textContent='';}
+    else if(row.winner===mySym){tb.textContent='🎉 YOU WIN!';$('msg').textContent='';}
+    else{tb.textContent='😤 Opponent wins.';$('msg').textContent='';}
+    $('msg').className='msg';
+  }else{tb.textContent=row.turn===mySym?'👉 Your turn ('+mySym+')':"Opponent's turn ("+row.turn+')';$('msg').textContent='';$('msg').className='msg';}
+}
+async function cellClick(i){
+  if(!row||row.status!=='playing'||row.turn!==mySym||row.board[i]!=='-')return;
+  const nb=row.board.slice(0,i)+mySym+row.board.slice(i+1);
+  const w=checkWin(nb);
+  const upd={board:nb,turn:mySym==='X'?'O':'X',updated_at:new Date().toISOString()};
+  if(w){upd.status='done';upd.winner=w.who;
+    if(w.who===mySym){wins++;localStorage.setItem('mp-ttt-wins',String(wins));$('wins').textContent=wins;
+      try{Arcade.saveScore(GAME_ID,Arcade.playerName(),wins);}catch(e){}}
+  }else if(!nb.includes('-')){upd.status='done';upd.winner='D';}
+  try{await supabase.from('mp_rooms').update(upd).eq('code',code);await fetchRow(false);}
+  catch(e){$('msg').textContent='Move failed — retrying…';$('msg').className='msg err';fetchRow(false);}
+}
+async function rematch(){
+  if(!supabase||!code)return;
+  $('msg').textContent='Resetting board…';$('msg').className='msg';
+  try{await supabase.from('mp_rooms').update({board:'---------',turn:'X',status:'playing',winner:null,updated_at:new Date().toISOString()}).eq('code',code);await fetchRow(false);}
+  catch(e){$('msg').textContent='Rematch failed.';$('msg').className='msg err';}
+}
+function leave(){
+  if(pollTimer)clearInterval(pollTimer);pollTimer=null;
+  if(chan){try{supabase.removeChannel(chan);}catch(e){}chan=null;}
+  code=null;mySym=null;row=null;
+  $('game').classList.add('hidden');$('lobby').classList.remove('hidden');
+  $('lobbymsg').textContent='';$('codeIn').value='';
+}
+$('createBtn').addEventListener('click',createRoom);
+$('joinBtn').addEventListener('click',joinRoom);
+$('codeIn').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
+$('rematchBtn').addEventListener('click',rematch);
+$('leaveBtn').addEventListener('click',leave);
+</script>
+</body>
+</html>
