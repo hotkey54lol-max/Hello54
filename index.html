@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandbox Arcade 🕹️</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ut-white: #ffffff;
+    --ut-yellow: #ffff00;
+    --ut-red: #ff0000;
+    --ut-gray: #808080;
+    --ut-dark: #333333;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #000000;
+    color: var(--ut-white);
+    font-family: "Press Start 2P", monospace;
+    font-size: 11px;
+    line-height: 1.8;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  header { text-align: center; margin: 28px 0 10px; }
+  header h1 {
+    font-size: clamp(1.1rem, 5vw, 1.7rem);
+    letter-spacing: 2px;
+    color: var(--ut-white);
+    line-height: 1.8;
+  }
+  header p { color: var(--ut-white); margin-top: 16px; font-size: 10px; }
+  .name-row { text-align: center; margin: 18px 0 6px; font-size: 10px; }
+  .name-row strong { color: var(--ut-yellow); }
+  .name-row button {
+    background: #000; border: 2px solid var(--ut-white); color: var(--ut-white);
+    border-radius: 0; padding: 6px 10px; cursor: pointer;
+    font-family: inherit; font-size: 10px; margin-left: 8px;
+  }
+  .name-row button:hover { border-color: var(--ut-yellow); color: var(--ut-yellow); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 14px;
+    max-width: 900px;
+    margin: 24px auto;
+  }
+  .card {
+    background: #000;
+    border: 3px solid var(--ut-white);
+    border-radius: 0;
+    padding: 16px 8px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--ut-white);
+    display: block;
+  }
+  .card:hover, .card:active {
+    border-color: var(--ut-yellow);
+  }
+  .card:hover .title { color: var(--ut-yellow); }
+  .card .emoji { font-size: 2.2rem; display: block; margin-bottom: 10px; }
+  .card .title { font-size: 11px; line-height: 1.8; }
+  .card .title::before { content: ""; }
+  .card:hover .title::before, .card:active .title::before {
+    content: "♥ "; color: var(--ut-red);
+  }
+  .card .best { margin-top: 10px; font-size: 9px; color: var(--ut-gray); min-height: 1.1em; line-height: 1.8; }
+  .leaders {
+    max-width: 900px; margin: 8px auto 40px;
+    background: #000; border: 3px solid var(--ut-white); border-radius: 0;
+    padding: 18px;
+  }
+  .leaders h2 {
+    color: var(--ut-white);
+    font-size: 13px; margin-bottom: 14px; text-align: center; letter-spacing: 1px;
+    line-height: 1.8;
+  }
+  .leaders ol { list-style: none; }
+  .leaders li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 6px; border-bottom: 2px solid var(--ut-dark); font-size: 10px;
+  }
+  .leaders li:last-child { border-bottom: none; }
+  .leaders .who { color: var(--ut-yellow); }
+  .leaders .pts { color: var(--ut-yellow); }
+  footer { text-align: center; color: var(--ut-gray); font-size: 9px; padding-bottom: 24px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>* SANDBOX ARCADE</h1>
+  <p>* 21 games. The air is filled with determination.</p>
+</header>
+<div class="name-row">Playing as <strong id="pname">…</strong><button id="rename">change</button></div>
+
+<div class="grid" id="grid"></div>
+
+<div class="leaders">
+  <h2>* HALL OF FAME</h2>
+  <ol id="hof"><li>loading…</li></ol>
+</div>
+
+<footer>scores sync to the cloud when online · made for fun · <span id="vtag" style="opacity:.35;cursor:default">v1.0</span></footer>
+
+<script src="js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const GAMES = [
+    { id: "snake",       emoji: "🐍", title: "Snake" },
+    { id: "2048",        emoji: "🔢", title: "2048" },
+    { id: "minesweeper", emoji: "💣", title: "Minesweeper" },
+    { id: "tetris",      emoji: "🧱", title: "Tetris" },
+    { id: "pong",        emoji: "🏓", title: "Pong" },
+    { id: "breakout",    emoji: "🧱", title: "Breakout" },
+    { id: "memory",      emoji: "🃏", title: "Memory" },
+    { id: "tictactoe",   emoji: "⭕", title: "Tic-Tac-Toe" },
+    { id: "flappy",      emoji: "🐤", title: "Flappy" },
+    { id: "asteroids",   emoji: "🚀", title: "Asteroids" },
+    // ---- AGENT-B: games 11-20 (added by second builder; do not remove) ----
+    { id: "simon",       emoji: "🎛️", title: "Simon Says" },
+    { id: "whackamole",  emoji: "🐹", title: "Whack-a-Mole" },
+    { id: "dodge",       emoji: "🚀", title: "Dodge" },
+    { id: "reaction",    emoji: "⚡", title: "Reaction Test" },
+    { id: "guessnumber", emoji: "🔢", title: "Guess the Number" },
+    { id: "rps",         emoji: "✂️", title: "Rock Paper Scissors" },
+    { id: "hangman",     emoji: "🪢", title: "Hangman" },
+    { id: "slidepuzzle", emoji: "🧩", title: "15-Puzzle" },
+    { id: "connectfour", emoji: "⭕", title: "Connect Four" },
+    { id: "mp-tictactoe",emoji: "🌐", title: "Tic-Tac-Toe Online" },
+    // ---- END AGENT-B ----
+    { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin" },
+  ];
+
+  const grid = document.getElementById("grid");
+  const hof = document.getElementById("hof");
+  document.getElementById("pname").textContent = Arcade.playerName();
+  document.getElementById("rename").addEventListener("click", function () {
+    try { localStorage.removeItem("arcade_name"); } catch (e) {}
+    document.getElementById("pname").textContent = Arcade.playerName();
+  });
+
+  // Build cards first (instant), fill best scores async.
+  const bestEls = {};
+  GAMES.forEach(function (g) {
+    const a = document.createElement("a");
+    a.className = "card";
+    a.href = "games/" + g.id + ".html";
+    a.innerHTML =
+      '<span class="emoji">' + g.emoji + "</span>" +
+      '<span class="title">' + g.title + "</span>" +
+      '<div class="best" id="best-' + g.id + '">…</div>';
+    grid.appendChild(a);
+    bestEls[g.id] = a.querySelector(".best");
+  });
+
+  // Load #1 score for each card.
+  GAMES.forEach(function (g) {
+    Arcade.getScores(g.id, 1).then(function (rows) {
+      const el = bestEls[g.id];
+      if (rows.length) {
+        el.textContent = "🏆 " + rows[0].player_name + ": " + rows[0].score;
+      } else {
+        el.textContent = "no scores yet — be first!";
+      }
+    });
+  });
+
+  // Hall of fame: top score of every game, sorted.
+  Promise.all(
+    GAMES.map(function (g) {
+      return Arcade.getScores(g.id, 1).then(function (rows) {
+        return rows.length
+          ? { game: g.title, emoji: g.emoji, name: rows[0].player_name, score: rows[0].score }
+          : null;
+      });
+    })
+  ).then(function (all) {
+    const rows = all.filter(Boolean).sort(function (a, b) { return b.score - a.score; });
+    hof.innerHTML = "";
+    if (!rows.length) {
+      hof.innerHTML = "<li>no scores yet — play something!</li>";
+      return;
+    }
+    rows.slice(0, 10).forEach(function (r) {
+      const li = document.createElement("li");
+      li.innerHTML =
+        "<span>" + r.emoji + " " + r.game + ' <span class="who">— ' +
+        r.name + "</span></span>" +
+        '<span class="pts">' + r.score + "</span>";
+      hof.appendChild(li);
+    });
+  });
+})();
+</script>
+<script>
+/* quiet little easter egg: five quick taps on the version tag */
+(function () {
+  "use strict";
+  var tag = document.getElementById("vtag");
+  if (!tag) return;
+  var clicks = [];
+  tag.addEventListener("click", function () {
+    var now = Date.now();
+    clicks = clicks.filter(function (t) { return now - t < 3000; });
+    clicks.push(now);
+    if (clicks.length >= 5) {
+      clicks = [];
+      var pw = null;
+      try { pw = window.prompt("password:"); } catch (e) {}
+      if (pw === "Admin1@") { /* toy lock — client-side only */
+        try { localStorage.setItem("arcade_admin_until", String(Date.now() + 30 * 864e5)); } catch (e) {}
+        location.href = "admin.html";
+      } else if (pw !== null) {
+        try {
+          tag.animate(
+            [{ transform: "translateX(0)" }, { transform: "translateX(-4px)" },
+             { transform: "translateX(4px)" }, { transform: "translateX(0)" }],
+            { duration: 220 }
+          );
+        } catch (e) {}
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
