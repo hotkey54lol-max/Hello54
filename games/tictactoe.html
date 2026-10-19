@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tic-Tac-Toe — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #hud { display: flex; justify-content: center; gap: 24px; margin: 8px 0; font-size: 1.05rem; }
+  #hud span { color: #ffe600; font-weight: 700; }
+  #board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(92vw, 340px); margin: 0 auto; }
+  .cell { aspect-ratio: 1; background: #14142a; border: 2px solid #2a2a4a; border-radius: 10px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: clamp(2.4rem, 14vw, 3.4rem); cursor: pointer; font-weight: 800; }
+  .cell.x { color: #00e5ff; } .cell.o { color: #ff2d95; }
+  .cell:not(.x):not(.o):active { background: #1e1e3a; }
+  #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>⭕ Tic-Tac-Toe</h1>
+<div id="hud"><div>You <span id="w">0</span></div><div>Draws <span id="d">0</span></div><div>AI <span id="l">0</span></div></div>
+<div id="board"></div>
+<div id="msg">You are ❌ — go first!</div>
+<button id="start">New Round</button>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const boardEl = document.getElementById("board"), msgEl = document.getElementById("msg");
+  const wEl = document.getElementById("w"), dEl = document.getElementById("d"), lEl = document.getElementById("l");
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  let b, over, w, d, l, aiTimer;
+  w = d = l = 0;
+
+  function reset() {
+    b = ["", "", "", "", "", "", "", "", ""];
+    over = false;
+    clearTimeout(aiTimer);
+    msgEl.textContent = "You are ❌ — go first!";
+    render();
+  }
+  function winner(bd) {
+    for (let i = 0; i < LINES.length; i++) {
+      const l = LINES[i];
+      if (bd[l[0]] && bd[l[0]] === bd[l[1]] && bd[l[1]] === bd[l[2]]) return bd[l[0]];
+    }
+    return bd.every(function (c) { return c; }) ? "draw" : null;
+  }
+  // minimax, AI is "O" (maximizer)
+  function minimax(bd, isMax, depth) {
+    const w = winner(bd);
+    if (w === "O") return 10 - depth;
+    if (w === "X") return depth - 10;
+    if (w === "draw") return 0;
+    let best = isMax ? -Infinity : Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (bd[i]) continue;
+      bd[i] = isMax ? "O" : "X";
+      const s = minimax(bd, !isMax, depth + 1);
+      bd[i] = "";
+      best = isMax ? Math.max(best, s) : Math.min(best, s);
+    }
+    return best;
+  }
+  function aiMove() {
+    // 15% of the time play randomly so it's beatable-ish (but still strong)
+    const empt = b.map(function (c, i) { return c ? null : i; }).filter(function (v) { return v !== null; });
+    if (Math.random() < 0.15) return empt[(Math.random() * empt.length) | 0];
+    let best = -Infinity, move = empt[0];
+    for (let i = 0; i < empt.length; i++) {
+      b[empt[i]] = "O";
+      const s = minimax(b, false, 0);
+      b[empt[i]] = "";
+      if (s > best) { best = s; move = empt[i]; }
+    }
+    return move;
+  }
+  function render() {
+    boardEl.innerHTML = "";
+    b.forEach(function (v, i) {
+      const d = document.createElement("div");
+      d.className = "cell" + (v ? " " + v.toLowerCase() : "");
+      d.textContent = v === "X" ? "❌" : v === "O" ? "⭕" : "";
+      d.dataset.i = i;
+      boardEl.appendChild(d);
+    });
+  }
+  function finish(result) {
+    over = true;
+    if (result === "X") {
+      w++; wEl.textContent = w;
+      msgEl.textContent = "🏆 You beat the AI!";
+      Arcade.saveScore("tictactoe", Arcade.playerName(), 100);
+    } else if (result === "O") {
+      l++; lEl.textContent = l;
+      msgEl.textContent = "🤖 AI wins. Try again!";
+      Arcade.saveScore("tictactoe", Arcade.playerName(), 0);
+    } else {
+      d++; dEl.textContent = d;
+      msgEl.textContent = "🤝 Draw!";
+      Arcade.saveScore("tictactoe", Arcade.playerName(), 25);
+    }
+  }
+  boardEl.addEventListener("click", function (e) {
+    const t = e.target.closest(".cell");
+    if (!t || over) return;
+    const i = +t.dataset.i;
+    if (b[i]) return;
+    b[i] = "X";
+    render();
+    let r = winner(b);
+    if (r) return finish(r);
+    // AI thinks briefly
+    over = true; // block clicks during AI turn
+    aiTimer = setTimeout(function () {
+      if (over !== true) return; // round was reset
+      b[aiMove()] = "O";
+      over = false;
+      render();
+      r = winner(b);
+      if (r) finish(r);
+    }, 350);
+  });
+  document.getElementById("start").addEventListener("click", reset);
+  reset();
+})();
+</script>
+</body>
+</html>
