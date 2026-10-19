@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Memory — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; }
+  #hud { display: flex; justify-content: center; gap: 28px; margin: 8px 0; font-size: 1.05rem; }
+  #hud span { color: #ffe600; font-weight: 700; }
+  #board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: min(94vw, 400px); margin: 0 auto; }
+  .card { aspect-ratio: 1; background: #2a2a4a; border-radius: 10px; display: flex; align-items: center;
+          justify-content: center; font-size: clamp(1.8rem, 9vw, 2.6rem); cursor: pointer;
+          transition: transform .15s, background .15s; }
+  .card:active { transform: scale(.94); }
+  .card.up { background: #1a1a30; }
+  .card.done { background: #12351f; cursor: default; opacity: .75; }
+  #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:active { transform: scale(.96); }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>🃏 Memory</h1>
+<div id="hud"><div>Moves <span id="moves">0</span></div><div>Pairs <span id="pairs">0</span>/8</div><div>⏱️ <span id="time">0</span>s</div></div>
+<div id="board"></div>
+<div id="msg"></div>
+<button id="start">New Game</button>
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  const EMOJI = ["🐶", "🐱", "🦊", "🐼", "🐸", "🐵", "🦄", "🐙"];
+  const boardEl = document.getElementById("board");
+  const movesEl = document.getElementById("moves"), pairsEl = document.getElementById("pairs"),
+        timeEl = document.getElementById("time"), msgEl = document.getElementById("msg");
+  let deck, first, lock, moves, pairs, t0, tick, done;
+
+  function reset() {
+    deck = EMOJI.concat(EMOJI).map(function (e, i) { return { e: e, id: i }; });
+    // shuffle
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      const t = deck[i]; deck[i] = deck[j]; deck[j] = t;
+    }
+    first = null; lock = false; moves = 0; pairs = 0; done = false;
+    clearInterval(tick);
+    movesEl.textContent = "0"; pairsEl.textContent = "0/8";
+    timeEl.textContent = "0"; msgEl.textContent = "";
+    boardEl.innerHTML = "";
+    deck.forEach(function (c, i) {
+      const d = document.createElement("div");
+      d.className = "card"; d.dataset.i = i; d.textContent = "❓";
+      boardEl.appendChild(d);
+    });
+    t0 = Date.now();
+    tick = setInterval(function () {
+      if (!done) timeEl.textContent = ((Date.now() - t0) / 1000) | 0;
+    }, 250);
+  }
+  function flip(el) {
+    const i = +el.dataset.i;
+    el.classList.add("up");
+    el.textContent = deck[i].e;
+  }
+  function unflip(el) {
+    const i = +el.dataset.i;
+    el.classList.remove("up");
+    el.textContent = "❓";
+  }
+  boardEl.addEventListener("click", function (e) {
+    const el = e.target.closest(".card");
+    if (!el || lock || done || el.classList.contains("up") || el.classList.contains("done")) return;
+    flip(el);
+    if (!first) { first = el; return; }
+    moves++; movesEl.textContent = moves;
+    const a = deck[+first.dataset.i].e, b = deck[+el.dataset.i].e;
+    if (a === b) {
+      first.classList.add("done"); el.classList.add("done");
+      first = null;
+      pairs++; pairsEl.textContent = pairs + "/8";
+      if (pairs === 8) finish();
+    } else {
+      lock = true;
+      const f = first, s = el;
+      first = null;
+      setTimeout(function () { unflip(f); unflip(s); lock = false; }, 650);
+    }
+  });
+  function finish() {
+    done = true;
+    clearInterval(tick);
+    const secs = ((Date.now() - t0) / 1000) | 0;
+    // score: fewer moves + faster = higher. Max ~10000.
+    const score = Math.max(100, 10000 - moves * 120 - secs * 15);
+    msgEl.textContent = "🏆 All pairs in " + moves + " moves, " + secs + "s!";
+    Arcade.saveScore("memory", Arcade.playerName(), score);
+  }
+  document.getElementById("start").addEventListener("click", reset);
+  reset();
+})();
+</script>
+</body>
+</html>
