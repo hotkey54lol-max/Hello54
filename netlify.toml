@@ -7,3 +7,4 @@
 
 [functions."tinyquest"]
   included_files = ["netlify/functions/tinyquest-int8.onnx", "netlify/functions/quest_config.json"]
+  external_node_modules = ["onnxruntime-node"]
