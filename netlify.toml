@@ -3,7 +3,7 @@
   publish = "."
 
 [functions]
-  node_bundler = "esbuild"
+  node_bundler = "nft"
 
 [functions."tinyquest"]
   included_files = ["netlify/functions/tinyquest-int8.onnx", "netlify/functions/quest_config.json"]
