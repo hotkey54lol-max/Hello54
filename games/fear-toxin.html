@@ -337,7 +337,11 @@ for(var di=0;di<NROOMS;di++){
   plate.rotation.x=Math.PI/2; plate.position.set(0.68,0.86,0.06); panel.add(plate);
   var plate2=plate.clone(); plate2.position.z=-0.06; panel.add(plate2);
   var dc={x0:dx-DOOR_W/2-0.05,x1:dx+DOOR_W/2+0.05,z0:wz-0.28,z1:wz+0.28};
-  addCollider(dc.x0,dc.x1,dc.z0,dc.z1);
+  /* push dc ITSELF, not a copy: tryInteract removes/re-adds this exact
+     object by identity when the door opens/closes. addCollider() would
+     store a fresh object, indexOf(dc) would never match, and the doorway
+     would stay blocked by an invisible collider after unlocking. */
+  colliders.push(dc);
   doors.push({group:grp,panel:panel,open:false,opening:false,target:0,unlocked:false,shake:0,wallZ:wz,x:dx,idx:di,collider:dc});
 }
 
