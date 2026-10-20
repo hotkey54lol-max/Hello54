@@ -1883,6 +1883,7 @@ window.__w3={
 
 /* ================= WAVE 4: it changes when unobserved ================= */
 /* a dollhouse replica of the mansion (gallery) */
+var dollWins=[];
 (function(){
   var stand=new THREE.Mesh(new THREE.BoxGeometry(0.62,0.5,0.62),matWoodDark);
   stand.position.set(-4.7,0.25,-36.9); stand.castShadow=true; stand.receiveShadow=true; scene.add(stand);
@@ -1896,6 +1897,7 @@ window.__w3={
   var win=new THREE.Mesh(new THREE.PlaneGeometry(0.07,0.09),
     new THREE.MeshBasicMaterial({color:0xffc86e}));
   win.position.set(0.1,0.18,0.215); dh.add(win);
+  dollWins.push(win.material);
   var win2=win.clone(); win2.position.x=-0.12; dh.add(win2);
   var dr=new THREE.Mesh(new THREE.PlaneGeometry(0.08,0.15),
     new THREE.MeshBasicMaterial({color:0x090604}));
@@ -2113,6 +2115,45 @@ window.__w5={
   get idleT(){return idleT;},
   get shaftOn(){return dayShaft?dayShaft.visible:false;},
   drawCalls:function(){return renderer.info.render.calls;}
+};
+
+/* ================= WAVE 6: loose ends ================= */
+/* a last note on the vault table, pinned beside the skull */
+(function(){
+  var note=new THREE.Mesh(new THREE.PlaneGeometry(0.34,0.24),
+    new THREE.MeshStandardMaterial({map:tex(cnv(256,176,function(g){
+      g.fillStyle='#cfc7a8'; g.fillRect(0,0,256,176);
+      g.fillStyle='#33302a'; g.font='italic 19px "Segoe Script",cursive'; g.textAlign='left';
+      g.fillText('guest,',16,40);
+      g.fillText('if you are reading this',16,70);
+      g.fillText('do not look back',16,100);
+      g.fillText('at the portraits.',16,130);
+      g.fillStyle='#5a0d0d';
+      g.fillText('— E.W.',170,158);
+    }),1,1),roughness:0.95}));
+  note.rotation.x=-Math.PI/2; note.rotation.z=0.35;
+  note.position.set(2.0,0.945,-62.7);
+  note.receiveShadow=true;
+  scene.add(note);
+})();
+
+/* ================= WAVE 6 director ================= */
+var dollLit=true;
+var _w5Details=window.__ftDetails;
+window.__ftDetails=function(dt,t){
+  if(_w5Details)_w5Details(dt,t);
+  /* when the figure leaves, the dollhouse goes dark too */
+  if(dollLit&&figureGone){
+    dollLit=false;
+    for(var di=0;di<dollWins.length;di++)dollWins[di].color.setHex(0x14120c);
+  }
+  /* clouds cross the sun outside the last door */
+  if(dayShaft&&dayShaft.visible){
+    dayShaft.material.opacity=0.72+0.28*Math.sin(t*0.21)+0.1*Math.sin(t*0.83);
+  }
+};
+window.__w6={
+  get dollLit(){return dollLit;}
 };
 
 /* ================= MULTIPLAYER: others in the mansion =================
