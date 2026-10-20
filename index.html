@@ -41,6 +41,25 @@
     font-family: inherit; font-size: 10px; margin-left: 8px;
   }
   .name-row button:hover { border-color: var(--ut-yellow); color: var(--ut-yellow); }
+  .searchbox {
+    max-width: 900px; margin: 18px auto 4px;
+    background: #000; border: 3px solid var(--ut-white); border-radius: 0;
+    padding: 16px 18px; text-align: center;
+  }
+  .searchbox h2 { font-size: 12px; letter-spacing: 1px; margin-bottom: 8px; }
+  .searchbox p { font-size: 9px; color: var(--ut-gray); margin-bottom: 12px; }
+  .searchbox form { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .searchbox input[type="text"] {
+    flex: 1 1 260px; max-width: 520px;
+    background: #000; border: 2px solid var(--ut-white); color: var(--ut-white);
+    font-family: inherit; font-size: 11px; padding: 10px 12px; border-radius: 0;
+  }
+  .searchbox input[type="text"]:focus { border-color: var(--ut-yellow); outline: none; }
+  .searchbox button {
+    background: #000; border: 2px solid var(--ut-white); color: var(--ut-white);
+    font-family: inherit; font-size: 11px; padding: 10px 16px; cursor: pointer; border-radius: 0;
+  }
+  .searchbox button:hover { border-color: var(--ut-yellow); color: var(--ut-yellow); }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -96,6 +115,15 @@
   <p>* 21 games. The air is filled with determination.</p>
 </header>
 <div class="name-row">Playing as <strong id="pname">…</strong><button id="rename">change</button></div>
+
+<div class="searchbox">
+  <h2>🔍 * WEB SEARCH</h2>
+  <p>* Private search by Startpage — your search goes straight from your browser to Startpage. Nothing is tracked here.</p>
+  <form method="GET" action="https://www.startpage.com/do/dsearch" target="_blank" rel="noopener">
+    <input type="text" name="query" placeholder="* search the web…" aria-label="Search the web with Startpage" autocomplete="off">
+    <button type="submit">SEARCH</button>
+  </form>
+</div>
 
 <div class="grid" id="grid"></div>
 
