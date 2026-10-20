@@ -239,23 +239,26 @@ try{renderer=new THREE.WebGLRenderer({antialias:true});}
 catch(e){msg.textContent='WebGL is not available on this device.';startBtn.disabled=true;return;}
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
 renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFShadowMap;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=0.9;
 container.appendChild(renderer.domElement);
 
 var scene=new THREE.Scene();
-scene.background=new THREE.Color(0x000000);
-scene.fog=new THREE.FogExp2(0x020402,0.034); /* moody but readable */
+scene.background=new THREE.Color(0x020603);
+scene.fog=new THREE.FogExp2(0x020603,0.020); /* layered depth: corridor reads ~65m */
 
-var camera=new THREE.PerspectiveCamera(70,1,0.1,200);
+var camera=new THREE.PerspectiveCamera(72,1,0.1,160);
 camera.position.set(0,2.7,6.2);
 
-/* dim sickly ambience — bright enough to read the corridor */
-scene.add(new THREE.AmbientLight(0x2a4a2a,0.95));
-var hemi=new THREE.HemisphereLight(0x14301a,0x050505,0.55);
+/* low ambience — real shading comes from the lamps and headlamp now */
+scene.add(new THREE.AmbientLight(0x2a4a2a,0.22));
+var hemi=new THREE.HemisphereLight(0x14301a,0x050505,0.25);
 scene.add(hemi);
 
 /* the runner's headlamp: the one real shadow-casting light */
-var headlamp=new THREE.SpotLight(0xfff0c8,2.6,46,0.55,0.4,1);
+var headlamp=new THREE.SpotLight(0xfff0c8,2.8,52,0.62,0.5,1);
 headlamp.castShadow=true;
 headlamp.shadow.mapSize.width=512;headlamp.shadow.mapSize.height=512;
 headlamp.shadow.camera.near=1;headlamp.shadow.camera.far=42;
@@ -278,30 +281,63 @@ function resize(){
 }
 window.addEventListener('resize',resize);
 
-/* ================= GROUND (wet, glossy) ================= */
+/* ================= GROUND (wet metal plates) ================= */
 function gridTexture(){
-  var c=document.createElement('canvas');c.width=c.height=128;
+  var c=document.createElement('canvas');c.width=c.height=256;
   var g=c.getContext('2d');
-  g.fillStyle='#060906';g.fillRect(0,0,128,128);
-  g.strokeStyle='rgba(90,220,120,0.5)';g.lineWidth=2;
-  g.strokeRect(1,1,126,126);
-  g.fillStyle='rgba(255,42,255,0.10)';g.fillRect(0,0,128,4);
+  /* base plate */
+  var grad=g.createLinearGradient(0,0,256,256);
+  grad.addColorStop(0,'#11150f');grad.addColorStop(0.5,'#0b0f0a');grad.addColorStop(1,'#0e120c');
+  g.fillStyle=grad;g.fillRect(0,0,256,256);
+  /* grime blotches */
+  for(var i=0;i<130;i++){
+    g.fillStyle='rgba(0,0,0,'+(0.04+Math.random()*0.12)+')';
+    g.beginPath();g.arc(Math.random()*256,Math.random()*256,4+Math.random()*26,0,7);g.fill();
+  }
+  for(var j=0;j<40;j++){
+    g.fillStyle='rgba(120,160,110,'+(0.02+Math.random()*0.05)+')';
+    g.beginPath();g.arc(Math.random()*256,Math.random()*256,2+Math.random()*10,0,7);g.fill();
+  }
+  /* center walkway strip, worn */
+  g.fillStyle='rgba(38,44,36,0.85)';g.fillRect(58,0,140,256);
+  g.fillStyle='rgba(90,100,88,0.20)';g.fillRect(58,0,3,256);g.fillRect(195,0,3,256);
+  /* plate seams */
+  g.strokeStyle='rgba(0,0,0,0.9)';g.lineWidth=3;g.strokeRect(1,1,254,254);
+  g.strokeStyle='rgba(150,180,150,0.13)';g.lineWidth=1;g.strokeRect(4,4,248,248);
+  /* rivets */
+  g.fillStyle='rgba(170,190,170,0.5)';
+  var rv=[14,128,242];
+  for(var a=0;a<3;a++)for(var b=0;b<3;b++){
+    g.beginPath();g.arc(rv[a],rv[b],3,0,7);g.fill();
+    g.fillStyle='rgba(0,0,0,0.6)';g.fillRect(rv[a]-1,rv[b]+2,2,2);
+    g.fillStyle='rgba(170,190,170,0.5)';
+  }
+  /* scratches */
+  g.strokeStyle='rgba(200,220,200,0.07)';g.lineWidth=1;
+  for(var s=0;s<16;s++){
+    g.beginPath();
+    var sx=Math.random()*256,sy=Math.random()*256;
+    g.moveTo(sx,sy);g.lineTo(sx+(Math.random()-0.5)*60,sy+(Math.random()-0.5)*14);g.stroke();
+  }
+  /* faint magenta toxin stains bleeding in */
+  g.fillStyle='rgba(255,42,255,0.05)';g.fillRect(0,0,256,7);
   var t=new THREE.CanvasTexture(c);
   t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,40);
+  t.encoding=THREE.sRGBEncoding;
   return t;
 }
 var groundTex=gridTexture();
 var ground=new THREE.Mesh(
   new THREE.PlaneGeometry(40,260),
-  new THREE.MeshPhongMaterial({color:0x0a0d0a,map:groundTex,
-    shininess:110,specular:0x3a5a3a,emissive:0x020402})
+  new THREE.MeshPhongMaterial({color:0x69725f,map:groundTex,
+    shininess:90,specular:0x3a4a3a,emissive:0x010201})
 );
 ground.rotation.x=-Math.PI/2;ground.position.set(0,0,-110);
 ground.receiveShadow=true;
 scene.add(ground);
 var TILE=6.5;
 
-/* ================= CORRIDOR: pillars, beams, lamps, walls ================= */
+/* ================= CORRIDOR: arches, beams, lamps, walls ================= */
 var scrollables=[]; /* {obj, spacing} recycled toward camera */
 function recycle(list,z,spacing,count){
   for(var i=0;i<list.length;i++){
@@ -309,33 +345,110 @@ function recycle(list,z,spacing,count){
     if(o.position.z>12)o.position.z-=spacing*count;
   }
 }
-var pillarGeo=new THREE.BoxGeometry(0.9,7.5,0.9);
-var pillarMat=new THREE.MeshLambertMaterial({color:0x1c231a,emissive:0x0a120a});
+/* arch frames: two columns + a crossbeam — running through gates sells depth */
+var pillarGeo=new THREE.BoxGeometry(1.1,7.8,1.1);
+var archBeamGeo=new THREE.BoxGeometry(17.6,1.0,1.1);
+var pillarMat=new THREE.MeshLambertMaterial({color:0x272e20,emissive:0x040704});
+var beamMat=new THREE.MeshLambertMaterial({color:0x1a2015,emissive:0x020302});
+var trimMat=new THREE.MeshBasicMaterial({color:0x1d4023});
 var pillars=[];
-for(var pi=0;pi<22;pi++){
-  var side=pi%2?1:-1;
-  var p=new THREE.Mesh(pillarGeo,pillarMat);
-  p.position.set(side*7.2,3.75,14-Math.floor(pi/2)*12);
-  scene.add(p);pillars.push(p);
+for(var pi=0;pi<11;pi++){
+  var arch=new THREE.Group();
+  var colL=new THREE.Mesh(pillarGeo,pillarMat);colL.position.set(-8.2,3.9,0);
+  var colR=new THREE.Mesh(pillarGeo,pillarMat);colR.position.set(8.2,3.9,0);
+  var top=new THREE.Mesh(archBeamGeo,beamMat);top.position.set(0,7.5,0);
+  colL.receiveShadow=true;colR.receiveShadow=true;
+  arch.add(colL);arch.add(colR);arch.add(top);
+  /* faint guide-light strips on the inner faces */
+  var stripL=new THREE.Mesh(new THREE.BoxGeometry(0.06,6.8,0.2),trimMat);
+  stripL.position.set(-7.62,3.6,0);arch.add(stripL);
+  var stripR=stripL.clone();stripR.position.x=7.62;arch.add(stripR);
+  arch.position.z=14-pi*12;
+  scene.add(arch);pillars.push(arch);
 }
 var beamGeo=new THREE.BoxGeometry(16,0.7,1.0);
-var beamMat=new THREE.MeshLambertMaterial({color:0x0d100c,emissive:0x020202});
 var beams=[];
 for(var bi=0;bi<14;bi++){
   var b=new THREE.Mesh(beamGeo,beamMat);
   b.position.set(0,7.4,14-bi*18);
   scene.add(b);beams.push(b);
 }
-/* walls + ceiling: barely-there slabs */
-var wallMat=new THREE.MeshLambertMaterial({color:0x070a07});
+/* walls: paneled metal with vents, conduit and grime */
+function wallTexture(){
+  var c=document.createElement('canvas');c.width=c.height=256;
+  var g=c.getContext('2d');
+  g.fillStyle='#0d100c';g.fillRect(0,0,256,256);
+  for(var i=0;i<90;i++){
+    g.fillStyle='rgba(0,0,0,'+(0.05+Math.random()*0.13)+')';
+    g.beginPath();g.arc(Math.random()*256,Math.random()*256,3+Math.random()*22,0,7);g.fill();
+  }
+  /* panel seams */
+  g.strokeStyle='rgba(0,0,0,0.85)';g.lineWidth=3;
+  g.strokeRect(1,1,254,254);
+  g.beginPath();g.moveTo(128,0);g.lineTo(128,256);g.stroke();
+  g.strokeStyle='rgba(160,190,160,0.10)';g.lineWidth=1;
+  g.strokeRect(5,5,246,246);
+  /* vent slats, upper right panel */
+  g.fillStyle='rgba(0,0,0,0.55)';
+  for(var v=0;v<5;v++)g.fillRect(150,36+v*13,84,6);
+  g.strokeStyle='rgba(140,170,140,0.25)';g.strokeRect(146,28,92,72);
+  /* horizontal conduit lines */
+  g.fillStyle='rgba(6,8,6,0.9)';g.fillRect(0,178,256,10);g.fillRect(0,196,256,5);
+  g.fillStyle='rgba(150,180,150,0.12)';g.fillRect(0,176,256,2);
+  /* hazard base stripe */
+  g.save();g.beginPath();g.rect(0,228,256,28);g.clip();
+  for(var hz=-2;hz<10;hz++){
+    g.fillStyle=hz%2?'rgba(120,90,10,0.5)':'rgba(8,8,8,0.6)';
+    g.beginPath();
+    g.moveTo(hz*32,256);g.lineTo(hz*32+16,228);g.lineTo(hz*32+32,228);g.lineTo(hz*32+16,256);
+    g.fill();
+  }
+  g.restore();
+  /* rivets */
+  g.fillStyle='rgba(170,190,170,0.4)';
+  var rv2=[12,128,244];
+  for(var a2=0;a2<3;a2++)for(var b2=0;b2<2;b2++){
+    g.beginPath();g.arc(rv2[a2],b2?244:12,2.5,0,7);g.fill();
+  }
+  var t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(26,1);
+  t.encoding=THREE.sRGBEncoding;
+  return t;
+}
+var wallTex=wallTexture();
+var wallMat=new THREE.MeshLambertMaterial({map:wallTex,color:0x77816f,emissive:0x010201});
 var wallL=new THREE.Mesh(new THREE.PlaneGeometry(260,9),wallMat);
-wallL.rotation.y=Math.PI/2;wallL.position.set(-9.5,4.5,-110);scene.add(wallL);
+wallL.rotation.y=Math.PI/2;wallL.position.set(-9.5,4.5,-110);
+wallL.receiveShadow=true;scene.add(wallL);
 var wallR=wallL.clone();wallR.rotation.y=-Math.PI/2;wallR.position.x=9.5;scene.add(wallR);
-var ceil=new THREE.Mesh(new THREE.PlaneGeometry(40,260),wallMat);
+var ceilMat=new THREE.MeshLambertMaterial({map:wallTex,color:0x59614f,emissive:0x010201});
+var ceil=new THREE.Mesh(new THREE.PlaneGeometry(40,260),ceilMat);
 ceil.rotation.x=Math.PI/2;ceil.position.set(0,7.8,-110);scene.add(ceil);
+/* wall pipes: long lines converging to the vanishing point */
+var pipeMat=new THREE.MeshPhongMaterial({color:0x1c211b,shininess:60,specular:0x223322});
+var pipeGeo=new THREE.CylinderGeometry(0.14,0.14,260,8);
+var pipeGeo2=new THREE.CylinderGeometry(0.09,0.09,260,8);
+[[-9.2,1.1],[9.2,1.1],[-9.2,5.9],[9.2,5.9]].forEach(function(pp){
+  var pipe=new THREE.Mesh(pp[1]>3?pipeGeo2:pipeGeo,pipeMat);
+  pipe.rotation.x=Math.PI/2;pipe.position.set(pp[0],pp[1],-110);
+  scene.add(pipe);
+});
+/* one sickly glowing conduit crawling down the left wall */
+var glowPipe=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,260,6),
+  new THREE.MeshBasicMaterial({color:0x14590a}));
+glowPipe.rotation.x=Math.PI/2;glowPipe.position.set(-9.35,3.4,-110);
+scene.add(glowPipe);
 
 /* hanging lamps: emissive cages + light pools on the floor */
 var lampGeo=new THREE.BoxGeometry(0.5,0.35,0.5);
+var coneGeo=new THREE.ConeGeometry(2.7,6.6,20,1,true);
+var poolTexC=document.createElement('canvas');poolTexC.width=poolTexC.height=64;
+var pgx=poolTexC.getContext('2d');
+var pgr=pgx.createRadialGradient(32,32,2,32,32,32);
+pgr.addColorStop(0,'rgba(255,255,255,0.9)');pgr.addColorStop(0.6,'rgba(255,255,255,0.35)');
+pgr.addColorStop(1,'rgba(255,255,255,0)');
+pgx.fillStyle=pgr;pgx.fillRect(0,0,64,64);
+var poolTex=new THREE.CanvasTexture(poolTexC);
 var lamps=[];
 var poolGeo=new THREE.CircleGeometry(2.6,20);
 for(var li=0;li<12;li++){
@@ -347,21 +460,28 @@ for(var li=0;li<12;li++){
     new THREE.MeshBasicMaterial({color:0x111111}));
   wire.position.set(0,7.5,lamp.position.z);
   scene.add(wire);
-  var poolMat=new THREE.MeshBasicMaterial({color:0x9fd88f,transparent:true,
+  /* fake volumetric shaft under each lamp */
+  var coneMat=new THREE.MeshBasicMaterial({color:0xbfff9f,transparent:true,
+    opacity:0.02,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  var cone=new THREE.Mesh(coneGeo,coneMat);
+  cone.position.set(0,3.6,lamp.position.z);
+  scene.add(cone);
+  var poolMat=new THREE.MeshBasicMaterial({color:0x9fd88f,map:poolTex,transparent:true,
     opacity:0.10,blending:THREE.AdditiveBlending,depthWrite:false});
   var pool=new THREE.Mesh(poolGeo,poolMat);
   pool.rotation.x=-Math.PI/2;pool.position.set(0,0.02,14-li*20);
   scene.add(pool);
-  lamps.push({mesh:lamp,mat:lampMat,pool:pool,poolMat:poolMat,wire:wire,flickT:0,z0:14-li*20});
+  lamps.push({mesh:lamp,mat:lampMat,pool:pool,poolMat:poolMat,wire:wire,cone:cone,coneMat:coneMat,flickT:0,z0:14-li*20});
 }
 var blackoutT=0,nextBlackout=9+Math.random()*8;
 function setLampLevel(v){
   for(var i=0;i<lamps.length;i++){
     var L=lamps[i];
     L.mat.color.setRGB(0.85*v+0.02,1.0*v+0.02,0.82*v+0.02);
-    L.poolMat.opacity=0.11*v;
+    L.poolMat.opacity=0.17*v;
+    L.coneMat.opacity=0.022*v;
   }
-  corridorLight.intensity=0.9*v+0.05;
+  corridorLight.intensity=1.2*v+0.05;
 }
 function updateLamps(dt){
   if(blackoutT>0){
@@ -387,9 +507,43 @@ for(var di=0;di<DUSTN;di++){
   dustPos[di*3+2]=12-Math.random()*80;
 }
 dustGeo.setAttribute('position',new THREE.Float32BufferAttribute(dustPos,3));
+var dustTexC=document.createElement('canvas');dustTexC.width=dustTexC.height=32;
+var dgx=dustTexC.getContext('2d');
+var dgr=dgx.createRadialGradient(16,16,0,16,16,16);
+dgr.addColorStop(0,'rgba(255,255,255,1)');dgr.addColorStop(0.4,'rgba(255,255,255,0.4)');
+dgr.addColorStop(1,'rgba(255,255,255,0)');
+dgx.fillStyle=dgr;dgx.fillRect(0,0,32,32);
 var dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({color:0x9aa88f,
-  size:0.09,transparent:true,opacity:0.55,sizeAttenuation:true}));
+  size:0.12,transparent:true,opacity:0.6,sizeAttenuation:true,
+  map:new THREE.CanvasTexture(dustTexC),depthWrite:false}));
 scene.add(dust);
+
+/* ================= SPEED STREAKS (near-field rush) ================= */
+var STKN=42;
+var stkGeo=new THREE.BufferGeometry();
+var stkPos=new Float32Array(STKN*6);
+var stkDat=[];
+for(var si=0;si<STKN;si++){
+  stkDat.push({x:(Math.random()<0.5?-1:1)*(3.2+Math.random()*5.5),
+    y:0.3+Math.random()*5.8,z:10-Math.random()*70,len:0.7+Math.random()*1.3});
+}
+stkGeo.setAttribute('position',new THREE.Float32BufferAttribute(stkPos,3));
+var streaks=new THREE.LineSegments(stkGeo,new THREE.LineBasicMaterial({
+  color:0x86c98a,transparent:true,opacity:0}));
+scene.add(streaks);
+function updateStreaks(dt,eff){
+  var op=Math.max(0,Math.min(0.5,(eff-13)/22));
+  streaks.material.opacity=op;
+  for(var i=0;i<STKN;i++){
+    var s=stkDat[i];
+    s.z+=eff*dt*1.9;
+    if(s.z>9){s.z-=70;s.x=(Math.random()<0.5?-1:1)*(3.2+Math.random()*5.5);
+      s.y=0.3+Math.random()*5.8;}
+    stkPos[i*6]=s.x;stkPos[i*6+1]=s.y;stkPos[i*6+2]=s.z;
+    stkPos[i*6+3]=s.x;stkPos[i*6+4]=s.y;stkPos[i*6+5]=s.z-s.len*(0.6+eff*0.05);
+  }
+  stkGeo.attributes.position.needsUpdate=true;
+}
 
 /* ================= THE RUNNER ================= */
 var player=new THREE.Group();scene.add(player);
@@ -528,9 +682,9 @@ function updateToxin(dt,t,f){
     T.mesh.position.x+=Math.sin(t*0.0013+T.ph)*dt*2;
     T.mesh.rotation.z=Math.sin(t*0.0011+T.ph)*0.25;
   }
-  /* its glow stains the corridor */
+  /* its glow stains the corridor — quadratically, only as it truly nears */
   toxinGlow.position.z=toxinGroup.position.z-4;
-  toxinGlow.intensity=(1.1+f*4.5)*(0.9+0.1*Math.sin(t*0.01));
+  toxinGlow.intensity=(f*f*5.5)*(0.9+0.1*Math.sin(t*0.01));
   toxinGlow.color.setHSL(0.86-f*0.06,1,0.5+f*0.1);
 }
 
@@ -545,9 +699,61 @@ var crateGeo=new THREE.BoxGeometry(1.9,1.9,1.9);
 var barrierGeo=new THREE.BoxGeometry(2.1,1.0,0.7);
 var hangGeo=new THREE.BoxGeometry(2.1,3.6,0.7);
 var chainGeo=new THREE.CylinderGeometry(0.05,0.05,4.4,6);
-var crateMat=new THREE.MeshLambertMaterial({color:0x4a3418,emissive:0x241100});
-var barrierMat=new THREE.MeshLambertMaterial({color:0x6b4a10,emissive:0x3a1e00});
-var hangMat=new THREE.MeshLambertMaterial({color:0x3a2040,emissive:0x1c0520});
+function crateTexture(){
+  var c=document.createElement('canvas');c.width=c.height=128;
+  var g=c.getContext('2d');
+  g.fillStyle='#4a3418';g.fillRect(0,0,128,128);
+  for(var i=0;i<5;i++){ /* planks */
+    g.fillStyle=i%2?'#533c1c':'#422d13';g.fillRect(0,i*26,128,24);
+    g.fillStyle='rgba(0,0,0,0.5)';g.fillRect(0,i*26+23,128,3);
+  }
+  for(var j=0;j<40;j++){ /* grain */
+    g.strokeStyle='rgba(0,0,0,'+(0.05+Math.random()*0.1)+')';g.lineWidth=1;
+    var gy=Math.random()*128;g.beginPath();g.moveTo(0,gy);
+    g.lineTo(128,gy+(Math.random()-0.5)*6);g.stroke();
+  }
+  g.strokeStyle='#2a1a08';g.lineWidth=10;g.strokeRect(5,5,118,118); /* frame */
+  g.strokeStyle='rgba(220,180,110,0.35)';g.lineWidth=2;g.strokeRect(11,11,106,106);
+  g.fillStyle='rgba(0,0,0,0.65)'; /* stencil */
+  g.font='bold 26px monospace';g.textAlign='center';g.fillText('☠',64,74);
+  var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;
+}
+function barrierTexture(){
+  var c=document.createElement('canvas');c.width=128;c.height=64;
+  var g=c.getContext('2d');
+  g.fillStyle='#5a3d0c';g.fillRect(0,0,128,64);
+  g.save();g.beginPath();g.rect(0,20,128,24);g.clip();
+  for(var hz=-2;hz<10;hz++){
+    g.fillStyle=hz%2?'#c9a227':'#141414';
+    g.beginPath();
+    g.moveTo(hz*16,44);g.lineTo(hz*16+8,20);g.lineTo(hz*16+16,20);g.lineTo(hz*16+8,44);
+    g.fill();
+  }
+  g.restore();
+  g.fillStyle='rgba(0,0,0,0.35)';g.fillRect(0,0,128,6);g.fillRect(0,58,128,6);
+  g.fillStyle='#ff2222'; /* warning lamps */
+  g.beginPath();g.arc(14,10,4,0,7);g.fill();g.beginPath();g.arc(114,10,4,0,7);g.fill();
+  var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;
+}
+function hangTexture(){
+  var c=document.createElement('canvas');c.width=128;c.height=220;
+  var g=c.getContext('2d');
+  g.fillStyle='#2c1838';g.fillRect(0,0,128,220);
+  for(var i=0;i<60;i++){
+    g.fillStyle='rgba(0,0,0,'+(0.05+Math.random()*0.15)+')';
+    g.beginPath();g.arc(Math.random()*128,Math.random()*220,2+Math.random()*14,0,7);g.fill();
+  }
+  g.strokeStyle='rgba(0,0,0,0.8)';g.lineWidth=3;g.strokeRect(2,2,124,216);
+  g.strokeStyle='rgba(190,120,255,0.20)';g.lineWidth=1;g.strokeRect(6,6,116,208);
+  /* a smeared handprint-ish smudge */
+  g.fillStyle='rgba(255,42,255,0.13)';
+  g.beginPath();g.arc(64,150,16,0,7);g.fill();
+  for(var f=0;f<4;f++){g.beginPath();g.arc(46+f*12,128,5,0,7);g.fill();}
+  var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;
+}
+var crateMat=new THREE.MeshLambertMaterial({map:crateTexture(),color:0xd8c8a8,emissive:0x120a02});
+var barrierMat=new THREE.MeshLambertMaterial({map:barrierTexture(),color:0xd8c8a8,emissive:0x140c02});
+var hangMat=new THREE.MeshLambertMaterial({map:hangTexture(),color:0xc8b8d8,emissive:0x0a0312});
 var chainMat=new THREE.MeshBasicMaterial({color:0x0a0a0a});
 function spawnObstacle(laneIdx,kind){
   var grp=new THREE.Group();
@@ -555,6 +761,7 @@ function spawnObstacle(laneIdx,kind){
   if(kind==='crate'){
     mesh=new THREE.Mesh(crateGeo,crateMat);
     mesh.position.y=0.95;
+    grp.rotation.y=(Math.random()-0.5)*0.14;
   }else if(kind==='hang'){
     mesh=new THREE.Mesh(hangGeo,hangMat);
     mesh.position.y=1.8;
@@ -563,12 +770,8 @@ function spawnObstacle(laneIdx,kind){
   }else{
     mesh=new THREE.Mesh(barrierGeo,barrierMat);
     mesh.position.y=0.5;
-    /* warning stripes */
-    var stripe=new THREE.Mesh(new THREE.BoxGeometry(2.12,0.18,0.72),
-      new THREE.MeshBasicMaterial({color:0xaa2222}));
-    stripe.position.y=0.28;grp.add(stripe);
   }
-  mesh.castShadow=true;
+  mesh.castShadow=true;mesh.receiveShadow=true;
   grp.add(mesh);
   grp.position.set(laneIdx*2.4,0,-62);
   grp.userData={lane:laneIdx,kind:kind,counted:false};
@@ -903,7 +1106,7 @@ function MP_renderHUD(){
 MP_init();
 
 /* ================= MAIN LOOP ================= */
-var lastT=0;
+var lastT=0,landDip=0,fovCur=72;
 function loop(t){
   requestAnimationFrame(loop);
   if(!running&&!dying)return;
@@ -946,7 +1149,7 @@ function loop(t){
   var bank=(playerX-prevX)/Math.max(dt,0.001);
   if(jumpV!==0||jumpY>0){
     jumpY+=jumpV*dt;jumpV-=25*dt;
-    if(jumpY<=0){jumpY=0;jumpV=0;}
+    if(jumpY<=0){if(jumpV<-3)landDip=1;jumpY=0;jumpV=0;}
   }
   runPhase+=dt*(8+eff*0.4);
   var sw=Math.sin(runPhase);
@@ -957,14 +1160,22 @@ function loop(t){
   player.position.set(playerX,jumpY+Math.abs(Math.cos(runPhase))*0.08,0);
   if(stumbleT>0)player.rotation.z+=Math.sin(t*0.04)*0.14;
 
-  /* --- chase camera: low, close, banking --- */
+  /* --- chase camera: low, close, banking, alive --- */
+  landDip=Math.max(0,landDip-dt*5);
+  var dip=landDip*landDip*0.22;
   var camBobY=Math.sin(runPhase*2)*0.055;
   var camBobX=Math.sin(runPhase)*0.03;
-  camera.position.x+=(playerX*0.45+camBobX-camera.position.x)*Math.min(1,dt*8);
-  camera.position.y=2.7+camBobY;
-  camera.position.z=6.2;
-  camera.lookAt(playerX*0.5,1.5,-12);
-  camera.rotation.z+=-bank*0.045;
+  camera.position.x+=(playerX*0.5+camBobX-camera.position.x)*Math.min(1,dt*8);
+  camera.position.y=2.7+camBobY-dip+jumpY*0.25;
+  camera.position.z=6.2+(speed-9)*0.03;
+  camera.lookAt(playerX*0.62,1.45-dip*1.4,-12);
+  camera.rotation.z+=-bank*0.06;
+  /* speed stretches the world: FOV breathes with velocity and dread */
+  var fovTgt=72+(speed-9)*0.6+f*4;
+  if(Math.abs(fovTgt-fovCur)>0.02){
+    fovCur+=(fovTgt-fovCur)*Math.min(1,dt*4);
+    camera.fov=fovCur;camera.updateProjectionMatrix();
+  }
 
   /* --- headlamp follows --- */
   headlamp.position.set(playerX,2.1,0.4);
@@ -974,19 +1185,27 @@ function loop(t){
   groundTex.offset.y+=eff*dt/TILE;
   recycle(pillars,eff*dt,12,11);
   recycle(beams,eff*dt,18,14);
+  var nearestLampZ=-4,bestLampD=1e9;
   for(var li2=0;li2<lamps.length;li2++){
     var L2=lamps[li2];
-    L2.mesh.position.z+=eff*dt;L2.wire.position.z+=eff*dt;L2.pool.position.z+=eff*dt;
+    L2.mesh.position.z+=eff*dt;L2.wire.position.z+=eff*dt;
+    L2.pool.position.z+=eff*dt;L2.cone.position.z+=eff*dt;
     if(L2.mesh.position.z>12){
-      L2.mesh.position.z-=240;L2.wire.position.z-=240;L2.pool.position.z-=240;
+      L2.mesh.position.z-=240;L2.wire.position.z-=240;
+      L2.pool.position.z-=240;L2.cone.position.z-=240;
     }
+    var dz=Math.abs(L2.mesh.position.z+2);
+    if(dz<bestLampD){bestLampD=dz;nearestLampZ=L2.mesh.position.z;}
   }
+  /* the pooled corridor light lives under the lamp nearest the player */
+  corridorLight.position.z+=(nearestLampZ-corridorLight.position.z)*Math.min(1,dt*6);
   var dp2=dust.geometry.attributes.position.array;
   for(var di2=0;di2<DUSTN;di2++){
     dp2[di2*3+2]+=eff*dt*(0.7+((di2%5)/5)*0.6);
     if(dp2[di2*3+2]>12)dp2[di2*3+2]-=80;
   }
   dust.geometry.attributes.position.needsUpdate=true;
+  updateStreaks(dt,eff);
   updateLamps(dt);
 
   /* --- obstacles --- */
