@@ -1,5 +1,5 @@
 /**
- * TinyQuest inference — Netlify Function.
+ * TinyQuest inference — Netlify Function. (build v3: external onnxruntime-node)
  * POST /.netlify/functions/tinyquest  { prompt, max_chars?, temp? }  ->  { text }
  * Runs our own Kaggle-trained ~14M char-level transformer (int8 ONNX) via onnxruntime.
  * No model download on the client; the arcade just calls this endpoint.
