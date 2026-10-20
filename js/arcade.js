@@ -932,6 +932,11 @@ window.Arcade = (function () {
     var on = _fsActive();
     _fsBtn.textContent = on ? "✕" : "⛶";
     _fsBtn.title = on ? "Exit fullscreen" : "Fullscreen";
+    // Nudge games with window-resize handlers (e.g. Fear Toxin's 3D
+    // renderer) to re-fit their stage to the new screen size.
+    setTimeout(function () {
+      try { window.dispatchEvent(new Event("resize")); } catch (e) { /* silent */ }
+    }, 80);
   }
 
   function _fsToggle() {
