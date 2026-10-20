@@ -47,11 +47,14 @@ function sample(logits, temp) {
   return exps.length - 1;
 }
 
-async function generate(prompt, maxChars, temp) {
+async function generate(prompt, maxChars, temp, timeBudgetMs) {
   const block = cfg.config.block;
-  let ids = encode(prompt, block);
+  const CTX = Math.min(block, 96); // shorter window: ~30% faster per step, plenty for snippets
+  let ids = encode(prompt, block).slice(-CTX);
   const out = [];
+  const t0 = Date.now();
   for (let n = 0; n < maxChars; n++) {
+    if (Date.now() - t0 > timeBudgetMs) break; // always answer before Netlify cuts us off
     const feeds = { input: new ort.Tensor("int64", BigInt64Array.from(ids.map(BigInt)), [1, ids.length]) };
     const results = await session.run(feeds);
     const logits = results.logits.data; // [1, T, V]
@@ -61,7 +64,7 @@ async function generate(prompt, maxChars, temp) {
     const nextId = sample(last, temp);
     out.push(itos[nextId]);
     ids.push(nextId);
-    if (ids.length > block) ids = ids.slice(-block);
+    if (ids.length > CTX) ids = ids.slice(-CTX);
     const ch = itos[nextId];
     if (ch === "\n" && out.length > 40 && Math.random() < 0.3) break; // natural-ish stop
   }
@@ -90,7 +93,7 @@ exports.handler = async (event) => {
 
   try {
     await loadModel();
-    const text = await generate(prompt, maxChars, temp);
+    const text = await generate(prompt, maxChars, temp, 20000);
     return { statusCode: 200, headers, body: JSON.stringify({ text }) };
   } catch (e) {
     console.error("tinyquest error:", e && e.message);
