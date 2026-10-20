@@ -2220,6 +2220,23 @@ window.__ftDetails=function(dt,t){
   }
 };
 
+/* ================= WAVE 11: goodbye ================= */
+(function(){
+  var gb=new THREE.Mesh(new THREE.PlaneGeometry(1.7,0.85),
+    new THREE.MeshStandardMaterial({map:tex(cnv(256,128,function(g){
+      g.clearRect(0,0,256,128);
+      g.fillStyle='rgba(200,178,128,.92)'; g.font='bold 40px Georgia,serif'; g.textAlign='center';
+      g.fillText('GOODBYE',128,80);
+      g.globalCompositeOperation='destination-out';
+      for(var i=0;i<500;i++)g.fillRect(Math.random()*256,Math.random()*128,2.5,2.5);
+      g.globalCompositeOperation='source-over';
+    }),1,1),transparent:true,roughness:1}));
+  gb.rotation.x=-Math.PI/2; gb.rotation.z=Math.PI;
+  gb.position.set(DOOR_X[4],0.012,-(NROOMS*ROOM_D)-2.2);
+  gb.receiveShadow=true;
+  scene.add(gb);
+})();
+
 /* ================= MULTIPLAYER: others in the mansion =================
  * ft_escape table: heartbeat (x, z, rot, room, escaped) every 600ms;
  * other players render as glowing figures with name tags, lerped.
