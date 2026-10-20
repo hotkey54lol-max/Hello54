@@ -18,6 +18,9 @@
            padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
   button:active { transform: scale(.96); }
   .hint { color: #8a8aa8; font-size: .8rem; }
+/* arcade fullscreen fit */
+:fullscreen h1,:fullscreen .back,:fullscreen .leaderboard,:fullscreen .hint{display:none!important}
+:fullscreen canvas{max-width:100vw;max-height:none;width:min(94vw,61vh);width:min(94vw,61dvh);height:auto}
 </style>
 </head>
 <body>
