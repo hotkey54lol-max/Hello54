@@ -336,7 +336,7 @@ for(var di=0;di<NROOMS;di++){
   var plate2=plate.clone(); plate2.position.z=-0.06; panel.add(plate2);
   var dc={x0:dx-DOOR_W/2-0.05,x1:dx+DOOR_W/2+0.05,z0:wz-0.28,z1:wz+0.28};
   addCollider(dc.x0,dc.x1,dc.z0,dc.z1);
-  doors.push({group:grp,panel:panel,open:false,opening:false,shake:0,wallZ:wz,x:dx,idx:di,collider:dc});
+  doors.push({group:grp,panel:panel,open:false,opening:false,target:0,unlocked:false,shake:0,wallZ:wz,x:dx,idx:di,collider:dc});
 }
 
 /* furniture (visual + collider) per room */
@@ -559,12 +559,23 @@ function scanInteract(){
     var ddx=d.x-player.x,ddz=d.wallZ-player.z;
     if(ddx*ddx+ddz*ddz<2.6*2.6)nearDoor=d;
   }
+  if(!nearDoor){
+    for(var di2=0;di2<doors.length;di2++){
+      var od=doors[di2]; if(!od.unlocked)continue;
+      var ox=od.x-player.x,oz=od.wallZ-player.z;
+      if(ox*ox+oz*oz<2.6*2.6){nearDoor=od;break;}
+    }
+  }
   /* HUD prompt + touch button state */
   var btn=interactBtn;
   if(!playing){btn.className='off';return;}
   if(nearKey){setMsgOnce('A key glints nearby — '+(isTouch?'tap TAKE':'press E')+' to grab it.');
     btn.innerHTML='&#128273; TAKE';btn.className='';}
+  else if(nearDoor&&nearDoor.open){setMsgOnce('An open door — '+(isTouch?'tap CLOSE':'press E')+' to swing it shut.');
+    btn.innerHTML='&#128682; CLOSE';btn.className='';}
   else if(nearDoor&&holdingKey){setMsgOnce('The key fits this door — '+(isTouch?'tap OPEN':'press E')+' to unlock.');
+    btn.innerHTML='&#128682; OPEN';btn.className='';}
+  else if(nearDoor&&nearDoor.unlocked){setMsgOnce('Unlocked — '+(isTouch?'tap OPEN':'press E')+' to open it.');
     btn.innerHTML='&#128682; OPEN';btn.className='';}
   else if(nearDoor){setMsgOnce('Locked tight. The key is hidden somewhere in this room.');
     btn.innerHTML='&#128682; LOCKED';btn.className='off';}
@@ -589,8 +600,17 @@ function tryInteract(){
     return;
   }
   if(nearDoor){
-    if(holdingKey){
-      holdingKey=false; nearDoor.opening=true;
+    if(nearDoor.open){
+      nearDoor.target=0; sndCreak();
+      if(colliders.indexOf(nearDoor.collider)<0)colliders.push(nearDoor.collider);
+      textflash('&#128682; DOOR CLOSED',800);
+      nearDoor=null; scanInteract();
+    }else if(nearDoor.unlocked){
+      nearDoor.target=1.85; sndCreak();
+      var ci2=colliders.indexOf(nearDoor.collider); if(ci2>=0)colliders.splice(ci2,1);
+      nearDoor=null; scanInteract();
+    }else if(holdingKey){
+      holdingKey=false; nearDoor.unlocked=true; nearDoor.target=1.85;
       sndUnlock(); setTimeout(sndCreak,140);
       textflash('&#128682; DOOR '+(nearDoor.idx+1)+' UNLOCKED');
       $('keyStat').textContent='no key';
@@ -671,10 +691,12 @@ function loop(){
   /* door animations */
   for(var j=0;j<doors.length;j++){
     var d=doors[j];
-    if(d.opening&&!d.open){
-      d.group.rotation.y+=(1.85-d.group.rotation.y)*Math.min(1,dt*4.2);
-      if(d.group.rotation.y>1.78){d.open=true;d.group.rotation.y=1.85;}
+    var tgt=d.target||0;
+    if(Math.abs(d.group.rotation.y-tgt)>0.005){
+      d.group.rotation.y+=(tgt-d.group.rotation.y)*Math.min(1,dt*6.0);
+      if(Math.abs(d.group.rotation.y-tgt)<=0.03)d.group.rotation.y=tgt;
     }
+    d.open=d.group.rotation.y>1.7;
     if(d.shake>0){
       d.shake-=dt;
       d.group.rotation.y=Math.sin(d.shake*46)*0.035*Math.max(0,d.shake);
@@ -1017,7 +1039,7 @@ for(var dI2=0;dI2<NROOMS;dI2++){
   plaque(NEXT_NAMES[dI2],DOOR_X[dI2],2.99,-(dI2+1)*ROOM_D+0.26,0,
     dI2===4?'#7dff8a':undefined);
 }
-plaque('THE FOYER',0,2.5,0.04,Math.PI);
+plaque('THE FOYER',0,2.5,-0.03,Math.PI);
 var seepTex=tex(cnv(128,32,function(g){
   var grd=g.createLinearGradient(0,32,0,0);
   grd.addColorStop(0,'rgba(90,255,90,.9)'); grd.addColorStop(1,'rgba(90,255,90,0)');
@@ -1397,6 +1419,244 @@ window.__ftDetails=function(dt,t){
   }
 };
 
+/* ================= WAVE 2: more dressing ================= */
+function makeChair(x,z,ry){
+  var g=new THREE.Group();
+  var seat=new THREE.Mesh(new THREE.BoxGeometry(0.46,0.05,0.44),matWood);
+  seat.position.y=0.46; g.add(seat);
+  var back=new THREE.Mesh(new THREE.BoxGeometry(0.46,0.6,0.05),matWood);
+  back.position.set(0,0.79,-0.195); g.add(back);
+  [[-0.18,-0.17],[0.18,-0.17],[-0.18,0.17],[0.18,0.17]].forEach(function(l){
+    var leg=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.46,0.05),matWoodDark);
+    leg.position.set(l[0],0.23,l[1]); g.add(leg);
+  });
+  g.position.set(x,0,z); g.rotation.y=ry;
+  g.traverse(function(o){o.castShadow=true;o.receiveShadow=true;});
+  scene.add(g);
+  addCollider(x-0.27,x+0.27,z-0.27,z+0.27);
+}
+TABLE_POS.forEach(function(tp){
+  makeChair(tp[0]-0.5,tp[1]-0.95,0);
+  makeChair(tp[0]+0.5,tp[1]+0.95,Math.PI);
+});
+/* coat rack + a forgotten coat (foyer) */
+(function(){
+  var g=new THREE.Group();
+  var pole=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.045,1.8,10),matWoodDark);
+  pole.position.y=0.9; g.add(pole);
+  var base=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.26,0.05,12),matWoodDark);
+  base.position.y=0.025; g.add(base);
+  var knob2=new THREE.Mesh(new THREE.SphereGeometry(0.05,10,8),matFrame);
+  knob2.position.y=1.83; g.add(knob2);
+  for(var i=0;i<4;i++){
+    var peg=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.3,6),matWood);
+    var a=i*Math.PI/2+0.4;
+    peg.position.set(Math.cos(a)*0.12,1.58,Math.sin(a)*0.12);
+    peg.rotation.z=Math.PI/2.4; peg.rotation.y=-a;
+    g.add(peg);
+  }
+  var coat=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.3,0.85,10,1,true),
+    new THREE.MeshStandardMaterial({color:0x1d2b1a,roughness:1,side:THREE.DoubleSide}));
+  coat.position.set(0.17,1.06,0.05); coat.rotation.z=0.1; g.add(coat);
+  var hat=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.025,14),matWoodDark);
+  hat.position.set(-0.1,1.52,-0.08); hat.rotation.z=0.16; g.add(hat);
+  g.position.set(-5.25,0,-5.6);
+  g.traverse(function(o){o.castShadow=true;});
+  scene.add(g);
+  addCollider(-5.5,-5.0,-5.85,-5.35);
+})();
+/* barrels in the vault */
+(function(){
+  var band=new THREE.MeshStandardMaterial({color:0x1a120a,roughness:0.7,metalness:0.4});
+  function barrel(x,z,y){
+    var g=new THREE.Group();
+    var bd=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.34,0.95,14),matWood);
+    bd.position.y=0.475; g.add(bd);
+    [-0.26,0.26].forEach(function(off){
+      var t=new THREE.Mesh(new THREE.TorusGeometry(0.345,0.016,8,22),band);
+      t.rotation.x=Math.PI/2; t.position.y=0.475+off; g.add(t);
+    });
+    g.position.set(x,y||0,z);
+    g.traverse(function(o){o.castShadow=true;o.receiveShadow=true;});
+    scene.add(g);
+  }
+  barrel(-5.0,-60.5); barrel(-4.22,-60.85); barrel(-4.62,-60.62,0.95);
+  addCollider(-5.42,-3.82,-61.3,-60.05);
+})();
+/* stone busts on pedestals (gallery) */
+(function(){
+  var stone=new THREE.MeshStandardMaterial({color:0x6f6f78,roughness:0.9});
+  var stoneL=new THREE.MeshStandardMaterial({color:0x8d8d96,roughness:0.85});
+  [-3.6,3.6].forEach(function(x){
+    var col=new THREE.Mesh(new THREE.BoxGeometry(0.52,1.05,0.52),stone);
+    col.position.set(x,0.525,-36.8); col.castShadow=true; col.receiveShadow=true; scene.add(col);
+    var sh=new THREE.Mesh(new THREE.BoxGeometry(0.46,0.24,0.28),stoneL);
+    sh.position.set(x,1.17,-36.8); sh.castShadow=true; scene.add(sh);
+    var hd=new THREE.Mesh(new THREE.SphereGeometry(0.135,14,12),stoneL);
+    hd.position.set(x,1.42,-36.8); hd.castShadow=true; scene.add(hd);
+    addCollider(x-0.3,x+0.3,-37.1,-36.5);
+  });
+})();
+/* torn wallpaper patches */
+var tearTex=tex(cnv(96,128,function(g){
+  g.clearRect(0,0,96,128);
+  g.fillStyle='#0d0f08';
+  g.beginPath();
+  g.moveTo(10,6); g.lineTo(70,0); g.lineTo(88,38); g.lineTo(76,80); g.lineTo(90,120);
+  g.lineTo(40,128); g.lineTo(8,104); g.lineTo(16,58); g.lineTo(2,30); g.closePath(); g.fill();
+  g.strokeStyle='rgba(214,198,150,.5)'; g.lineWidth=3;
+  g.beginPath(); g.moveTo(10,6); g.lineTo(16,58); g.lineTo(8,104); g.stroke();
+}),1,1);
+var tearMat=new THREE.MeshStandardMaterial({map:tearTex,transparent:true,roughness:1});
+[[-5.93,1.7,-9.8,Math.PI/2],[5.93,1.65,-28.6,-Math.PI/2],[-5.93,1.8,-57.2,Math.PI/2],[-3.9,1.75,-51.76,0]].forEach(function(tp){
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(0.85,1.15),tearMat);
+  m.position.set(tp[0],tp[1],tp[2]); m.rotation.y=tp[3]; scene.add(m);
+});
+/* warm light pools under the table candles */
+TABLE_POS.forEach(function(tp){
+  var pool=new THREE.Mesh(new THREE.CircleGeometry(0.55,18),
+    new THREE.MeshBasicMaterial({map:flameTex,transparent:true,opacity:0.13,
+      blending:THREE.AdditiveBlending,depthWrite:false}));
+  pool.rotation.x=-Math.PI/2; pool.position.set(tp[0]-0.3,0.912,tp[1]);
+  scene.add(pool);
+});
+/* green glow hugging each locked door's seep */
+var seepGlows=[];
+for(var sgI=0;sgI<NROOMS;sgI++){
+  var sgl=glowSprite(sparkTex,0x51ff51,1.5,0.13);
+  sgl.position.set(DOOR_X[sgI],0.32,-(sgI+1)*ROOM_D+0.45);
+  scene.add(sgl); seepGlows.push(sgl);
+}
+/* the library book that falls */
+var fallBook=null,fallState='idle';
+(function(){
+  fallBook=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.3,0.055),bookMats[0]);
+  fallBook.position.set(-5.55,1.295,-18.15);
+  fallBook.castShadow=true;
+  scene.add(fallBook);
+})();
+
+/* ================= WAVE 2 director ================= */
+var ROOM_NAMES={1:'THE FOYER',2:'THE LIBRARY',3:'THE GALLERY',4:'THE STUDY',5:'THE VAULT'};
+var w2Visited={1:true},gutterT=0,slamCount=0,slamNext=65;
+var prevHolding=false,glinted={},hissGain=null,hissSrc=null;
+var _baseDetails=window.__ftDetails;
+window.__ftDetails=function(dt,t){
+  if(_baseDetails)_baseDetails(dt,t);
+  /* room title cards */
+  if(playing&&!escaped){
+    var r=roomAt(player.z);
+    if(r>=1&&r<=NROOMS&&!w2Visited[r]){
+      w2Visited[r]=true;
+      textflash('&mdash; '+ROOM_NAMES[r]+' &mdash;',1250);
+    }
+  }
+  /* pickup reactions: key 3 gutters every flame; key 5 knows your name */
+  if(holdingKey&&!prevHolding){
+    var roomJust=doorsOpened+1;
+    if(roomJust===3)gutterT=1.6;
+    if(roomJust===5){
+      var nm='TRAVELER';
+      try{nm=String(Arcade.playerName()||nm).toUpperCase();}catch(e){}
+      var tx=$('textflashTxt'),el=$('textflash');
+      tx.textContent='IT KNOWS YOUR NAME, '+nm;
+      tx.style.color='#ff3333';
+      el.style.transition='none'; el.style.opacity='1';
+      noiseHit(0.5,1100,0.05);
+      setTimeout(function(){
+        el.style.transition='opacity .2s'; el.style.opacity='0';
+        setTimeout(function(){tx.style.color='';},260);
+      },1000);
+    }
+  }
+  prevHolding=holdingKey;
+  /* gutter: all flames die down briefly */
+  if(gutterT>0){
+    gutterT-=dt;
+    for(var gi=0;gi<flickerSprites.length;gi++){
+      var fs2=flickerSprites[gi];
+      fs2.sp.scale.set(0.02,0.02,1);
+      fs2.sp.material.opacity=0.04;
+    }
+  }
+  /* a faint glint the first time the hunted key is near and ahead */
+  var ck2=(playing&&!holdingKey)?currentKeyObj():null;
+  if(ck2&&!glinted[ck2.room]){
+    var kx=ck2.mesh.position.x-player.x,kz=ck2.mesh.position.z-player.z;
+    var kd=Math.sqrt(kx*kx+kz*kz);
+    if(kd<7.5){
+      var sy2=Math.sin(player.yaw),cy2=Math.cos(player.yaw);
+      var dot2=(kx*(-sy2)+kz*(-cy2))/Math.max(0.01,kd);
+      if(dot2>0.4){
+        glinted[ck2.room]=true;
+        tone(2093,2637,0.22,'sine',0.028);
+      }
+    }
+  }
+  /* toxin hiss that swells near a locked door */
+  try{
+    if(AC&&!hissSrc){
+      var len=AC.sampleRate*1.5,buf=AC.createBuffer(1,len,AC.sampleRate);
+      var dd=buf.getChannelData(0);
+      for(var hi=0;hi<len;hi++)dd[hi]=Math.random()*2-1;
+      hissSrc=AC.createBufferSource(); hissSrc.buffer=buf; hissSrc.loop=true;
+      var hf=AC.createBiquadFilter(); hf.type='lowpass'; hf.frequency.value=750;
+      hissGain=AC.createGain(); hissGain.gain.value=0;
+      hissSrc.connect(hf); hf.connect(hissGain); hissGain.connect(masterGain);
+      hissSrc.start();
+    }
+    if(hissGain){
+      var tgt2=0;
+      if(playing&&doorsOpened<NROOMS){
+        var fd=doors[doorsOpened];
+        if(!fd.open){
+          var fdx=fd.x-player.x,fdz=fd.wallZ-player.z;
+          var fdd=Math.sqrt(fdx*fdx+fdz*fdz);
+          if(fdd<5.5)tgt2=(1-fdd/5.5)*0.055;
+        }
+      }
+      hissGain.gain.value+=(tgt2-hissGain.gain.value)*Math.min(1,dt*5);
+    }
+  }catch(e){}
+  /* a door slams, somewhere else in the mansion */
+  if(playing){
+    slamNext-=dt;
+    if(slamNext<=0){
+      slamNext=70+Math.random()*70;
+      slamCount++;
+      tone(52,28,0.6,'sine',0.2); noiseHit(0.3,160,0.2);
+      var bo=$('blackout');
+      bo.style.transition='none'; bo.style.opacity='0.3';
+      setTimeout(function(){bo.style.transition='opacity .5s';bo.style.opacity='0';},130);
+    }
+  }
+  /* the falling book */
+  if(fallBook&&fallState==='idle'&&playing&&player.z<-15.2)fallState='falling';
+  if(fallBook&&fallState==='falling'){
+    fallBook.userData.f=(fallBook.userData.f||0)+dt*2.1;
+    var ff=Math.min(1,fallBook.userData.f);
+    fallBook.rotation.z=-1.5*ff;
+    fallBook.position.y=1.295-(1.295-0.16)*ff*ff;
+    fallBook.position.x=-5.55+0.55*ff;
+    if(ff>=1){
+      fallState='done';
+      noiseHit(0.09,300,0.15); tone(120,60,0.12,'sine',0.07);
+    }
+  }
+  /* seep glows breathe with their doors */
+  for(var sg2=0;sg2<seepGlows.length;sg2++){
+    if(doors[sg2].open){seepGlows[sg2].visible=false;continue;}
+    seepGlows[sg2].visible=true;
+    seepGlows[sg2].material.opacity=0.1+0.05*Math.sin(t*1.7+sg2*1.3);
+  }
+};
+window.__w2={
+  visited:w2Visited,
+  get gutter(){return gutterT;},
+  get slams(){return slamCount;},
+  get bookState(){return fallState;}
+};
+
 /* ================= MULTIPLAYER: others in the mansion =================
  * ft_escape table: heartbeat (x, z, rot, room, escaped) every 600ms;
  * other players render as glowing figures with name tags, lerped.
@@ -1538,6 +1798,7 @@ function MP_renderStandings(rows){
 function MP_update(dt){
   for(var id in MP_rivals){
     var rv=MP_rivals[id],row=rv.row; if(!row)continue;
+    rv.group.visible=!row.escaped; /* escaped players have left the mansion */
     var tx=(typeof row.x==='number')?row.x:0, tz=(typeof row.z==='number')?row.z:-2;
     var p=rv.group.position;
     var f=1-Math.pow(0.001,dt);
