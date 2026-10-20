@@ -23,8 +23,10 @@ h1{color:#c00000;letter-spacing:5px;font-size:1.7rem;text-align:center;margin:6p
 #stage{position:relative;width:min(880px,96vw);height:min(74vh,620px);min-height:400px}
 #scene{width:100%;height:100%;border:2px solid #3a0a3a;border-radius:10px;background:#000;touch-action:none;overflow:hidden;box-shadow:0 0 26px #f0f22,inset 0 0 60px #000;cursor:pointer}
 #scene canvas{display:block;width:100%!important;height:100%!important}
-#vignette{position:absolute;inset:0;pointer-events:none;border-radius:10px;opacity:.55;
-  background:radial-gradient(ellipse at center,transparent 52%,rgba(0,0,0,.85) 100%)}
+#vignette{position:absolute;inset:0;pointer-events:none;border-radius:10px;opacity:.53;
+  background:radial-gradient(ellipse at center,transparent 52%,rgba(0,0,0,.85) 100%);
+  animation:vignBreathe 7s ease-in-out infinite}
+@keyframes vignBreathe{0%,100%{opacity:.48}50%{opacity:.63}}
 #flash{position:absolute;inset:0;pointer-events:none;border-radius:10px;opacity:0;background:#ffd7ff}
 #textflash{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;
   opacity:0;transition:opacity .15s}
@@ -1655,6 +1657,217 @@ window.__w2={
   get gutter(){return gutterT;},
   get slams(){return slamCount;},
   get bookState(){return fallState;}
+};
+
+/* ================= WAVE 3: things that watch back ================= */
+/* a rocking chair in the study. it stops when you look at it. */
+var rockChair=null;
+(function(){
+  var pivot=new THREE.Group();
+  var inner=new THREE.Group(); inner.position.y=0.06; pivot.add(inner);
+  var seat=new THREE.Mesh(new THREE.BoxGeometry(0.48,0.05,0.46),matWood);
+  seat.position.y=0.46; inner.add(seat);
+  var back=new THREE.Mesh(new THREE.BoxGeometry(0.48,0.62,0.05),matWood);
+  back.position.set(0,0.8,-0.2); inner.add(back);
+  [[-0.19],[0.19]].forEach(function(lx){
+    var legF=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.46,0.05),matWoodDark);
+    legF.position.set(lx[0],0.23,0.17); inner.add(legF);
+    var legB=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.46,0.05),matWoodDark);
+    legB.position.set(lx[0],0.23,-0.17); inner.add(legB);
+    var rocker=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.045,0.72),matWoodDark);
+    rocker.position.set(lx[0],0.02,0); inner.add(rocker);
+  });
+  pivot.add(inner);
+  pivot.position.set(4.55,0,-47.6); pivot.rotation.y=-1.15;
+  pivot.traverse(function(o){o.castShadow=true;o.receiveShadow=true;});
+  scene.add(pivot);
+  rockChair=pivot;
+  addCollider(4.25,4.85,-47.9,-47.3);
+})();
+/* chess game abandoned mid-match (study table) */
+(function(){
+  var board=new THREE.Mesh(new THREE.PlaneGeometry(0.52,0.52),
+    new THREE.MeshStandardMaterial({map:tex(cnv(128,128,function(g){
+      for(var y=0;y<8;y++)for(var x=0;x<8;x++){
+        g.fillStyle=(x+y)%2?'#2b2b2b':'#cfc7a8';
+        g.fillRect(x*16,y*16,16,16);
+      }
+      g.fillStyle='rgba(60,30,10,.35)'; g.fillRect(30,50,40,20);
+    }),1,1),roughness:0.6}));
+  board.rotation.x=-Math.PI/2; board.rotation.z=0.4;
+  board.position.set(-2.6,0.909,-45.5); scene.add(board);
+  var dark=new THREE.MeshStandardMaterial({color:0x17130f,roughness:0.5});
+  var lite=new THREE.MeshStandardMaterial({color:0xd9d2ba,roughness:0.5});
+  [[-0.15,-0.1,dark],[-0.05,0.12,dark],[0.08,-0.16,lite],[0.16,0.05,lite],[-0.12,0.18,lite]].forEach(function(pc){
+    var p=new THREE.Mesh(new THREE.CylinderGeometry(0.021,0.026,0.055,10),pc[2]);
+    p.position.set(-2.6+pc[0],0.937,-45.5+pc[1]); p.castShadow=true; scene.add(p);
+  });
+  var king=new THREE.Mesh(new THREE.ConeGeometry(0.024,0.09,10),dark);
+  king.position.set(-2.42,0.954,-45.62); king.castShadow=true; scene.add(king);
+  var fallen=new THREE.Mesh(new THREE.CylinderGeometry(0.021,0.026,0.055,10),lite);
+  fallen.rotation.z=Math.PI/2; fallen.position.set(-2.85,0.922,-45.3); scene.add(fallen);
+})();
+/* a teapot, long cold (library table) */
+(function(){
+  var cer=new THREE.MeshStandardMaterial({color:0x24303a,roughness:0.35,metalness:0.15});
+  var g=new THREE.Group();
+  var body=new THREE.Mesh(new THREE.SphereGeometry(0.11,16,12),cer);
+  body.scale.y=0.8; body.position.y=0.085; g.add(body);
+  var spout=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.026,0.13,8),cer);
+  spout.position.set(0.12,0.12,0); spout.rotation.z=-0.8; g.add(spout);
+  var handle=new THREE.Mesh(new THREE.TorusGeometry(0.055,0.013,8,16,Math.PI),cer);
+  handle.position.set(-0.11,0.1,0); handle.rotation.z=Math.PI/2; g.add(handle);
+  var lid=new THREE.Mesh(new THREE.SphereGeometry(0.022,10,8),matFrame);
+  lid.position.y=0.175; g.add(lid);
+  g.position.set(3.55,0.905,-22.3);
+  g.traverse(function(o){o.castShadow=true;});
+  scene.add(g);
+})();
+/* something scrawled on the study wall, in the dark */
+(function(){
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(1.8,0.55),
+    new THREE.MeshStandardMaterial({map:tex(cnv(512,156,function(g){
+      g.clearRect(0,0,512,156);
+      g.fillStyle='rgba(96,16,16,.92)';
+      g.font='italic bold 64px "Comic Sans MS","Segoe Script",cursive';
+      g.textAlign='center';
+      g.fillText('it is behind you',256,80);
+      g.fillRect(120,104,4,34); g.fillRect(300,100,3,26); g.fillRect(398,106,4,30);
+    }),1,1),transparent:true,roughness:1}));
+  m.position.set(-5.93,1.55,-44.8); m.rotation.y=Math.PI/2; scene.add(m);
+})();
+/* a face that flashes in the library mirror, once */
+var mirrorFlash=null;
+(function(){
+  mirrorFlash=new THREE.Mesh(new THREE.PlaneGeometry(0.8,1.25),
+    new THREE.MeshBasicMaterial({map:tex(faceScaryTexC,1,1),transparent:true,opacity:0,depthWrite:false}));
+  mirrorFlash.position.set(5.9,1.8,-21.8); mirrorFlash.rotation.y=-Math.PI/2;
+  scene.add(mirrorFlash);
+})();
+/* warm daylight leaking under the LAST door */
+var dayLeak=null;
+(function(){
+  var warmTex=tex(cnv(128,32,function(g){
+    var grd=g.createLinearGradient(0,32,0,0);
+    grd.addColorStop(0,'rgba(255,240,200,.95)'); grd.addColorStop(1,'rgba(255,240,200,0)');
+    g.fillStyle=grd; g.fillRect(0,0,128,32);
+  }),1,1);
+  dayLeak=new THREE.Mesh(new THREE.PlaneGeometry(2.2,0.5),
+    new THREE.MeshBasicMaterial({map:warmTex,transparent:true,opacity:0.5,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  dayLeak.position.set(DOOR_X[4],0.24,-(NROOMS*ROOM_D)+0.28);
+  scene.add(dayLeak);
+})();
+/* doormats, ceiling stains, room rugs */
+for(var dmI=0;dmI<NROOMS;dmI++){
+  var mat1=new THREE.Mesh(new THREE.PlaneGeometry(1.9,0.8),
+    new THREE.MeshStandardMaterial({color:0x171208,roughness:1}));
+  mat1.rotation.x=-Math.PI/2;
+  mat1.position.set(DOOR_X[dmI],0.004,-(dmI+1)*ROOM_D+1.05);
+  mat1.receiveShadow=true; scene.add(mat1);
+}
+[[2,0x3a2a10],[4,0x10283a]].forEach(function(rr2){
+  var rug2=new THREE.Mesh(new THREE.PlaneGeometry(3.2,4.6),
+    new THREE.MeshStandardMaterial({color:rr2[1],roughness:1}));
+  rug2.rotation.x=-Math.PI/2;
+  rug2.position.set(0,0.0035,roomCenterZ(rr2[0]));
+  rug2.receiveShadow=true; scene.add(rug2);
+});
+for(var csI=0;csI<NROOMS;csI++){
+  var stain=new THREE.Mesh(new THREE.CircleGeometry(0.5+Math.random()*0.4,14),
+    new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.32,depthWrite:false}));
+  stain.rotation.x=Math.PI/2;
+  stain.position.set(-3+Math.random()*6,WALL_H-0.012,roomCenterZ(csI+1)+(Math.random()*4-2));
+  scene.add(stain);
+}
+/* breath puffs for the cold room */
+var puffPool=[];
+for(var pfI=0;pfI<3;pfI++){
+  var pf=glowSprite(sparkTex,0xdfe8ff,0.1,0);
+  pf.visible=false; scene.add(pf);
+  puffPool.push({sp:pf,age:99});
+}
+
+/* ================= WAVE 3 director ================= */
+var rockAmp=0.07,rockPhase=0,rockCalmUntil=0,mirrorFlashed=false;
+var hbCycle=0,lastThump=-1,puffTimer=2.5,puffCount=0;
+var _w2Details=window.__ftDetails;
+window.__ftDetails=function(dt,t){
+  if(_w2Details)_w2Details(dt,t);
+  /* the rocking chair settles under your gaze */
+  if(rockChair){
+    var cp=rockChair.position;
+    var cdx=cp.x-camera.position.x,cdz=cp.z-camera.position.z;
+    var cd=Math.sqrt(cdx*cdx+cdz*cdz);
+    var cf=new THREE.Vector3(); camera.getWorldDirection(cf);
+    var cdot=(cdx*cf.x+cdz*cf.z)/Math.max(0.01,cd);
+    if(cd<9&&cdot>0.93)rockCalmUntil=t+3;
+    var targetAmp=(t<rockCalmUntil)?0:0.07;
+    rockAmp+=(targetAmp-rockAmp)*Math.min(1,dt*(targetAmp?0.8:2.5));
+    rockPhase+=dt*1.7;
+    rockChair.rotation.x=Math.sin(rockPhase)*rockAmp;
+  }
+  /* the face in the mirror */
+  if(!mirrorFlashed&&playing&&mirrorFlash){
+    var mdx=5.9-camera.position.x,mdz=-21.8-camera.position.z;
+    var md=Math.sqrt(mdx*mdx+mdz*mdz);
+    if(md<3.4){
+      var mf=new THREE.Vector3(); camera.getWorldDirection(mf);
+      if((mdx*mf.x+mdz*mf.z)/Math.max(0.01,md)>0.8){
+        mirrorFlashed=true;
+        mirrorFlash.material.opacity=0.92;
+        tone(1250,180,0.45,'sine',0.03);
+        setTimeout(function(){
+          var iv=setInterval(function(){
+            mirrorFlash.material.opacity-=0.09;
+            if(mirrorFlash.material.opacity<=0){mirrorFlash.material.opacity=0;clearInterval(iv);}
+          },40);
+        },420);
+      }
+    }
+  }
+  /* daylight under door 5 dies when it opens */
+  if(dayLeak)dayLeak.visible=!doors[NROOMS-1].open;
+  if(!playing)return;
+  /* a heartbeat lives in the vault */
+  if(roomAt(player.z)===NROOMS){
+    hbCycle+=dt;
+    if(hbCycle>1.15){
+      hbCycle=0; lastThump=t;
+      tone(57,40,0.13,'sine',0.13); tone(52,38,0.11,'sine',0.09,0.24);
+    }
+    /* and your breath fogs in the cold */
+    puffTimer-=dt;
+    if(puffTimer<=0){
+      puffTimer=3.4+Math.random()*1.4;
+      var slot=null;
+      for(var p2=0;p2<puffPool.length;p2++)if(puffPool[p2].age>1.4){slot=puffPool[p2];break;}
+      if(slot){
+        slot.age=0; puffCount++;
+        var f3=new THREE.Vector3(); camera.getWorldDirection(f3);
+        slot.sp.position.copy(camera.position).addScaledVector(f3,0.55);
+        slot.sp.position.y-=0.06;
+        slot.sp.visible=true;
+      }
+    }
+  }
+  for(var p3=0;p3<puffPool.length;p3++){
+    var pu=puffPool[p3];
+    if(pu.age<=1.4){
+      pu.age+=dt;
+      var pa=Math.min(1,pu.age/1.4);
+      pu.sp.scale.set(0.1+pa*0.34,0.1+pa*0.34,1);
+      pu.sp.material.opacity=0.15*(1-pa);
+      pu.sp.position.y+=dt*0.07;
+      if(pa>=1)pu.sp.visible=false;
+    }
+  }
+};
+window.__w3={
+  get rockAmp(){return rockAmp;},
+  get mirrorFlashed(){return mirrorFlashed;},
+  get lastThump(){return lastThump;},
+  get puffs(){return puffCount;}
 };
 
 /* ================= MULTIPLAYER: others in the mansion =================
