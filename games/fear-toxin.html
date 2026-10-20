@@ -2156,6 +2156,46 @@ window.__w6={
   get dollLit(){return dollLit;}
 };
 
+/* ================= WAVE 7: slow dread ================= */
+/* a welcome mat at spawn, worn down to almost nothing */
+(function(){
+  var mat1=new THREE.Mesh(new THREE.PlaneGeometry(1.7,0.85),
+    new THREE.MeshStandardMaterial({map:tex(cnv(256,128,function(g){
+      g.fillStyle='#4a2320'; g.fillRect(0,0,256,128);
+      g.strokeStyle='#c8b280'; g.lineWidth=4; g.strokeRect(8,8,240,112);
+      g.fillStyle='#c8b280'; g.font='bold 40px Georgia,serif'; g.textAlign='center';
+      g.fillText('WELCOME',128,80);
+      g.globalCompositeOperation='destination-out';
+      for(var i=0;i<900;i++)g.fillRect(Math.random()*256,Math.random()*128,2.5,2.5);
+      g.beginPath(); g.ellipse(128,72,52,20,0.2,0,7); g.fill();
+      g.globalCompositeOperation='source-over';
+    }),1,1),roughness:1}));
+  mat1.rotation.x=-Math.PI/2; mat1.rotation.z=Math.PI;
+  mat1.position.set(0,0.007,-0.7);
+  mat1.receiveShadow=true;
+  scene.add(mat1);
+})();
+
+/* ================= WAVE 7 director ================= */
+var w7t0=0,w7tilt=0;
+var _w6Details=window.__ftDetails;
+window.__ftDetails=function(dt,t){
+  if(_w6Details)_w6Details(dt,t);
+  if(playing){
+    if(!w7t0)w7t0=t;
+    /* the longer you are inside, the more the portraits lean */
+    w7tilt=Math.min(0.09,(t-w7t0)*0.0009);
+    figurePortrait.canvas.rotation.z=0.05+w7tilt;
+    facePortrait.canvas.rotation.z=-0.03+w7tilt;
+    cdPortrait.canvas.rotation.z=0+w7tilt;
+    /* deep in the mansion, it groans more often */
+    if(roomAt(player.z)>=4)groanNext=Math.min(groanNext,14);
+  }
+};
+window.__w7={
+  get tilt(){return w7tilt;}
+};
+
 /* ================= MULTIPLAYER: others in the mansion =================
  * ft_escape table: heartbeat (x, z, rot, room, escaped) every 600ms;
  * other players render as glowing figures with name tags, lerped.
@@ -2241,7 +2281,9 @@ async function MP_fetchOthers(){
     var rows=await r.json();
     var seen={};
     for(var i=0;i<rows.length;i++){
-      var row=rows[i]; seen[row.id]=1;
+      var row=rows[i];
+      if(row.id===MP_myId)continue; /* never ghost yourself, whatever the backend says */
+      seen[row.id]=1;
       var rv=MP_rivals[row.id];
       if(!rv){rv=MP_rivals[row.id]=MP_makeGhost(row);scene.add(rv.group);}
       rv.row=row; rv.lastSeen=Date.now();
