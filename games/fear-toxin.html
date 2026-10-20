@@ -835,7 +835,18 @@ function makePortrait(w,h,map,tilt){
   return {group:grp,canvas:cv2};
 }
 function placePortrait(p,x,y,z,ry){p.group.position.set(x,y,z);p.group.rotation.y=ry;}
-placePortrait(makePortrait(0.95,1.3,tex(portraitArt('figure'),1,1),0.05),-5.95,1.9,-5.0,Math.PI/2);
+var figurePortrait=makePortrait(0.95,1.3,tex(portraitArt('figure'),1,1),0.05);
+placePortrait(figurePortrait,-5.95,1.9,-5.0,Math.PI/2);
+var figureEmptyTexC=cnv(192,256,function(g){
+  var grd=g.createLinearGradient(0,0,0,256);
+  grd.addColorStop(0,'#20242c'); grd.addColorStop(1,'#0b0d10');
+  g.fillStyle=grd; g.fillRect(0,0,192,256);
+  g.fillStyle='rgba(0,0,0,.45)';
+  for(var i=0;i<26;i++)g.fillRect(Math.random()*192,0,1.5,256);
+  var vg=g.createRadialGradient(96,128,60,96,128,180);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.65)');
+  g.fillStyle=vg; g.fillRect(0,0,192,256);
+});
 placePortrait(makePortrait(0.95,1.3,tex(portraitArt('house'),1,1),-0.04),5.95,1.9,-16.8,-Math.PI/2);
 placePortrait(makePortrait(0.95,1.3,tex(portraitArt('moon'),1,1),0.03),-3.5,1.95,-38.77,0);
 placePortrait(makePortrait(0.95,1.3,tex(portraitArt('skull'),1,1),-0.05),-5.95,1.9,-48.5,Math.PI/2);
@@ -1868,6 +1879,175 @@ window.__w3={
   get mirrorFlashed(){return mirrorFlashed;},
   get lastThump(){return lastThump;},
   get puffs(){return puffCount;}
+};
+
+/* ================= WAVE 4: it changes when unobserved ================= */
+/* a dollhouse replica of the mansion (gallery) */
+(function(){
+  var stand=new THREE.Mesh(new THREE.BoxGeometry(0.62,0.5,0.62),matWoodDark);
+  stand.position.set(-4.7,0.25,-36.9); stand.castShadow=true; stand.receiveShadow=true; scene.add(stand);
+  var dh=new THREE.Group();
+  var base=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.34,0.42),
+    new THREE.MeshStandardMaterial({color:0x2c3428,roughness:0.9}));
+  base.position.y=0.17; dh.add(base);
+  var roof=new THREE.Mesh(new THREE.ConeGeometry(0.42,0.26,4),
+    new THREE.MeshStandardMaterial({color:0x1c130c,roughness:1}));
+  roof.position.y=0.47; roof.rotation.y=Math.PI/4; roof.scale.z=0.8; dh.add(roof);
+  var win=new THREE.Mesh(new THREE.PlaneGeometry(0.07,0.09),
+    new THREE.MeshBasicMaterial({color:0xffc86e}));
+  win.position.set(0.1,0.18,0.215); dh.add(win);
+  var win2=win.clone(); win2.position.x=-0.12; dh.add(win2);
+  var dr=new THREE.Mesh(new THREE.PlaneGeometry(0.08,0.15),
+    new THREE.MeshBasicMaterial({color:0x090604}));
+  dr.position.set(0.01,0.09,0.215); dh.add(dr);
+  dh.position.set(-4.7,0.5,-36.9); dh.rotation.y=0.5;
+  dh.traverse(function(o){o.castShadow=true;});
+  scene.add(dh);
+  addCollider(-5.05,-4.35,-37.25,-36.55);
+})();
+/* the guest book on its lectern (foyer) */
+(function(){
+  var lect=new THREE.Mesh(new THREE.BoxGeometry(0.5,1.05,0.4),matWoodDark);
+  lect.position.set(4.9,0.525,-3.4); lect.castShadow=true; scene.add(lect);
+  var bk=new THREE.Mesh(new THREE.BoxGeometry(0.44,0.035,0.3),
+    new THREE.MeshStandardMaterial({map:tex(cnv(256,176,function(g){
+      g.fillStyle='#d8d0b2'; g.fillRect(0,0,256,176);
+      g.strokeStyle='rgba(90,90,120,.4)';
+      for(var y=34;y<170;y+=24){g.beginPath();g.moveTo(14,y);g.lineTo(242,y);g.stroke();}
+      g.fillStyle='#2a2a3e'; g.font='italic 17px "Segoe Script",cursive'; g.textAlign='left';
+      g.fillText('E. W. — 1962',22,30);
+      g.fillText('the colonel — 1974',22,54);
+      g.fillText('J. M. — tonight',22,78);
+      g.fillStyle='#5a0d0d';
+      g.fillText('H. M. — nice place!!',22,102);
+      g.fillStyle='rgba(42,42,62,.55)';
+      g.fillText('…why is the ink wet',22,126);
+    }),1,1),roughness:0.95}));
+  bk.position.set(4.9,1.09,-3.4); bk.rotation.x=-0.28; bk.rotation.y=-0.4;
+  bk.castShadow=true; scene.add(bk);
+  addCollider(4.6,5.2,-3.65,-3.15);
+})();
+/* a cobweb stretched across the gallery doorway */
+var doorWeb=null,doorWebState='up';
+(function(){
+  doorWeb=new THREE.Mesh(new THREE.PlaneGeometry(1.66,2.2),
+    new THREE.MeshBasicMaterial({map:tex(cnv(128,160,function(g){
+      g.clearRect(0,0,128,160);
+      g.strokeStyle='rgba(205,205,205,.5)'; g.lineWidth=1.3;
+      for(var i=0;i<9;i++){
+        g.beginPath(); g.moveTo(0,i*20); g.lineTo(128,i*20+((i%2)?10:-6)); g.stroke();
+      }
+      for(var j=0;j<7;j++){
+        g.beginPath(); g.moveTo(j*20,0); g.lineTo(j*20+((j%2)?-8:8),160); g.stroke();
+      }
+      for(var r=14;r<90;r+=15){
+        g.beginPath(); g.arc(64,80,r,0,7); g.stroke();
+      }
+    }),1,1),transparent:true,opacity:0.85,depthWrite:false,side:THREE.DoubleSide}));
+  doorWeb.position.set(DOOR_X[2],1.35,-3*ROOM_D);
+  scene.add(doorWeb);
+})();
+/* a slow ceiling drip in the vault */
+var dripBall=null,dripState={y:3.5,wait:2},dripCount=0;
+(function(){
+  dripBall=new THREE.Mesh(new THREE.SphereGeometry(0.021,8,8),
+    new THREE.MeshStandardMaterial({color:0x9fc4d8,roughness:0.1,metalness:0.3,transparent:true,opacity:0.85}));
+  dripBall.position.set(-2.2,3.5,-61.5);
+  dripBall.visible=false;
+  scene.add(dripBall);
+})();
+/* soft light pools beneath the keys themselves */
+keys.forEach(function(k){
+  var pool=new THREE.Mesh(new THREE.CircleGeometry(0.3,14),
+    new THREE.MeshBasicMaterial({map:flameTex,transparent:true,opacity:0.16,
+      blending:THREE.AdditiveBlending,depthWrite:false}));
+  pool.rotation.x=-Math.PI/2;
+  pool.position.set(k.mesh.position.x,k.baseY-0.17,k.mesh.position.z);
+  scene.add(pool);
+  k.poolMesh=pool;
+});
+
+/* ================= WAVE 4 director ================= */
+var figureGone=false,prevVisited4=false,chimeStrikes=0;
+var _w3Details=window.__ftDetails;
+window.__ftDetails=function(dt,t){
+  if(_w3Details)_w3Details(dt,t);
+  /* the foyer figure leaves its portrait once you reach the gallery */
+  if(!figureGone&&doorsOpened>=2){
+    figureGone=true;
+    figurePortrait.canvas.material.map=tex(figureEmptyTexC,1,1);
+    figurePortrait.canvas.material.needsUpdate=true;
+  }
+  /* the grandfather clock greets you entering the study */
+  if(w2Visited[4]&&!prevVisited4){
+    prevVisited4=true;
+    for(var ci=0;ci<3;ci++){
+      tone(147,98,1.6,'sine',0.06,ci*1.15);
+      chimeStrikes++;
+    }
+  }
+  /* walking through the gallery doorway web */
+  if(doorWebState==='up'&&playing){
+    if(Math.abs(player.z-(-3*ROOM_D))<0.9&&Math.abs(player.x-DOOR_X[2])<1.0){
+      doorWebState='breaking';
+      noiseHit(0.25,3200,0.05);
+    }
+  }else if(doorWebState==='breaking'&&doorWeb){
+    doorWeb.material.opacity-=dt*1.4;
+    doorWeb.position.y-=dt*0.4;
+    if(doorWeb.material.opacity<=0){doorWebState='gone';doorWeb.visible=false;}
+  }
+  /* running past candles dips their flames */
+  if(player.speed>4.4){
+    for(var fi=0;fi<flickerSprites.length;fi++){
+      var fs3=flickerSprites[fi];
+      var fdx=fs3.sp.position.x-player.x,fdz=fs3.sp.position.z-player.z;
+      if(fdx*fdx+fdz*fdz<1.5)fs3.dip=0.5;
+    }
+  }
+  for(var fj=0;fj<flickerSprites.length;fj++){
+    var fs4=flickerSprites[fj];
+    if(fs4.dip>0){
+      fs4.dip-=dt;
+      fs4.sp.scale.set(fs4.sp.scale.x*0.45,fs4.sp.scale.y*0.45,1);
+    }
+  }
+  /* carrying a key greens the dark at the edge of your sight */
+  var vig=$('vignette');
+  var wantGreen=holdingKey&&playing;
+  var cur=vig.getAttribute('data-green')==='1';
+  if(wantGreen!==cur){
+    vig.setAttribute('data-green',wantGreen?'1':'0');
+    vig.style.background=wantGreen?
+      'radial-gradient(ellipse at center,transparent 50%,rgba(24,52,18,.92) 100%)':'';
+  }
+  /* the vault drip */
+  if(dripBall){
+    if(dripState.wait>0){
+      dripState.wait-=dt; dripBall.visible=false;
+      if(dripState.wait<=0){dripState.y=3.5;dripBall.visible=true;}
+    }else{
+      dripState.y-=dt*6.5;
+      dripBall.position.y=dripState.y;
+      if(dripState.y<=0.03){
+        dripCount++;
+        dripState.wait=2.5+Math.random()*3;
+        dripBall.visible=false;
+        var ddx2=player.x+2.2,ddz2=player.z+61.5;
+        if(ddx2*ddx2+ddz2*ddz2<64)tone(880,290,0.07,'sine',0.03);
+      }
+    }
+  }
+  /* key pools hide once their key is taken */
+  for(var ki2=0;ki2<keys.length;ki2++){
+    if(keys[ki2].poolMesh)keys[ki2].poolMesh.visible=!keys[ki2].taken;
+  }
+};
+window.__w4={
+  get figureGone(){return figureGone;},
+  get chimes(){return chimeStrikes;},
+  get webState(){return doorWebState;},
+  get drips(){return dripCount;}
 };
 
 /* ================= MULTIPLAYER: others in the mansion =================
