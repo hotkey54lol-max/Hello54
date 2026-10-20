@@ -1,7 +1,0 @@
-{
-  "name": "sandbox-arcade",
-  "private": true,
-  "dependencies": {
-    "onnxruntime-node": "^1.20.0"
-  }
-}
