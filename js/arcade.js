@@ -911,6 +911,79 @@ window.Arcade = (function () {
     });
   }
 
+  /* ================= Fullscreen button (action games) =================
+   * The 10 action games get a small ⛶ button (top-right) that toggles
+   * document fullscreen. Pure client-side; games keep their own
+   * layouts, this just hands them the whole screen. Joslyn's call
+   * (Oct 20): fullscreen only makes sense for these — board/text
+   * games are intentionally left out.
+   */
+  var FS_GAMES = ["fear-toxin.html", "snake.html", "tetris.html", "pong.html",
+    "breakout.html", "flappy.html", "asteroids.html", "dodge.html",
+    "whackamole.html", "reaction.html"];
+  var _fsBtn = null, _fsStarted = false;
+
+  function _fsActive() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  }
+
+  function _fsSyncBtn() {
+    if (!_fsBtn) return;
+    var on = _fsActive();
+    _fsBtn.textContent = on ? "✕" : "⛶";
+    _fsBtn.title = on ? "Exit fullscreen" : "Fullscreen";
+  }
+
+  function _fsToggle() {
+    try {
+      if (_fsActive()) {
+        var exitFn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (exitFn) exitFn.call(document);
+        return;
+      }
+      var el = document.documentElement;
+      var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (!req) return;
+      try {
+        var p = req.call(el, { navigationUI: "hide" });
+        if (p && typeof p.catch === "function") {
+          p.catch(function () { try { req.call(el); } catch (e) { /* silent */ } });
+        }
+      } catch (e) {
+        try { req.call(el); } catch (e2) { /* silent */ }
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  function startFullscreenButton() {
+    if (_fsStarted) return;
+    _fsStarted = true;
+    _fxSafe(function () {
+      if (typeof document === "undefined" || window.ARCADE_NO_FULLSCREEN) return;
+      var pageName = window.location.pathname.split("/").pop() || "";
+      if (FS_GAMES.indexOf(pageName) === -1) return;
+      var probe = document.documentElement;
+      if (!(probe.requestFullscreen || probe.webkitRequestFullscreen || probe.msRequestFullscreen)) return;
+      var b = document.createElement("button");
+      b.id = "arcade-fs-btn";
+      b.textContent = "⛶";
+      b.title = "Fullscreen";
+      b.setAttribute("aria-label", "Toggle fullscreen");
+      b.setAttribute("style",
+        "position:fixed;top:10px;right:10px;z-index:99999;width:42px;height:42px;" +
+        "background:rgba(0,0,0,0.72);border:2px solid #fff;color:#fff;font-size:19px;" +
+        "line-height:1;cursor:pointer;border-radius:6px;opacity:0.8;padding:0;");
+      b.addEventListener("mouseenter", function () { b.style.opacity = "1"; });
+      b.addEventListener("mouseleave", function () { b.style.opacity = "0.8"; });
+      b.addEventListener("click", _fsToggle);
+      document.body.appendChild(b);
+      _fsBtn = b;
+      document.addEventListener("fullscreenchange", _fsSyncBtn);
+      document.addEventListener("webkitfullscreenchange", _fsSyncBtn);
+      _fsSyncBtn();
+    });
+  }
+
   // Auto-start once the DOM is ready.
   _fxSafe(function () {
     if (typeof document === "undefined") return;
@@ -918,10 +991,12 @@ window.Arcade = (function () {
       document.addEventListener("DOMContentLoaded", function () {
         startChatWatcher();
         startPermWatcher();
+        startFullscreenButton();
       });
     } else {
       startChatWatcher();
       startPermWatcher();
+      startFullscreenButton();
     }
   });
 
@@ -1049,5 +1124,6 @@ window.Arcade = (function () {
       tell: _storyTell,
     },
     settings: settingsApi,
+    fullscreen: { toggle: _fsToggle },
   };
 })();
