@@ -209,6 +209,7 @@ window.Arcade = (function () {
     _clearOverlay("arcade-event-snow");
     _clearOverlay("arcade-event-flashbang");
     _clearOverlay("arcade-event-spooky");
+    _clearOverlay("arcade-event-cooldude");
     _fxSafe(function () {
       document.documentElement.style.filter = "";
       document.documentElement.style.animation = "";
@@ -401,6 +402,47 @@ window.Arcade = (function () {
       _fxDisco(8000);
     });
   }
+  function _fxCoolDude() {
+    _fxSafe(function () {
+      _clearOverlay("arcade-event-cooldude");
+      // Resolve img/ relative to wherever this script was loaded from,
+      // so it works from the hub (js/arcade.js) and games (../js/arcade.js).
+      var base = "";
+      var tag = document.querySelector('script[src$="js/arcade.js"]');
+      if (tag) {
+        var src = tag.getAttribute("src") || "";
+        base = src.slice(0, src.length - "js/arcade.js".length);
+      }
+      if (!document.getElementById("arcade-cooldude-style")) {
+        var st = document.createElement("style");
+        st.id = "arcade-cooldude-style";
+        st.textContent =
+          "@keyframes arcadeCoolDude{" +
+          "from{transform:translateY(0) rotate(-3deg) scale(1)}" +
+          "to{transform:translateY(-26px) rotate(3deg) scale(1.05)}}";
+        document.head.appendChild(st);
+      }
+      var d = document.createElement("div");
+      d.id = "arcade-event-cooldude";
+      d.setAttribute("style",
+        "position:fixed;inset:0;z-index:999992;pointer-events:none;" +
+        "display:flex;align-items:center;justify-content:center;" +
+        "opacity:1;transition:opacity .4s;");
+      var img = document.createElement("img");
+      img.src = base + "img/cooldude.gif";
+      img.alt = "COOL DUDE";
+      img.setAttribute("style",
+        "width:min(68vmin,480px);image-rendering:pixelated;" +
+        "animation:arcadeCoolDude .9s ease-in-out infinite alternate;" +
+        "filter:drop-shadow(0 0 24px rgba(255,255,255,.35));");
+      d.appendChild(img);
+      document.body.appendChild(d);
+      setTimeout(function () {
+        _fxSafe(function () { d.style.opacity = "0"; });
+        setTimeout(function () { _clearOverlay("arcade-event-cooldude"); }, 450);
+      }, 6000);
+    });
+  }
   function _fxSnow() {
     _fxSafe(function () {
       _clearOverlay("arcade-event-snow");
@@ -476,6 +518,7 @@ window.Arcade = (function () {
         case "spooky": _fxSpooky(); break;
         case "party": _fxParty(); break;
         case "snow": _fxSnow(); break;
+        case "cooldude": _fxCoolDude(); break;
         case "tts": _fxTts(payload); break;
         case "clear": _fxClearAll(); break;
         default: break;
