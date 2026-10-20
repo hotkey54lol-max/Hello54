@@ -31,6 +31,10 @@ button:disabled{opacity:.35;cursor:default}
 .mole{font-size:2.6rem;animation:pop .18s ease-out;cursor:pointer;user-select:none;line-height:1}
 .mole.golden{filter:drop-shadow(0 0 10px #ffe14d)}
 @keyframes pop{from{transform:translateY(60%) scale(.6)}to{transform:translateY(0) scale(1)}}
+/* arcade fullscreen fit */
+:fullscreen h1,:fullscreen .back,:fullscreen .leaderboard,:fullscreen .hint{display:none!important}
+:fullscreen #grid{grid-template-columns:repeat(3,min(27vmin,168px));gap:14px}
+:fullscreen .hole{width:min(27vmin,168px);height:min(27vmin,168px)}
 </style>
 </head>
 <body>
