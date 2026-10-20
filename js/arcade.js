@@ -960,7 +960,7 @@ window.Arcade = (function () {
       const r = await fetch(STORY_FN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: String(prompt).slice(0, 400), max_chars: 220 }),
+        body: JSON.stringify({ prompt: String(prompt).slice(0, 400), max_chars: 150 }),
       });
       if (!r.ok) return null;
       const d = await r.json();
