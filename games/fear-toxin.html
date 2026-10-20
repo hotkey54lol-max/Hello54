@@ -54,6 +54,11 @@ button.big:disabled{opacity:.35;cursor:default}
 #mpPanel h4{font-size:9px;letter-spacing:1px;margin-bottom:2px;font-weight:normal}
 #mpPanel .me{color:#ffff00}
 #mpPanel .mp-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* arcade fullscreen fit */
+:fullscreen body{padding:6px;height:100vh;height:100dvh;overflow:hidden;justify-content:flex-start}
+:fullscreen h1,:fullscreen .back,:fullscreen .leaderboard,:fullscreen .hint{display:none!important}
+:fullscreen .scorebar{margin:2px 0 8px}
+:fullscreen #stage{flex:1 1 auto;width:100vw;max-width:none;height:auto;min-height:0}
 </style>
 </head>
 <body>
