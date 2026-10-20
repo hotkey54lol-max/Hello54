@@ -2196,6 +2196,30 @@ window.__w7={
   get tilt(){return w7tilt;}
 };
 
+/* ================= WAVE 8: the vault breathes green ================= */
+var vaultMist=null;
+(function(){
+  vaultMist=glowSprite(sparkTex,0x51ff7a,9.5,0.05);
+  vaultMist.position.set(0,0.55,-58);
+  scene.add(vaultMist);
+  var mist2=glowSprite(sparkTex,0x39d95e,7,0.04);
+  mist2.position.set(-2,0.35,-62);
+  scene.add(mist2);
+  vaultMist.userData.m2=mist2;
+})();
+
+/* ================= WAVE 8 director ================= */
+var _w7Details=window.__ftDetails;
+window.__ftDetails=function(dt,t){
+  if(_w7Details)_w7Details(dt,t);
+  if(vaultMist){
+    vaultMist.position.x=Math.sin(t*0.05)*1.6;
+    vaultMist.material.opacity=0.04+0.02*Math.sin(t*0.13);
+    var m2=vaultMist.userData.m2;
+    if(m2){m2.position.x=-2+Math.cos(t*0.04)*1.4;m2.material.opacity=0.03+0.02*Math.cos(t*0.11);}
+  }
+};
+
 /* ================= MULTIPLAYER: others in the mansion =================
  * ft_escape table: heartbeat (x, z, rot, room, escaped) every 600ms;
  * other players render as glowing figures with name tags, lerped.
