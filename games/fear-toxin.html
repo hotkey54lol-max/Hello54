@@ -502,6 +502,7 @@ stageEl.addEventListener('touchstart',function(e){
   var r=stageRect();
   for(var i=0;i<e.changedTouches.length;i++){
     var t=e.changedTouches[i],lx=t.clientX-r.left;
+    if(t.target===interactBtn)continue; /* the gold button handles itself */
     if(lx<r.width*0.45&&joyId===null){
       joyId=t.identifier; joyOrigin={x:t.clientX,y:t.clientY};
       joyEl.style.left=(lx-59)+'px'; joyEl.style.top=(t.clientY-r.top-59)+'px'; joyEl.style.bottom='auto';
@@ -541,7 +542,23 @@ function touchEnd(e){
 }
 stageEl.addEventListener('touchend',touchEnd);
 stageEl.addEventListener('touchcancel',touchEnd);
-interactBtn.addEventListener('click',function(){tryInteract();});
+/* The button lives INSIDE the stage, whose touchstart handler calls
+   preventDefault() — that suppresses the click a real tap would fire,
+   so a plain click listener never runs on a phone. Handle the tap on
+   the button itself and keep it away from the stage handlers. */
+var lastBtnTouch=0;
+interactBtn.addEventListener('touchstart',function(e){
+  e.stopPropagation(); e.preventDefault();
+},{passive:false});
+interactBtn.addEventListener('touchend',function(e){
+  e.stopPropagation(); e.preventDefault();
+  lastBtnTouch=Date.now();
+  tryInteract();
+},{passive:false});
+interactBtn.addEventListener('click',function(){
+  if(Date.now()-lastBtnTouch<700)return; /* already handled as a tap */
+  tryInteract();
+});
 
 /* ================= interaction ================= */
 function currentKeyObj(){
