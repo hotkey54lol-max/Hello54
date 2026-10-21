@@ -95,6 +95,11 @@
     display: inline-block; background: var(--ut-yellow); color: #000;
     font-size: 9px; letter-spacing: 1px; padding: 5px 10px; margin-bottom: 12px;
   }
+  .card .expbadge {
+    display: inline-block; background: #c0392b; color: #fff;
+    font-size: 9px; letter-spacing: 1px; padding: 5px 10px; margin-bottom: 12px;
+    box-shadow: 0 0 10px #c0392b88;
+  }
   .card .sub { margin-top: 8px; font-size: 9px; color: var(--ut-gray); line-height: 1.8; }
   .card .playbtn {
     display: inline-block; background: var(--ut-yellow); color: #000;
@@ -134,7 +139,7 @@
 <body>
 <header>
   <h1>* SANDBOX ARCADE</h1>
-  <p>* 21 games. The air is filled with determination.</p>
+  <p>* 22 games. The air is filled with determination.</p>
 </header>
 <div class="name-row">Playing as <strong id="pname">…</strong><button id="rename">change</button></div>
 
@@ -162,6 +167,7 @@
   "use strict";
   const GAMES = [
     { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin", featured: true, sub: "* FEAR TOXIN: ESCAPE — a haunted mansion. Find the keys. Get out." },
+    { id: "bloxtopia",   emoji: "🧱", title: "Bloxtopia", exp: true, sub: "* BLOXTOPIA — a tiny open world in your browser. Live players, Lua-powered. Proof of concept." },
     { id: "snake",       emoji: "🐍", title: "Snake" },
     { id: "2048",        emoji: "🔢", title: "2048" },
     { id: "minesweeper", emoji: "💣", title: "Minesweeper" },
@@ -202,6 +208,7 @@
     a.href = "games/" + g.id + ".html";
     a.innerHTML =
       (g.featured ? '<span class="badge">★ FEATURED</span>' : "") +
+      (g.exp ? '<span class="expbadge">🧪 EXPERIMENTAL</span>' : "") +
       '<img class="thumb" src="img/thumbs/' + g.id + '.jpg" alt="' + g.title + '" loading="lazy">' +
       '<span class="title">' + g.title + "</span>" +
       (g.sub ? '<div class="sub">' + g.sub + "</div>" : "") +
