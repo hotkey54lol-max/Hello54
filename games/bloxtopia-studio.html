@@ -85,6 +85,10 @@
     Uploaded sounds are public files — keep them friendly; the admin can review them.</p>
 
     <div class="row">
+      <button class="act" id="ed3dBtn" style="background:#7a4ae8;border-color:#b79aff;color:#fff;font-size:.95rem">&#127912; BUILD IN 3D</button>
+    </div>
+    <p class="hint">The new way: build inside the world itself — orbit camera, ghost preview, click to place. This page stays your desk for the name, Lua script, sounds and publishing; both editors share the same draft.</p>
+    <div class="row">
       <button class="act blue" id="testBtn">&#9654; TEST PLAY</button>
       <button class="act" id="saveBtn">&#128190; SAVE DRAFT</button>
       <button class="act purple" id="pubBtn">&#127758; PUBLISH</button>
@@ -293,6 +297,10 @@ document.getElementById('saveBtn').addEventListener('click',function(){saveDraft
 document.getElementById('testBtn').addEventListener('click',function(){
   saveDraft();
   window.open('bloxtopia.html?w=DRAFT','_blank');
+});
+document.getElementById('ed3dBtn').addEventListener('click',function(){
+  saveDraft();
+  location.href='bloxtopia.html?edit=DRAFT';
 });
 document.getElementById('clearBtn').addEventListener('click',function(){
   if(confirm('Clear the whole grid?')){cells={};pads={};spawn={x:0,z:0};draw();queueDraft();}
