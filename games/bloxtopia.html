@@ -92,6 +92,9 @@
     <p style="color:#ffd94d">Pick your colors:</p>
     <div class="chips" id="colorChips"></div>
     <button class="big" id="startBtn">&#9654; ENTER BLOXTOPIA</button>
+    <button class="big" id="studioBtn" style="background:#4a2a6e;border-color:#9a6fe8;color:#e6d9ff;font-size:.85rem;padding:9px 18px">&#128736; CREATE A WORLD</button>
+    <div style="font-size:.8rem;color:#cfe6f5">&#127758; Visit a world: <input id="wcodeInput" maxlength="11" placeholder="BLOX-XXXXXX" style="font-family:inherit;background:#0d2438;color:#fff;border:2px solid #2e5d8a;border-radius:6px;padding:5px 8px;width:130px;text-transform:uppercase"> <button id="wcodeGo" class="setbtn">GO</button></div>
+    <div id="worldDir" style="font-size:.78rem;color:#cfe6f5;max-width:520px;line-height:1.9"></div>
     <p style="color:#ff9d8a;font-size:.72rem">EXPERIMENTAL: things may break. That's what it's for.</p>
   </div>
 </div>
@@ -169,10 +172,37 @@ function box(x,y,z,w,h,d,color,opts){
 }
 function cnv(w,h,fn){var c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);return c;}
 
+/* ---- W4: worlds. ?w=CODE loads a player world; no code = Hometown ---- */
+var WCODE=new URLSearchParams(location.search).get('w');
+window.__BT_CUSTOM=!!WCODE;
+window.__BT_DEF=null;
+window.__BT_SPAWN=null;
+var PADS=[{x:8,z:-7,r:1.35,y:0,p:13.5}];
+var LAVA_CELLS=[];
+var water=null;
+var discoTiles=[];
+var coins=[];
+function coin(x,y,z,big){
+  var grp=new THREE.Group(); grp.position.set(x,y,z);
+  var m=new THREE.Mesh(new THREE.CylinderGeometry(big?0.7:0.45,big?0.7:0.45,0.1,18),
+    new THREE.MeshStandardMaterial({color:0xffd94d,roughness:0.25,metalness:0.7,emissive:0x554400}));
+  m.rotation.x=Math.PI/2; m.castShadow=true;
+  grp.add(m); scene.add(grp);
+  coins.push({mesh:grp,x:x,y:y,z:z,taken:false,respawn:0,big:!!big});
+}
+var SHOPS=[
+  {x:-17,z:-17,c:0xe86a4f,roof:0x8a3b2a},
+  {x:17,z:-17,c:0x4fa3e8,roof:0x2a4f8a},
+  {x:-17,z:17,c:0x63c94f,roof:0x2a6e35},
+  {x:17,z:17,c:0xe8c94f,roof:0x8a6d2a}
+];
+var TOWER={x:-36,z:-36};
+
+function buildHometown(){
 /* island + sea */
 box(0,-1.05,0,100,2,100,0x58a83c,{collide:false,tex:'grass',texRep:18});   /* grass, top y=-0.05 */
 box(0,-1.35,0,112,1.6,112,0xe8d28a,{collide:false,tex:'sand',texRep:14});  /* sand rim */
-var water=new THREE.Mesh(new THREE.PlaneGeometry(500,500),
+water=new THREE.Mesh(new THREE.PlaneGeometry(500,500),
   new THREE.MeshStandardMaterial({color:0x2e7fc9,transparent:true,opacity:0.88,roughness:0.4}));
 water.rotation.x=-Math.PI/2; water.position.y=-0.75; scene.add(water);
 water.userData.texKey='water'; water.userData.texRep=26;
@@ -198,12 +228,6 @@ box(0,0.01,0,7,0.06,100,0x6f6f68,{collide:false,tex:'asphalt',texRep:12});
 })();
 
 /* shops (bodies + pyramid roofs + step-boxes up the back) */
-var SHOPS=[
-  {x:-17,z:-17,c:0xe86a4f,roof:0x8a3b2a},
-  {x:17,z:-17,c:0x4fa3e8,roof:0x2a4f8a},
-  {x:-17,z:17,c:0x63c94f,roof:0x2a6e35},
-  {x:17,z:17,c:0xe8c94f,roof:0x8a6d2a}
-];
 SHOPS.forEach(function(s){
   box(s.x,2.5,s.z,11,5,11,s.c,{tex:'wood',texRep:2});
   var roof=new THREE.Mesh(new THREE.ConeGeometry(8.6,3,4),
@@ -224,7 +248,6 @@ SHOPS.forEach(function(s){
 });
 
 /* obby tower (NW corner): spiral platforms to a gold top */
-var TOWER={x:-36,z:-36};
 (function(){
   box(TOWER.x,1,TOWER.z,9,2,9,0xffffff,{tex:'brick',texRep:3});
   var px=TOWER.x,pz=TOWER.z,py=2;
@@ -253,7 +276,6 @@ function lamp(x,z){
 [[10,10],[-10,10],[10,-10],[-10,-10],[0,26],[26,0],[-26,0],[0,-26]].forEach(function(p){lamp(p[0],p[1]);});
 
 /* disco floor (Lua-driven): 4x4 tiles south of the fountain */
-var discoTiles=[];
 (function(){
   for(var i=0;i<16;i++){
     var tx=-6+(i%4)*3.1, tz=9+Math.floor(i/4)*3.1;
@@ -264,23 +286,14 @@ var discoTiles=[];
 })();
 
 /* bounce pad (Lua-driven) */
-var PAD={x:8,z:-7,r:1.35};
 (function(){
-  var p=new THREE.Mesh(new THREE.CylinderGeometry(PAD.r,PAD.r*1.1,0.3,18),
+  var pd=PADS[0];
+  var p=new THREE.Mesh(new THREE.CylinderGeometry(pd.r,pd.r*1.1,0.3,18),
     new THREE.MeshStandardMaterial({color:0xe23b3b,roughness:0.5,emissive:0x550000}));
-  p.position.set(PAD.x,0.15,PAD.z); p.receiveShadow=true; scene.add(p);
+  p.position.set(pd.x,0.15,pd.z); p.receiveShadow=true; scene.add(p);
 })();
 
 /* coins */
-var coins=[];
-function coin(x,y,z,big){
-  var grp=new THREE.Group(); grp.position.set(x,y,z);
-  var m=new THREE.Mesh(new THREE.CylinderGeometry(big?0.7:0.45,big?0.7:0.45,0.1,18),
-    new THREE.MeshStandardMaterial({color:0xffd94d,roughness:0.25,metalness:0.7,emissive:0x554400}));
-  m.rotation.x=Math.PI/2; m.castShadow=true;
-  grp.add(m); scene.add(grp);
-  coins.push({mesh:grp,x:x,y:y,z:z,taken:false,respawn:0,big:!!big});
-}
 [[6,1,-3],[-6,1,-3],[3,1,6],[-3,1,-7],[12,1,3],[-12,1,-3],[0,1,14],[14,1,-14],[-14,1,14],
  [24,1,24],[-24,1,-24],[30,1,-30],[-30,1,30],[8,1,30],[-36,1,8],[36,1,-8],[0,1,-34],[20,1,8]
 ].forEach(function(p){coin(p[0],p[1],p[2]);});
@@ -290,6 +303,54 @@ SHOPS.forEach(function(s){ coin(s.x+(s.x<0?-4.6:4.6),4.7,s.z); }); /* top step-b
   coin(TOWER.x-4.5,7.9,TOWER.z-4.5, false);
   coin(TOWER.x,14.3,TOWER.z, true);
 })();
+} /* end buildHometown */
+
+/* ---- custom worlds: built from a Studio definition ---- */
+function blockTopAt(blocks,cx,cz){
+  var top=0;
+  for(var i=0;i<blocks.length;i++){
+    if(blocks[i].x===cx&&blocks[i].z===cz)top=Math.max(top,Math.max(1,blocks[i].h|0));
+  }
+  return top;
+}
+var CUSTOM_MATS={
+  grass:[0x58a83c,'grass'], stone:[0x9aa3ad,'stone'], wood:[0xb08954,'wood'],
+  brick:[0xffffff,'brick'], sand:[0xe8d28a,'sand'], leaf:[0x2c7a2c,'leaf'],
+  glass:[0xd6f0fa,'glass'], lava:[0xff5a2a,null], disco:[0x444444,null]
+};
+function buildCustom(def){
+  window.__BT_DEF=def;
+  var blocks=(def&&def.blocks)||[];
+  box(0,-1.05,0,66,2,66,0x58a83c,{collide:false,tex:'grass',texRep:12});
+  box(0,-1.35,0,78,1.6,78,0xe8d28a,{collide:false,tex:'sand',texRep:10});
+  water=new THREE.Mesh(new THREE.PlaneGeometry(500,500),
+    new THREE.MeshStandardMaterial({color:0x2e7fc9,transparent:true,opacity:0.88,roughness:0.4}));
+  water.rotation.x=-Math.PI/2; water.position.y=-0.75; scene.add(water);
+  water.userData.texKey='water'; water.userData.texRep=26;
+  blocks.forEach(function(b){
+    var wx=b.x*3, wz=b.z*3, h=Math.max(1,Math.min(8,b.h|0));
+    var mt=CUSTOM_MATS[b.m]||CUSTOM_MATS.grass;
+    var mesh=box(wx,h/2,wz,3,h,3,mt[0],mt[1]?{tex:mt[1],texRep:1}:{});
+    if(b.m==='lava'){mesh.material.emissive=new THREE.Color(0x7a1e00);LAVA_CELLS.push({x:wx,z:wz,top:h});}
+    if(b.m==='glass'){mesh.material.transparent=true;mesh.material.opacity=0.72;}
+    if(b.m==='disco'){mesh.material=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.4,emissive:0x222222});discoTiles.push(mesh);}
+    if(b.coin)coin(wx,h+1.15,wz,false);
+  });
+  ((def&&def.pads)||[]).forEach(function(pd){
+    var wx=pd.x*3, wz=pd.z*3, base=blockTopAt(blocks,pd.x,pd.z);
+    var p=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.45,0.3,18),
+      new THREE.MeshStandardMaterial({color:0xe23b3b,roughness:0.5,emissive:0x550000}));
+    p.position.set(wx,base+0.15,wz); p.receiveShadow=true; scene.add(p);
+    PADS.push({x:wx,z:wz,r:1.35,y:base,p:pd.p||13.5});
+  });
+  var sp=(def&&def.spawn)||{x:0,z:0};
+  var sx=sp.x*3, sz=sp.z*3, sy=blockTopAt(blocks,sp.x,sp.z);
+  var ring=new THREE.Mesh(new THREE.CylinderGeometry(1.45,1.45,0.1,24),
+    new THREE.MeshStandardMaterial({color:0x2ed573,roughness:0.4,emissive:0x0a5a2a}));
+  ring.position.set(sx,sy+0.05,sz); scene.add(ring);
+  window.__BT_SPAWN={x:sx,y:sy,z:sz};
+}
+if(!window.__BT_CUSTOM)buildHometown();
 </script>
 <script>
 /* ================= DETAILED TEXTURES + QUALITY =================
@@ -837,6 +898,7 @@ function signPost(text,x,y,z,w,bg,fg,ry,posts){
   }
   return s;
 }
+if(!window.__BT_CUSTOM){ /* hometown dressing only — custom worlds bring their own */
 signPost('★ BLOXTOPIA ★',0,2.7,-13.5,7.5,'#ffd94d','#20202a',0,true);
 var SHOP_NAMES=['BLOX MART','BLOX CAFE','BLOX ARCADE','BLOX TOYS'];
 SHOPS.forEach(function(s,i){
@@ -882,6 +944,8 @@ bench(7.5,0,false); bench(-7.5,0,false); bench(0,7.5,true); bench(0,-7.5,true);
     placed++;
   }
 })();
+
+} /* end hometown dressing */
 
 /* blocky clouds */
 var CLOUDS=[];
@@ -1011,6 +1075,7 @@ animateAvatar=function(g,sn,dt,ph){
 /* obby checkpoints + reset character (the classic ↺) */
 var CHECKPOINTS=[], CP_IDX=-1, RESPAWN={x:0,y:0,z:10};
 (function(){
+  if(window.__BT_CUSTOM)return; /* obby checkpoints are a Hometown thing */
   var spots=[ /* step idx, dx, dz, platform top */
     {i:1,dx:4.5,dz:-4.5,top:4.75},
     {i:4,dx:-4.5,dz:0,top:8.5},
@@ -1201,7 +1266,8 @@ function initLua(){
       console.log('[lua]',s?fengari.to_jsstring(s):'');
       return 0;
     });
-    var rc=lauxlib.luaL_dostring(LUA,S(WORLD_SCRIPT));
+    var src=(window.__BT_DEF&&window.__BT_DEF.script)?window.__BT_DEF.script:WORLD_SCRIPT;
+    var rc=lauxlib.luaL_dostring(LUA,S(src));
     if(rc!==0)throw new Error('world script failed to load');
     luaOkFlag=true;
     $('luaStat').textContent='running ✓';
@@ -1248,6 +1314,10 @@ var SB_URL=(window.Arcade&&Arcade.SUPABASE_URL)||'', SB_KEY=(window.Arcade&&Arca
 var myId=null;
 try{myId=localStorage.getItem('bt_id');}catch(e){}
 if(!myId){myId='bt'+Math.random().toString(36).slice(2,10);try{localStorage.setItem('bt_id',myId);}catch(e){}}
+/* W4: players in different worlds must not see each other — custom-world
+   heartbeats carry a w<CODE>_ prefix and each side filters for its own. */
+var MP_ID=window.__BT_CUSTOM?('w'+WCODE+'_'+myId):myId;
+var MP_PREFIX=window.__BT_CUSTOM?('w'+WCODE+'_'):null;
 var others=new Map(), mpAlive=true, hbT=0, fetchT=0;
 function sbHeaders(extra){
   var h={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
@@ -1260,7 +1330,7 @@ async function mpHeartbeat(){
     var r=await fetch(SB_URL+'/rest/v1/bt_players',{
       method:'POST',
       headers:sbHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({id:myId,name:myName,x:player.x,y:player.y,z:player.z,ry:player.ry,c:myColor,updated_at:new Date().toISOString()})
+      body:JSON.stringify({id:MP_ID,name:myName,x:player.x,y:player.y,z:player.z,ry:player.ry,c:myColor,updated_at:new Date().toISOString()})
     });
     if(r.status===404){mpAlive=false;console.warn('bt_players table missing — MP off');}
   }catch(e){}
@@ -1269,11 +1339,12 @@ async function mpFetch(){
   if(!mpAlive||!SB_URL)return;
   try{
     var since=new Date(Date.now()-12000).toISOString();
-    var r=await fetch(SB_URL+'/rest/v1/bt_players?select=*&id=neq.'+encodeURIComponent(myId)+'&updated_at=gt.'+encodeURIComponent(since),{headers:sbHeaders()});
+    var r=await fetch(SB_URL+'/rest/v1/bt_players?select=*&id=neq.'+encodeURIComponent(MP_ID)+'&updated_at=gt.'+encodeURIComponent(since),{headers:sbHeaders()});
     if(!r.ok)return;
     var rows=await r.json();
     var seen={};
     rows.forEach(function(row){
+      if(MP_PREFIX?(row.id.indexOf(MP_PREFIX)!==0):(row.id.charAt(0)==='w'))return; /* other worlds are invisible */
       seen[row.id]=true;
       var o=others.get(row.id);
       if(!o){
@@ -1297,7 +1368,7 @@ async function mpFetch(){
 }
 function mpRemoveMe(){
   try{
-    fetch(SB_URL+'/rest/v1/bt_players?id=eq.'+encodeURIComponent(myId),{
+    fetch(SB_URL+'/rest/v1/bt_players?id=eq.'+encodeURIComponent(MP_ID),{
       method:'DELETE',headers:sbHeaders(),keepalive:true});
   }catch(e){}
 }
@@ -1365,6 +1436,7 @@ function loop(){
   luaCallBt('onTick',[dt]); /* world scripts run even on the menu — the town is alive */
   if(window.updateLife)updateLife(dt,t);
   if(window.updateFx)updateFx(dt);
+  if(window.updateCustomWorld)updateCustomWorld(dt);
   if(playing){
     stepPlayer(dt);
     if(pendingLaunch){
@@ -1374,10 +1446,15 @@ function loop(){
       pendingLaunch=0;
     }
     padCooldown-=dt;
-    var pdx=player.x-PAD.x, pdz=player.z-PAD.z;
-    if(padCooldown<=0&&pdx*pdx+pdz*pdz<PAD.r*PAD.r&&player.y<0.5){
-      padCooldown=0.6;
-      if(!luaCallBt('onPad',[])){player.vy=13.5;sndBounce();} /* fallback if Lua died */
+    if(padCooldown<=0){
+      for(var pi=0;pi<PADS.length;pi++){
+        var pd=PADS[pi], pdx=player.x-pd.x, pdz=player.z-pd.z;
+        if(pdx*pdx+pdz*pdz<pd.r*pd.r&&Math.abs(player.y-pd.y)<0.6){
+          padCooldown=0.6;
+          if(!luaCallBt('onPad',[])){player.vy=pd.p;sndBounce();} /* fallback if Lua died */
+          break;
+        }
+      }
     }
     hbT-=dt; if(hbT<=0){hbT=0.7;mpHeartbeat();}
     fetchT-=dt; if(fetchT<=0){fetchT=1.1;mpFetch();}
@@ -1417,9 +1494,77 @@ function loop(){
   renderer.render(scene,camera);
 }
 resize();
-loadSettings();
-initLua();
-loadScores();
+/* ================= W4 boot: load the world, then start systems ================= */
+function applyCustomMeta(def){
+  var nm=(def&&def.name)||'CUSTOM WORLD';
+  document.title='🧱 '+nm+' — Bloxtopia';
+  var h=document.querySelector('#overlay h2');
+  if(h)h.textContent='🧱 '+nm.toUpperCase();
+  var tag=document.querySelector('h1');
+  if(tag)tag.innerHTML='🧱 '+nm.toUpperCase()+' <span class="exp">PLAYER WORLD</span>';
+  if(window.__BT_SPAWN){
+    player.x=window.__BT_SPAWN.x; player.y=window.__BT_SPAWN.y; player.z=window.__BT_SPAWN.z;
+    RESPAWN={x:player.x,y:player.y,z:player.z};
+  }
+  var msg=$('msg');
+  if(msg)msg.textContent='A world made by a player'+(def&&def.author?(' ('+def.author+')'):'')+'. Code: '+WCODE;
+}
+function updateCustomWorld(dt){
+  if(!playing||!LAVA_CELLS.length)return;
+  if(!player.grounded)return;
+  for(var i=0;i<LAVA_CELLS.length;i++){
+    var c=LAVA_CELLS[i];
+    if(Math.abs(player.x-c.x)<1.5&&Math.abs(player.z-c.z)<1.5&&Math.abs(player.y-c.top)<0.35){
+      tone(160,60,.3,'sawtooth',.06);
+      if(window.worldMsg)worldMsg('🔥 OUCH! LAVA!');
+      resetCharacter();
+      return;
+    }
+  }
+}
+async function loadWorldDir(){
+  if(!SB_URL)return;
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/bt_worlds?select=code,name,author&listed=eq.true&order=updated_at.desc&limit=10',{headers:sbHeaders()});
+    if(!r.ok)return;
+    var rows=await r.json();
+    if(!rows.length)return;
+    $('worldDir').innerHTML='&#127758; <b>Player worlds:</b> '+rows.map(function(w){
+      return '<a href="?w='+encodeURIComponent(w.code)+'" style="color:#ffd94d">'+String(w.name||'').replace(/</g,'')+'</a>';
+    }).join(' &middot; ');
+  }catch(e){}
+}
+$('studioBtn').addEventListener('click',function(){location.href='bloxtopia-studio.html';});
+$('wcodeGo').addEventListener('click',function(){
+  var v=$('wcodeInput').value.trim().toUpperCase();
+  if(v)location.href='?w='+encodeURIComponent(v.indexOf('BLOX-')===0?v:('BLOX-'+v));
+});
+(async function bootWorld(){
+  if(WCODE){
+    var def=null;
+    if(WCODE==='DRAFT'){
+      try{def=JSON.parse(localStorage.getItem('bt_draft')||'null');}catch(e){}
+    }else{
+      try{
+        var r=await fetch(SB_URL+'/rest/v1/bt_worlds?code=eq.'+encodeURIComponent(WCODE)+'&select=data,name,author',{headers:sbHeaders()});
+        var rows=await r.json();
+        if(rows&&rows[0]&&rows[0].data){
+          def=rows[0].data;
+          def.name=rows[0].name; def.author=rows[0].author;
+        }
+      }catch(e){}
+    }
+    if(def){buildCustom(def);applyCustomMeta(def);}
+    else{
+      buildHometown();
+      var m=$('msg'); if(m)m.textContent='⚠ World "'+WCODE+'" not found — welcome to Hometown instead.';
+    }
+  }
+  loadSettings();
+  initLua();
+  loadScores();
+  loadWorldDir();
+})();
 requestAnimationFrame(function(){resize();loop();});
 
 /* debug/test handle */
@@ -1434,7 +1579,7 @@ window.__bt={
   jump:function(){jumpQueued=true;},
   press:function(code,down){keysDown[code]=!!down;},
   disco:function(i){return discoTiles[i].material.color.getHex();},
-  padPos:function(){return {x:PAD.x,z:PAD.z};},
+  padPos:function(){return {x:PADS[0].x,z:PADS[0].z};},
   coinPos:function(){for(var i=0;i<coins.length;i++)if(!coins[i].taken)return {x:coins[i].x,y:coins[i].y,z:coins[i].z};return null;},
   setCam:function(yaw,pitch){camYaw=yaw;if(pitch!==undefined)camPitch=pitch;},
   get quality(){return QUALITY;},
