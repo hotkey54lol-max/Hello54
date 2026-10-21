@@ -215,6 +215,13 @@
       (g.featured ? '<span class="playbtn">▶ PLAY</span>' : "") +
       '<div class="best" id="best-' + g.id + '">…</div>';
     grid.appendChild(a);
+    if (g.id === "bloxtopia") {
+      const st = document.createElement("a");
+      st.href = "games/bloxtopia-studio.html";
+      st.textContent = "🛠 OPEN THE STUDIO — build your own world";
+      st.style.cssText = "grid-column:1/-1;display:block;text-align:center;color:#c9a7ff;font-size:.75rem;text-decoration:none;border:2px dashed #9a6fe8;border-radius:8px;padding:8px 4px;background:#1a0f2a;";
+      grid.appendChild(st);
+    }
     bestEls[g.id] = a.querySelector(".best");
   });
 
