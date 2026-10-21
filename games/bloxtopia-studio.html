@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>&#128736; Bloxtopia Studio — create a world</title>
+<style>
+  * { box-sizing:border-box; }
+  body { background:#0b1c2c; color:#eee; font-family:'Courier New',ui-monospace,monospace; margin:0; padding:12px 10px 40px; }
+  a.back { color:#ffd94d; text-decoration:none; border:2px solid #ffd94d; padding:6px 10px; border-radius:8px; background:#000a; font-size:.8rem; }
+  h1 { color:#ffd94d; letter-spacing:2px; font-size:1.25rem; margin:12px 0 2px; text-align:center; }
+  .sub { text-align:center; color:#9fc3dd; font-size:.82rem; margin:0 0 14px; }
+  .wrap { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; align-items:flex-start; }
+  .card { background:#07182a; border:2px solid #2e5d8a; border-radius:10px; padding:12px 14px; }
+  #gridCard { text-align:center; }
+  canvas#grid { background:#12314d; border:2px solid #2e5d8a; border-radius:6px; touch-action:none; max-width:92vw; height:auto; }
+  .tools { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; justify-content:center; }
+  button.tool, button.mat, button.act { font-family:inherit; background:#0d2438; color:#cfe6f5; border:2px solid #2e5d8a; border-radius:6px; padding:6px 11px; cursor:pointer; font-size:.78rem; }
+  button.tool.on, button.mat.on { background:#ffd94d; color:#000; border-color:#ffd94d; font-weight:bold; }
+  button.act { background:#14532d; border-color:#22c55e; color:#d9ffd9; }
+  button.act.blue { background:#123a5e; border-color:#3aa7e8; color:#d9ecff; }
+  button.act.purple { background:#4a2a6e; border-color:#9a6fe8; color:#e6d9ff; }
+  .swatch { display:inline-block; width:11px; height:11px; border-radius:2px; margin-right:5px; vertical-align:-1px; border:1px solid #0008; }
+  .side { width:340px; max-width:92vw; }
+  .side h3 { color:#ffd94d; margin:4px 0 8px; font-size:.85rem; letter-spacing:1px; }
+  .side label { font-size:.75rem; color:#9fc3dd; display:block; margin:10px 0 3px; }
+  .side input[type=text], .side textarea { width:100%; font-family:inherit; background:#0d2438; color:#fff; border:2px solid #2e5d8a; border-radius:6px; padding:7px 9px; font-size:.82rem; }
+  .side textarea { height:150px; resize:vertical; font-size:.74rem; line-height:1.45; }
+  .hint { font-size:.7rem; color:#7fa3bd; line-height:1.55; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  #status { font-size:.78rem; color:#9fe870; min-height:1.2em; margin-top:8px; line-height:1.5; }
+  #status.err { color:#ff9d8a; }
+  .hght { display:flex; align-items:center; gap:8px; justify-content:center; margin-top:8px; font-size:.8rem; color:#cfe6f5; }
+  .hght button { width:32px; height:32px; font-size:1rem; }
+  code { color:#ffd94d; }
+</style>
+</head>
+<body>
+<a class="back" href="bloxtopia.html">&larr; BLOXTOPIA</a>
+<h1>&#128736; BLOXTOPIA STUDIO</h1>
+<p class="sub">Build a world. Publish it. Anyone with the code can play it — no downloads, no accounts.</p>
+
+<div class="wrap">
+  <div class="card" id="gridCard">
+    <div class="tools" id="matBar"></div>
+    <div class="tools" id="toolBar"></div>
+    <canvas id="grid" width="546" height="546"></canvas>
+    <div class="hght">
+      <span>Stack height:</span>
+      <button class="tool" id="hMinus">−</button>
+      <b id="hVal" style="color:#ffd94d">1</b>
+      <button class="tool" id="hPlus">+</button>
+      <span class="hint">paint = place &middot; drag works &middot; right-click erases</span>
+    </div>
+  </div>
+
+  <div class="card side">
+    <h3>WORLD</h3>
+    <label>World name</label>
+    <input type="text" id="wName" maxlength="40" placeholder="e.g. Sky Obby Deluxe">
+    <label>Author (your arcade name)</label>
+    <input type="text" id="wAuthor" maxlength="24">
+    <label><input type="checkbox" id="wListed"> List it in the world directory (anyone can find it — otherwise it's code-only)</label>
+
+    <h3 style="margin-top:16px">LUA SCRIPT</h3>
+    <textarea id="wScript" maxlength="4000" spellcheck="false"></textarea>
+    <p class="hint">Your script gets the <code>bt</code> API only — sandboxed, no internet, no data access:
+    <code>bt.onTick(dt)</code>, <code>bt.onPad()</code>, <code>bt.setDisco(i, 0xRRGGBB)</code>,
+    <code>bt.spinCoins(delta)</code>, <code>bt.launch(power)</code>, <code>bt.playTone(freq)</code>, <code>bt.log(msg)</code>.
+    Coroutines and <code>os.time</code>/<code>os.clock</code> work too.</p>
+
+    <div class="row">
+      <button class="act blue" id="testBtn">&#9654; TEST PLAY</button>
+      <button class="act" id="saveBtn">&#128190; SAVE DRAFT</button>
+      <button class="act purple" id="pubBtn">&#127758; PUBLISH</button>
+    </div>
+    <div class="row">
+      <input type="text" id="loadCode" placeholder="BLOX-XXXXXX" maxlength="11" style="flex:1;text-transform:uppercase">
+      <button class="tool" id="loadBtn">LOAD WORLD</button>
+      <button class="tool" id="clearBtn">CLEAR</button>
+    </div>
+    <div id="status"></div>
+    <p class="hint">Drafts save on this device. Publishing gives you a code like <code>BLOX-K7QX2M</code> —
+    share the link and anyone can walk in. Keep it friendly: names are filtered, and the admin can take worlds down.</p>
+  </div>
+</div>
+
+<script>window.ARCADE_NO_CHAT=true;window.ARCADE_NO_EVENTS=true;window.ARCADE_NO_UPDATE=true;</script>
+<script src="../js/arcade.js"></script>
+<script>
+(function(){
+"use strict";
+var GRID=21, CELL=26, HALF=10;
+var MATS={
+  grass:{c:'#58a83c',label:'Grass'},
+  stone:{c:'#9aa3ad',label:'Stone'},
+  wood:{c:'#b08954',label:'Wood'},
+  brick:{c:'#b2543e',label:'Brick'},
+  sand:{c:'#e8d28a',label:'Sand'},
+  leaf:{c:'#2c7a2c',label:'Leaf'},
+  glass:{c:'#a8d4e6',label:'Glass'},
+  disco:{c:'#5a5a6a',label:'Disco (Lua)'},
+  lava:{c:'#ff5a2a',label:'LAVA'}
+};
+var cells={};           /* "x,z" -> {h,m,coin} */
+var pads={};            /* "x,z" -> power */
+var spawn={x:0,z:0};
+var brush={tool:'paint', mat:'grass', h:1};
+
+var grid=document.getElementById('grid'), gx=grid.getContext('2d');
+function key(x,z){return x+','+z;}
+function shade(hex,amt){
+  var n=parseInt(hex.slice(1),16);
+  var r=Math.max(0,Math.min(255,(n>>16)+amt)), g=Math.max(0,Math.min(255,((n>>8)&255)+amt)), b=Math.max(0,Math.min(255,(n&255)+amt));
+  return 'rgb('+r+','+g+','+b+')';
+}
+function draw(){
+  gx.clearRect(0,0,546,546);
+  for(var cz=-HALF;cz<=HALF;cz++)for(var cx=-HALF;cx<=HALF;cx++){
+    var px=(cx+HALF)*CELL, py=(cz+HALF)*CELL;
+    gx.fillStyle=((cx+cz)%2===0)?'#173d5e':'#143350';
+    gx.fillRect(px,py,CELL,CELL);
+    var c=cells[key(cx,cz)];
+    if(c){
+      gx.fillStyle=shade(MATS[c.m].c,(c.h-1)*14);
+      gx.fillRect(px+1,py+1,CELL-2,CELL-2);
+      gx.fillStyle='rgba(255,255,255,0.20)';
+      gx.fillRect(px+1,py+1,CELL-2,3);
+      if(c.h>1){gx.fillStyle='#fff';gx.font='bold 11px Courier New';gx.textAlign='center';gx.fillText(String(c.h),px+CELL/2,py+CELL/2+4);}
+      if(c.coin){gx.fillStyle='#ffd94d';gx.beginPath();gx.arc(px+CELL-5,py+5,3.6,0,7);gx.fill();gx.strokeStyle='#8a6d1a';gx.stroke();}
+    }
+    if(pads[key(cx,cz)]){
+      gx.strokeStyle='#ff5a5a';gx.lineWidth=2.4;
+      gx.beginPath();gx.arc(px+CELL/2,py+CELL/2,7,0,7);gx.stroke();
+      gx.fillStyle='#ff5a5a';gx.font='bold 10px Courier New';gx.textAlign='center';gx.fillText('^',px+CELL/2,py+CELL/2+3.5);
+      gx.lineWidth=1;
+    }
+    if(spawn.x===cx&&spawn.z===cz){
+      gx.fillStyle='#2ed573';gx.font='bold 14px Courier New';gx.textAlign='center';
+      gx.fillText('S',px+CELL/2,py+CELL/2+5);
+    }
+  }
+  gx.strokeStyle='#2e5d8a';gx.strokeRect(0.5,0.5,545,545);
+}
+function cellFromEvent(e){
+  var r=grid.getBoundingClientRect();
+  var sx=546/r.width, sy=546/r.height;
+  var cx=Math.floor(((e.clientX-r.left)*sx)/CELL)-HALF;
+  var cz=Math.floor(((e.clientY-r.top)*sy)/CELL)-HALF;
+  if(cx<-HALF||cx>HALF||cz<-HALF||cz>HALF)return null;
+  return {x:cx,z:cz};
+}
+function applyBrush(cx,cz){
+  var k=key(cx,cz);
+  if(brush.tool==='erase'){delete cells[k];delete pads[k];}
+  else if(brush.tool==='paint'){cells[k]={h:brush.h,m:brush.mat,coin:(cells[k]&&cells[k].coin)||false};}
+  else if(brush.tool==='coin'){
+    if(!cells[k])cells[k]={h:1,m:'grass',coin:true};
+    else cells[k].coin=!cells[k].coin;
+  }
+  else if(brush.tool==='pad'){if(pads[k])delete pads[k];else pads[k]=13.5;}
+  else if(brush.tool==='spawn'){spawn={x:cx,z:cz};}
+  draw(); queueDraft();
+}
+var painting=false;
+grid.addEventListener('mousedown',function(e){e.preventDefault();var c=cellFromEvent(e);if(!c)return;if(e.button===2){var t=brush.tool;brush.tool='erase';applyBrush(c.x,c.z);brush.tool=t;return;}painting=true;applyBrush(c.x,c.z);});
+grid.addEventListener('mousemove',function(e){if(!painting)return;var c=cellFromEvent(e);if(c&&(brush.tool==='paint'||brush.tool==='erase'))applyBrush(c.x,c.z);});
+window.addEventListener('mouseup',function(){painting=false;});
+grid.addEventListener('contextmenu',function(e){e.preventDefault();});
+grid.addEventListener('touchstart',function(e){e.preventDefault();var t=e.touches[0];var c=cellFromEvent(t);if(c)applyBrush(c.x,c.z);},{passive:false});
+grid.addEventListener('touchmove',function(e){e.preventDefault();var t=e.touches[0];var c=cellFromEvent(t);if(c&&(brush.tool==='paint'||brush.tool==='erase'))applyBrush(c.x,c.z);},{passive:false});
+
+/* toolbars */
+var matBar=document.getElementById('matBar');
+Object.keys(MATS).forEach(function(mk){
+  var b=document.createElement('button');
+  b.className='mat'+(mk===brush.mat?' on':'');
+  b.innerHTML='<span class="swatch" style="background:'+MATS[mk].c+'"></span>'+MATS[mk].label;
+  b.addEventListener('click',function(){
+    brush.mat=mk; brush.tool='paint';
+    matBar.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on'); paintTools();
+  });
+  matBar.appendChild(b);
+});
+var toolBar=document.getElementById('toolBar');
+var TOOLS={paint:'🖌 Paint',coin:'🪙 Coin',pad:'🔴 Pad',spawn:'🟢 Spawn',erase:'⌫ Erase'};
+function paintTools(){
+  toolBar.querySelectorAll('button').forEach(function(x){
+    x.classList.toggle('on',x.getAttribute('data-t')===brush.tool);
+  });
+}
+Object.keys(TOOLS).forEach(function(tk){
+  var b=document.createElement('button');
+  b.className='tool'; b.setAttribute('data-t',tk); b.textContent=TOOLS[tk];
+  b.addEventListener('click',function(){brush.tool=tk;paintTools();});
+  toolBar.appendChild(b);
+});
+paintTools();
+document.getElementById('hMinus').addEventListener('click',function(){brush.h=Math.max(1,brush.h-1);document.getElementById('hVal').textContent=brush.h;});
+document.getElementById('hPlus').addEventListener('click',function(){brush.h=Math.min(8,brush.h+1);document.getElementById('hVal').textContent=brush.h;});
+
+/* data <-> editor */
+var STARTER_SCRIPT=[
+"-- Welcome to your world's brain! This is Lua.",
+"-- bt is your only superpower — it's sandboxed on purpose.",
+"",
+"local palette = {0xe23b3b, 0xffa502, 0xffd94d, 0x2ed573, 0x3aa7e8, 0xc56cf0}",
+"local t = 0",
+"",
+"function bt.onTick(dt)",
+"  t = t + dt",
+"  for i = 0, 15 do",
+"    bt.setDisco(i, palette[(math.floor(t * 3) + i) % #palette + 1])",
+"  end",
+"  bt.spinCoins(0.06)",
+"end",
+"",
+"function bt.onPad()",
+"  bt.launch(13.5)",
+"  bt.playTone(520)",
+"end"
+].join("\n");
+function serialize(){
+  var blocks=[];
+  Object.keys(cells).forEach(function(k){
+    var p=k.split(','), c=cells[k];
+    var b={x:Number(p[0]),z:Number(p[1]),h:c.h,m:c.m};
+    if(c.coin)b.coin=true;
+    blocks.push(b);
+  });
+  var pd=[];
+  Object.keys(pads).forEach(function(k){
+    var p=k.split(',');
+    pd.push({x:Number(p[0]),z:Number(p[1]),p:pads[k]});
+  });
+  return {
+    name:document.getElementById('wName').value.trim(),
+    author:document.getElementById('wAuthor').value.trim(),
+    blocks:blocks, pads:pd, spawn:{x:spawn.x,z:spawn.z},
+    script:document.getElementById('wScript').value,
+    listed:document.getElementById('wListed').checked
+  };
+}
+function loadDef(d){
+  cells={}; pads={};
+  (d.blocks||[]).forEach(function(b){cells[key(b.x,b.z)]={h:b.h||1,m:b.m||'grass',coin:!!b.coin};});
+  (d.pads||[]).forEach(function(p){pads[key(p.x,p.z)]=p.p||13.5;});
+  spawn=d.spawn||{x:0,z:0};
+  document.getElementById('wName').value=d.name||'';
+  document.getElementById('wAuthor').value=d.author||'';
+  document.getElementById('wScript').value=d.script||STARTER_SCRIPT;
+  document.getElementById('wListed').checked=!!d.listed;
+  draw();
+}
+function status(msg,err){
+  var s=document.getElementById('status');
+  s.textContent=msg; s.className=err?'err':'';
+}
+var draftTimer=null;
+function queueDraft(){
+  if(draftTimer)clearTimeout(draftTimer);
+  draftTimer=setTimeout(saveDraft,600);
+}
+function saveDraft(){
+  try{localStorage.setItem('bt_draft',JSON.stringify(serialize()));}catch(e){}
+}
+document.getElementById('saveBtn').addEventListener('click',function(){saveDraft();status('💾 Draft saved on this device.');});
+document.getElementById('testBtn').addEventListener('click',function(){
+  saveDraft();
+  window.open('bloxtopia.html?w=DRAFT','_blank');
+});
+document.getElementById('clearBtn').addEventListener('click',function(){
+  if(confirm('Clear the whole grid?')){cells={};pads={};spawn={x:0,z:0};draw();queueDraft();}
+});
+
+/* starter demo for first-time builders */
+function starterWorld(){
+  return {
+    name:'My First World', author:'',
+    blocks:[
+      {x:0,z:1,h:1,m:'stone'},{x:1,z:1,h:2,m:'wood',coin:true},{x:2,z:1,h:3,m:'wood'},
+      {x:3,z:1,h:2,m:'disco'},{x:3,z:2,h:2,m:'disco'},{x:3,z:3,h:2,m:'disco'},{x:2,z:3,h:2,m:'disco'},
+      {x:-1,z:1,h:1,m:'grass'},{x:-2,z:1,h:1,m:'grass'},{x:-2,z:2,h:2,m:'brick',coin:true},
+      {x:0,z:-1,h:1,m:'sand'},{x:0,z:-2,h:1,m:'lava'}
+    ],
+    pads:[{x:-3,z:1,p:13.5}],
+    spawn:{x:0,z:1},
+    script:STARTER_SCRIPT,
+    listed:false
+  };
+}
+
+/* publish / load via Supabase */
+var SB_URL=(window.Arcade&&Arcade.SUPABASE_URL)||'', SB_KEY=(window.Arcade&&Arcade.SUPABASE_ANON)||'';
+function sbh(extra){
+  var h={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+  if(extra)for(var k in extra)h[k]=extra[k];
+  return h;
+}
+var BADWORDS=['fuck','shit','bitch','nigger','nigga','faggot','retard','whore','slut','pussy','porn','rape','nazi','hitler','kys'];
+function nameOk(n){
+  var low=(' '+n.toLowerCase()+' ');
+  for(var i=0;i<BADWORDS.length;i++)if(low.indexOf(BADWORDS[i])>=0)return false;
+  return true;
+}
+function genCode(){
+  var A='ABCDEFGHJKMNPQRSTUVWXYZ23456789', s='';
+  for(var i=0;i<6;i++)s+=A[(Math.random()*A.length)|0];
+  return 'BLOX-'+s;
+}
+document.getElementById('pubBtn').addEventListener('click',async function(){
+  var d=serialize();
+  if(!d.name||d.name.length<2){status('Give your world a name first (2+ letters).',true);return;}
+  if(!nameOk(d.name)){status('That name trips the word filter — pick a friendlier one.',true);return;}
+  if(!d.blocks.length){status('Your world is empty — paint some blocks first!',true);return;}
+  if(!SB_URL){status('Not connected to the world server right now.',true);return;}
+  status('Publishing…');
+  var code=genCode();
+  for(var attempt=0;attempt<5;attempt++){
+    try{
+      var r=await fetch(SB_URL+'/rest/v1/bt_worlds',{
+        method:'POST',
+        headers:sbh({'Prefer':'resolution=merge-duplicates,return=minimal'}),
+        body:JSON.stringify({code:code,name:d.name,author:d.author||'Anonymous',data:d,listed:!!d.listed,updated_at:new Date().toISOString()})
+      });
+      if(r.ok){
+        var url='bloxtopia.html?w='+code;
+        status('🎉 Published! Code: '+code+' — play it at '+location.href.replace('bloxtopia-studio.html',url)+(d.listed?' (listed in the directory)':' (code-only: share the link!)'));
+        return;
+      }
+      if(r.status===409||r.status===400){code=genCode();continue;}
+      status('Publish failed ('+r.status+'). Try again in a bit.',true);return;
+    }catch(e){status('Publish failed — connection hiccup. Try again.',true);return;}
+  }
+  status('Could not find a free code — try once more.',true);
+});
+document.getElementById('loadBtn').addEventListener('click',async function(){
+  var v=document.getElementById('loadCode').value.trim().toUpperCase();
+  if(!v)return;
+  if(v.indexOf('BLOX-')!==0)v='BLOX-'+v;
+  status('Loading '+v+'…');
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/bt_worlds?code=eq.'+encodeURIComponent(v)+'&select=data,name,author,listed',{headers:sbh()});
+    var rows=await r.json();
+    if(!rows||!rows[0]){status('No world with that code (yet).',true);return;}
+    var d=rows[0].data; d.listed=rows[0].listed;
+    loadDef(d);
+    status('Loaded "'+(rows[0].name||v)+'" — edit away, then Publish to save a copy under a new code.');
+  }catch(e){status('Load failed — connection hiccup.',true);}
+});
+
+/* init */
+try{
+  var myName=(window.Arcade&&Arcade.playerName&&Arcade.playerName())||'';
+  if(myName)document.getElementById('wAuthor').value=myName;
+}catch(e){}
+var existing=null;
+try{existing=JSON.parse(localStorage.getItem('bt_draft')||'null');}catch(e){}
+loadDef(existing||starterWorld());
+['wName','wAuthor','wScript','wListed'].forEach(function(id){
+  document.getElementById(id).addEventListener('input',queueDraft);
+  document.getElementById(id).addEventListener('change',queueDraft);
+});
+draw();
+window.__studio={serialize:serialize,loadDef:loadDef,
+  cellCount:function(){return Object.keys(cells).length;},
+  padCount:function(){return Object.keys(pads).length;}};
+})();
+</script>
+</body>
+</html>
