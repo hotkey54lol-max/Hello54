@@ -180,6 +180,7 @@ window.__BT_DEF=null;
 window.__BT_SPAWN=null;
 var PADS=[{x:8,z:-7,r:1.35,y:0,p:13.5}];
 var LAVA_CELLS=[];
+var RAMPS=[]; /* S2 W3: wedge ramps {x,z,h,ax,az,px,pz} — walkable slopes */
 var water=null;
 var discoTiles=[];
 var coins=[];
@@ -332,10 +333,35 @@ function buildCustom(def){
   blocks.forEach(function(b){
     var wx=b.x*3, wz=b.z*3, h=Math.max(1,Math.min(8,b.h|0));
     var mt=CUSTOM_MATS[b.m]||CUSTOM_MATS.grass;
-    var mesh=box(wx,h/2,wz,3,h,3,mt[0],mt[1]?{tex:mt[1],texRep:1}:{});
-    if(b.m==='lava'){mesh.material.emissive=new THREE.Color(0x7a1e00);LAVA_CELLS.push({x:wx,z:wz,top:h});}
-    if(b.m==='glass'){mesh.material.transparent=true;mesh.material.opacity=0.72;}
-    if(b.m==='disco'){mesh.material=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.4,emissive:0x222222});discoTiles.push(mesh);}
+    var col=(typeof b.c==='number')?b.c:mt[0];
+    var shaped=b.s&&b.s!=='box'&&b.m!=='lava'&&b.m!=='disco';
+    var mesh;
+    if(shaped&&b.s==='wedge'){
+      var wm=new THREE.MeshStandardMaterial({color:col,roughness:0.9});
+      mesh=wedgeMesh(h,wm);
+      mesh.position.set(wx,0,wz);
+      mesh.rotation.y=(b.r|0)*Math.PI/2;
+      scene.add(mesh);
+      if(mt[1]){wm.map=getTex(mt[1],1);mesh.userData.texKey=mt[1];mesh.userData.texRep=1;}
+      var A=(b.r|0)*Math.PI/2;
+      RAMPS.push({x:wx,z:wz,h:h,ax:Math.cos(A),az:-Math.sin(A),px:Math.sin(A),pz:Math.cos(A)});
+    } else if(shaped&&b.s==='cyl'){
+      mesh=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,h,20),new THREE.MeshStandardMaterial({color:col,roughness:0.9}));
+      mesh.position.set(wx,h/2,wz); mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh);
+      if(mt[1]){mesh.material.map=getTex(mt[1],1);mesh.userData.texKey=mt[1];mesh.userData.texRep=1;}
+      colliders.push({x0:wx-1.5,x1:wx+1.5,z0:wz-1.5,z1:wz+1.5,top:h,bottom:0});
+    } else if(shaped&&b.s==='ball'){
+      var sc=h/3;
+      mesh=new THREE.Mesh(new THREE.SphereGeometry(1.5,20,16),new THREE.MeshStandardMaterial({color:col,roughness:0.55}));
+      mesh.scale.set(1,sc,1); mesh.position.set(wx,1.5*sc,wz); mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh);
+      if(mt[1]){mesh.material.map=getTex(mt[1],1);mesh.userData.texKey=mt[1];mesh.userData.texRep=1;}
+      /* spheres are scenery: no collider */
+    } else {
+      mesh=box(wx,h/2,wz,3,h,3,col,mt[1]?{tex:mt[1],texRep:1}:{});
+      if(b.m==='lava'){mesh.material.emissive=new THREE.Color(0x7a1e00);LAVA_CELLS.push({x:wx,z:wz,top:h});}
+      if(b.m==='glass'){mesh.material.transparent=true;mesh.material.opacity=0.72;}
+      if(b.m==='disco'){mesh.material=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.4,emissive:0x222222});discoTiles.push(mesh);}
+    }
     if(b.coin)coin(wx,h+1.15,wz,false);
   });
   ((def&&def.pads)||[]).forEach(function(pd){
@@ -753,6 +779,15 @@ var coinCount=0,lastSaved=0,bestHaul=0;
 try{bestHaul=Number(localStorage.getItem('bt_best')||0);}catch(e){}
 $('bestStat').textContent=bestHaul?String(bestHaul):'—';
 
+function wedgeMesh(h,mat){
+  var sh=new THREE.Shape();
+  sh.moveTo(-1.5,0); sh.lineTo(1.5,0); sh.lineTo(1.5,h); sh.lineTo(-1.5,0);
+  var geo=new THREE.ExtrudeGeometry(sh,{depth:3,bevelEnabled:false});
+  geo.translate(0,0,-1.5);
+  var m=new THREE.Mesh(geo,mat);
+  m.castShadow=true; m.receiveShadow=true;
+  return m;
+}
 function supportHeight(px,pz,feetY){
   var g=0;
   for(var i=0;i<colliders.length;i++){
@@ -760,6 +795,16 @@ function supportHeight(px,pz,feetY){
     if(px>c.x0-0.3&&px<c.x1+0.3&&pz>c.z0-0.3&&pz<c.z1+0.3){
       if(c.top<=feetY+0.5&&c.top>g)g=c.top;
     }
+  }
+  for(var ri=0;ri<RAMPS.length;ri++){
+    var rp=RAMPS[ri];
+    var dx=px-rp.x, dz=pz-rp.z;
+    if(Math.abs(dx)>1.8||Math.abs(dz)>1.8)continue;
+    if(Math.abs(dx*rp.px+dz*rp.pz)>1.8)continue;
+    var t=((dx*rp.ax+dz*rp.az)+1.5)/3;
+    if(t<0||t>1)continue;
+    var hgt=t*rp.h;
+    if(hgt<=feetY+0.55&&hgt>g)g=hgt;
   }
   return g;
 }
