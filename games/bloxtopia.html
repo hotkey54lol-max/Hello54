@@ -28,6 +28,8 @@
   #joy { position:absolute; left:14px; bottom:14px; width:110px; height:110px; border-radius:50%; border:2px solid #ffffff55; background:#0003; display:none; z-index:15; }
   #joyKnob { position:absolute; left:35px; top:35px; width:40px; height:40px; border-radius:50%; background:#fff8; }
   #jumpBtn { position:absolute; right:16px; bottom:22px; width:76px; height:76px; border-radius:50%; border:2px solid #ffd94d; background:#0006; color:#ffd94d; font-family:inherit; font-size:.72rem; display:none; z-index:15; }
+  #waveBtn { position:absolute; right:104px; bottom:22px; width:60px; height:60px; border-radius:50%; border:2px solid #ffd94d; background:#0006; font-size:1.25rem; display:none; z-index:15; }
+  #resetBtn { position:absolute; right:110px; bottom:94px; width:48px; height:48px; border-radius:50%; border:2px solid #9fb6c9; background:#0006; color:#cfe6f5; font-size:1.05rem; display:none; z-index:15; }
   #mpPanel { position:absolute; top:8px; right:8px; z-index:12; background:#000a; border:2px solid #2e5d8a; border-radius:8px; padding:6px 10px; font-size:.7rem; text-align:left; max-width:180px; }
   #mpPanel h4 { color:#ffd94d; font-size:.68rem; letter-spacing:1px; margin-bottom:3px; }
   #mpList div { color:#cfe6f5; white-space:nowrap; }
@@ -66,7 +68,9 @@
     Render scale <button data-scale="1" class="setbtn">100%</button><button data-scale="0.75" class="setbtn">75%</button><button data-scale="0.5" class="setbtn">50%</button>
     <span style="color:#7fa3bd;font-size:.7rem">— pixels pushed per frame</span><br>
     View distance <button id="tView" class="setbtn"></button>
-    <span style="color:#7fa3bd;font-size:.7rem">— hides far decorations (fewer draw calls)</span>
+    <span style="color:#7fa3bd;font-size:.7rem">— hides far decorations (fewer draw calls)</span><br>
+    Music <button id="musBtn" class="setbtn"></button>
+    <span style="color:#7fa3bd;font-size:.7rem">— an original chiptune loop</span>
   </div>
   <div style="font-size:.72rem;color:#7fa3bd;margin-top:8px">Saved automatically on this device.</div>
 </div>
@@ -77,6 +81,8 @@
   <div id="mpPanel"><h4>&#127760; IN BLOXTOPIA</h4><div id="mpList"></div></div>
   <div id="joy"><div id="joyKnob"></div></div>
   <button id="jumpBtn">JUMP</button>
+  <button id="waveBtn">👋</button>
+  <button id="resetBtn">↺</button>
   <div id="overlay">
     <h2>&#129521; WELCOME TO BLOXTOPIA</h2>
     <p>A tiny open world in your browser — the proof-of-concept for our own game engine.
@@ -959,6 +965,158 @@ function updateLife(dt,t){
 window.__btSetHour=function(h){DAYHOUR=h;skyT=0;updateSky(1);};
 </script>
 <script>
+/* ================= WAVE 3: GAME FEEL (sparkles, wave, checkpoints, music) ================= */
+/* coin sparkle bursts */
+var BURSTS=[];
+function spawnBurst(x,y,z,color){
+  var n=16, pos=new Float32Array(n*3), vel=[];
+  for(var i=0;i<n;i++){
+    pos[i*3]=x; pos[i*3+1]=y; pos[i*3+2]=z;
+    var a=Math.random()*Math.PI*2, r=1+Math.random()*1.6, up=1.6+Math.random()*2.2;
+    vel.push([Math.cos(a)*r,up,Math.sin(a)*r]);
+  }
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  var mat=new THREE.PointsMaterial({color:color,size:0.17,transparent:true,opacity:1,depthWrite:false});
+  var pts=new THREE.Points(geo,mat);
+  scene.add(pts);
+  BURSTS.push({pts:pts,vel:vel,life:0.55});
+}
+function updateBursts(dt){
+  for(var i=BURSTS.length-1;i>=0;i--){
+    var b=BURSTS[i]; b.life-=dt;
+    if(b.life<=0){scene.remove(b.pts);b.pts.geometry.dispose();b.pts.material.dispose();BURSTS.splice(i,1);continue;}
+    var arr=b.pts.geometry.attributes.position.array;
+    for(var j=0;j<b.vel.length;j++){
+      b.vel[j][1]-=8.5*dt;
+      arr[j*3]+=b.vel[j][0]*dt; arr[j*3+1]+=b.vel[j][1]*dt; arr[j*3+2]+=b.vel[j][2]*dt;
+    }
+    b.pts.geometry.attributes.position.needsUpdate=true;
+    b.pts.material.opacity=b.life/0.55;
+  }
+}
+
+/* wave emote (T key / 👋 button) */
+var WAVE_T=0;
+function doWave(){ if(!playing)return; WAVE_T=1.3; tone(660,660,.09,'sine',.03); setTimeout(function(){tone(880,880,.1,'sine',.03);},110); }
+var _animOrig=animateAvatar;
+animateAvatar=function(g,sn,dt,ph){
+  _animOrig(g,sn,dt,ph);
+  if(g===myAvatar&&WAVE_T>0){
+    var p=g.userData.parts;
+    if(p){p.rArm.rotation.z=-2.25;p.rArm.rotation.x=Math.sin(performance.now()/85)*0.45;}
+  }
+};
+
+/* obby checkpoints + reset character (the classic ↺) */
+var CHECKPOINTS=[], CP_IDX=-1, RESPAWN={x:0,y:0,z:10};
+(function(){
+  var spots=[ /* step idx, dx, dz, platform top */
+    {i:1,dx:4.5,dz:-4.5,top:4.75},
+    {i:4,dx:-4.5,dz:0,top:8.5},
+    {i:6,dx:0,dz:4.5,top:11.0}
+  ];
+  spots.forEach(function(s){
+    var m=box(TOWER.x+s.dx,s.top+0.05,TOWER.z+s.dz,1.7,0.1,1.7,0x2ed573,{collide:false});
+    m.material.emissive=new THREE.Color(0x0d4d2a);
+    CHECKPOINTS.push({x:TOWER.x+s.dx,y:s.top+0.1,z:TOWER.z+s.dz,idx:s.i,mesh:m});
+  });
+})();
+function checkCheckpoints(){
+  if(!player.grounded)return;
+  for(var i=0;i<CHECKPOINTS.length;i++){
+    var p=CHECKPOINTS[i];
+    if(p.idx<=CP_IDX)continue;
+    if(Math.abs(player.x-p.x)<1.15&&Math.abs(player.z-p.z)<1.15&&Math.abs(player.y-p.y)<0.45){
+      CP_IDX=p.idx;
+      RESPAWN={x:p.x,y:p.y,z:p.z};
+      p.mesh.material.emissive=new THREE.Color(0x8a6d1a);
+      spawnBurst(p.x,p.y+0.4,p.z,0x2ed573);
+      tone(880,880,.1,'square',.05); setTimeout(function(){tone(1318,1318,.16,'square',.05);},95);
+      if(window.worldMsg)worldMsg('✓ CHECKPOINT!');
+    }
+  }
+}
+function resetCharacter(){
+  if(!playing)return;
+  player.x=RESPAWN.x; player.y=RESPAWN.y; player.z=RESPAWN.z; player.vy=0;
+  spawnBurst(player.x,player.y+1.2,player.z,0x9fd8e8);
+  tone(520,180,.22,'sine',.05);
+}
+
+/* music: an original chiptune loop (WebAudio sequencer) */
+var MUSC=null, musicTimer=null, mStep=0, nextStepT=0, MUSIC_ON=false;
+try{MUSIC_ON=localStorage.getItem('bt_music')==='1';}catch(e){}
+var MEL=[72,0,76,0,79,0,76,0,74,0,77,0,76,0,0,0, 81,0,79,0,76,0,74,0,72,0,74,0,76,0,0,0];
+var BAS=[48,0,55,0,43,0,50,0,45,0,52,0,41,0,48,0];
+function n2f(m){return 440*Math.pow(2,(m-69)/12);}
+function mnote(m,t,dur,type,vol){
+  var o=MUSC.createOscillator(), gn=MUSC.createGain();
+  o.type=type; o.frequency.value=n2f(m);
+  gn.gain.setValueAtTime(vol,t);
+  gn.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(gn); gn.connect(MUSC.destination);
+  o.start(t); o.stop(t+dur+0.02);
+}
+function musicTick(){
+  while(nextStepT<MUSC.currentTime+0.28){
+    var s=mStep%32;
+    if(MEL[s])mnote(MEL[s],nextStepT,0.2,'square',0.038);
+    var b=BAS[s%16];
+    if(b)mnote(b,nextStepT,0.22,'triangle',0.075);
+    mStep++; nextStepT+=0.235;
+  }
+}
+function paintMusicBtn(){
+  var b=$('musBtn'); if(!b)return;
+  b.textContent=MUSIC_ON?'ON':'OFF';
+  b.className='setbtn'+(MUSIC_ON?' on':'');
+}
+function setMusic(on){
+  MUSIC_ON=on;
+  try{localStorage.setItem('bt_music',on?'1':'0');}catch(e){}
+  if(on){
+    if(!MUSC){try{MUSC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+    if(MUSC){
+      MUSC.resume();
+      if(!musicTimer){mStep=0;nextStepT=MUSC.currentTime+0.08;musicTimer=setInterval(musicTick,105);}
+    }
+  }else if(musicTimer){clearInterval(musicTimer);musicTimer=null;}
+  paintMusicBtn();
+}
+$('musBtn').addEventListener('click',function(){setMusic(!MUSIC_ON);});
+$('startBtn').addEventListener('click',function(){if(MUSIC_ON)setMusic(true);});
+paintMusicBtn();
+
+/* wiring: keys + touch buttons */
+document.addEventListener('keydown',function(e){
+  if(e.code==='KeyT')doWave();
+  if(e.code==='KeyR')resetCharacter();
+});
+$('waveBtn').addEventListener('touchstart',function(e){e.preventDefault();doWave();},{passive:false});
+$('resetBtn').addEventListener('touchstart',function(e){e.preventDefault();resetCharacter();},{passive:false});
+$('waveBtn').addEventListener('click',function(){doWave();});
+$('resetBtn').addEventListener('click',function(){resetCharacter();});
+
+function updateFx(dt){
+  updateBursts(dt);
+  if(WAVE_T>0)WAVE_T-=dt;
+  checkCheckpoints();
+}
+window.__btW3={
+  burst:function(x,y,z){spawnBurst(x,y,z,0xffd94d);},
+  burstCount:function(){return BURSTS.length;},
+  wave:doWave,
+  waving:function(){return WAVE_T>0;},
+  reset:resetCharacter,
+  respawn:function(){return {x:RESPAWN.x,y:RESPAWN.y,z:RESPAWN.z};},
+  cp:function(){return CP_IDX;},
+  pads:function(){return CHECKPOINTS.length;},
+  setMusic:setMusic,
+  musicOn:function(){return !!musicTimer;}
+};
+</script>
+<script>
 /* ================= LUA ENGINE (Fengari, sandboxed) =================
  * World scripts get ONLY the `bt` table: no os/io/package/network.
  * This is the same sandbox future player-made worlds will run in. */
@@ -1075,6 +1233,7 @@ function updateCoins(dt){
       c.taken=true; c.mesh.visible=false; c.respawn=18;
       coinCount++; $('coinStat').textContent=String(coinCount);
       sndCoin();
+      if(window.spawnBurst)spawnBurst(c.x,c.y+0.3,c.z,0xffd94d);
       if(coinCount>bestHaul){
         bestHaul=coinCount; $('bestStat').textContent=String(bestHaul);
         try{localStorage.setItem('bt_best',String(bestHaul));}catch(e){}
@@ -1182,7 +1341,7 @@ $('startBtn').addEventListener('click',function(){
   myAvatar=makeAvatar(myColor,myName);
   $('overlay').classList.add('hidden');
   playing=true;
-  if(isTouch){joyEl.style.display='block';$('jumpBtn').style.display='block';}
+  if(isTouch){joyEl.style.display='block';$('jumpBtn').style.display='block';$('waveBtn').style.display='block';$('resetBtn').style.display='block';}
   $('msg').textContent='Welcome to Hometown, '+myName+'! Coins respawn — rooftops and the tower top pay best. The red pad by the spawn is Lua-powered. 🚀';
   mpHeartbeat();
 });
@@ -1205,6 +1364,7 @@ function loop(){
   if(cullT<=0){cullT=0.35;if(SETTINGS.view==='near')cullDecor();}
   luaCallBt('onTick',[dt]); /* world scripts run even on the menu — the town is alive */
   if(window.updateLife)updateLife(dt,t);
+  if(window.updateFx)updateFx(dt);
   if(playing){
     stepPlayer(dt);
     if(pendingLaunch){
