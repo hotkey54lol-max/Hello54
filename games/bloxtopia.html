@@ -49,14 +49,28 @@
   <span>Best haul: <b id="bestStat">&mdash;</b></span>
   <button id="setBtn" style="font-family:inherit;background:#07182a;color:#ffd94d;border:2px solid #2e5d8a;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.8rem">&#9881; SETTINGS</button>
 </div>
-<div id="setPanel" class="hidden" style="max-width:520px;margin:0 auto 8px;border:2px solid #2e5d8a;border-radius:8px;background:#07182a;padding:12px 16px">
-  <div style="color:#ffd94d;letter-spacing:2px;font-size:.8rem;margin-bottom:8px">&#9881; SETTINGS</div>
-  <div style="font-size:.82rem;color:#cfe6f5">Graphics:
-    <button id="qHigh" style="font-family:inherit;padding:6px 14px;border-radius:6px;cursor:pointer;margin-left:8px">&#127912; DETAILED</button>
-    <button id="qLow" style="font-family:inherit;padding:6px 14px;border-radius:6px;cursor:pointer;margin-left:6px">&#129521; LOW POLY</button>
+<div id="setPanel" class="hidden" style="max-width:560px;margin:0 auto 8px;border:2px solid #2e5d8a;border-radius:8px;background:#07182a;padding:12px 16px;text-align:left">
+  <div style="color:#ffd94d;letter-spacing:2px;font-size:.8rem;margin-bottom:4px">&#9881; SETTINGS <span style="color:#9fe870;float:right" id="fpsStat">FPS: —</span></div>
+  <div style="font-size:.7rem;color:#7fa3bd;margin-bottom:10px">Every toggle cuts a real cost. Watch the FPS meter prove it.</div>
+  <div style="font-size:.82rem;color:#cfe6f5;margin-bottom:8px">Preset:
+    <button data-preset="best" class="setbtn">&#128293; BEST</button>
+    <button data-preset="balanced" class="setbtn">&#9878;&#65038; BALANCED</button>
+    <button data-preset="potato" class="setbtn">&#129364; POTATO</button>
+    <span id="presetName" style="color:#ffd94d;font-size:.75rem;margin-left:6px"></span>
   </div>
-  <div style="font-size:.72rem;color:#7fa3bd;margin-top:8px;line-height:1.6">Detailed = rich textures + shadows. Low Poly = flat colors, no shadows — for phones that struggle. Saved automatically.</div>
+  <div style="font-size:.82rem;color:#cfe6f5;line-height:2.1">
+    Textures <button id="tTex" class="setbtn"></button>
+    <span style="color:#7fa3bd;font-size:.7rem">— surface detail (GPU memory + sampling)</span><br>
+    Shadows <button id="tShadows" class="setbtn"></button>
+    <span style="color:#7fa3bd;font-size:.7rem">— the scene renders TWICE when on. Biggest single win.</span><br>
+    Render scale <button data-scale="1" class="setbtn">100%</button><button data-scale="0.75" class="setbtn">75%</button><button data-scale="0.5" class="setbtn">50%</button>
+    <span style="color:#7fa3bd;font-size:.7rem">— pixels pushed per frame</span><br>
+    View distance <button id="tView" class="setbtn"></button>
+    <span style="color:#7fa3bd;font-size:.7rem">— hides far decorations (fewer draw calls)</span>
+  </div>
+  <div style="font-size:.72rem;color:#7fa3bd;margin-top:8px">Saved automatically on this device.</div>
 </div>
+<style>.setbtn{font-family:inherit;padding:5px 12px;border-radius:6px;cursor:pointer;margin-left:6px;background:#0d2438;color:#cfe6f5;border:2px solid #2e5d8a}.setbtn.on{background:#ffd94d;color:#000;border-color:#ffd94d;font-weight:bold}</style>
 <div id="stage">
   <div id="scene"></div>
   <div id="vignette"></div>
@@ -134,6 +148,7 @@ scene.add(new THREE.HemisphereLight(0xbfe3ff,0x3a6b35,0.6));
 
 /* ================= world ================= */
 var colliders=[]; /* {x0,x1,z0,z1,top,bottom} */
+var decorList=[]; /* trees + lamps: culled in near view-distance mode */
 function box(x,y,z,w,h,d,color,opts){
   opts=opts||{};
   var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
@@ -211,16 +226,17 @@ var TOWER={x:-36,z:-36};
 
 /* trees + lamps in the park (south-west) and around */
 function tree(x,z){
-  box(x,1.0,z,0.7,2,0.7,0x7a4a26,{tex:'bark',texRep:1});
-  box(x,3.1,z,2.6,2.2,2.6,0x2c7a2c,{tex:'leaf',texRep:1});
-  box(x,4.4,z,1.8,1.2,1.8,0x359935,{tex:'leaf',texRep:1});
+  decorList.push(box(x,1.0,z,0.7,2,0.7,0x7a4a26,{tex:'bark',texRep:1}));
+  decorList.push(box(x,3.1,z,2.6,2.2,2.6,0x2c7a2c,{tex:'leaf',texRep:1}));
+  decorList.push(box(x,4.4,z,1.8,1.2,1.8,0x359935,{tex:'leaf',texRep:1}));
 }
 [[-30,26],[-24,32],[-36,34],[30,30],[36,24],[26,-30],[-28,-24],[8,34],[-8,36],[34,-8]].forEach(function(p){tree(p[0],p[1]);});
 function lamp(x,z){
-  box(x,1.6,z,0.25,3.2,0.25,0x2c2c34);
+  decorList.push(box(x,1.6,z,0.25,3.2,0.25,0x2c2c34));
   var bulb=new THREE.Mesh(new THREE.SphereGeometry(0.32,10,8),
     new THREE.MeshBasicMaterial({color:0xfff2b0}));
   bulb.position.set(x,3.4,z); scene.add(bulb);
+  decorList.push(bulb);
 }
 [[10,10],[-10,10],[10,-10],[-10,-10],[0,26],[26,0],[-26,0],[0,-26]].forEach(function(p){lamp(p[0],p[1]);});
 
@@ -414,30 +430,97 @@ function texturedCount(){
   scene.traverse(function(o){if(o.userData&&o.userData.texKey&&o.material&&o.material.map)n++;});
   return n;
 }
-function styleQualityButtons(){
-  var on={background:'#ffd94d',color:'#000',border:'2px solid #ffd94d',fontWeight:'bold'};
-  var off={background:'#0d2438',color:'#cfe6f5',border:'2px solid #2e5d8a',fontWeight:'normal'};
-  function apply(el,st){for(var k in st)el.style[k]=st[k];}
-  apply($('qHigh'),QUALITY==='high'?on:off);
-  apply($('qLow'),QUALITY==='low'?on:off);
+/* ---- settings: individual levers, each wired to a real cost ----
+   tex     -> material maps on/off (memory + sampling)
+   shadows -> sun.castShadow (the whole scene renders a 2nd time when on)
+   scale   -> pixel ratio multiplier (raw pixel count)
+   view    -> far: no culling / near: fog + decor beyond 45m hidden */
+var GFX_PRESETS={
+  best:{tex:true,shadows:true,scale:1,view:'far'},
+  balanced:{tex:true,shadows:false,scale:0.75,view:'far'},
+  potato:{tex:false,shadows:false,scale:0.5,view:'near'}
+};
+var SETTINGS={tex:true,shadows:true,scale:1,view:'far'};
+var FPSNOW=0;
+function currentPreset(){
+  for(var k in GFX_PRESETS){
+    var p=GFX_PRESETS[k];
+    if(p.tex===SETTINGS.tex&&p.shadows===SETTINGS.shadows&&p.scale===SETTINGS.scale&&p.view===SETTINGS.view)return k;
+  }
+  return 'custom';
 }
-function applyQuality(q){
-  QUALITY=q;
-  try{localStorage.setItem('bt_quality',q);}catch(e){}
+function paintSettingsUI(){
+  $('tTex').textContent=SETTINGS.tex?'ON':'OFF';
+  $('tTex').className='setbtn'+(SETTINGS.tex?' on':'');
+  $('tShadows').textContent=SETTINGS.shadows?'ON':'OFF';
+  $('tShadows').className='setbtn'+(SETTINGS.shadows?' on':'');
+  $('tView').textContent=SETTINGS.view==='far'?'FAR':'NEAR';
+  $('tView').className='setbtn'+(SETTINGS.view==='near'?' on':'');
+  document.querySelectorAll('[data-scale]').forEach(function(b){
+    b.className='setbtn'+(Number(b.getAttribute('data-scale'))===SETTINGS.scale?' on':'');
+  });
+  document.querySelectorAll('[data-preset]').forEach(function(b){
+    b.className='setbtn'+(b.getAttribute('data-preset')===currentPreset()?' on':'');
+  });
+  var cp=currentPreset();
+  $('presetName').textContent=cp==='custom'?'* custom mix':'* currently: '+cp.toUpperCase();
+}
+function cullDecor(){
+  var near=SETTINGS.view==='near';
+  var cx=playing?player.x:camera.position.x, cz=playing?player.z:camera.position.z;
+  for(var i=0;i<decorList.length;i++){
+    var m=decorList[i];
+    if(!near){m.visible=true;continue;}
+    var dx=m.position.x-cx, dz=m.position.z-cz;
+    m.visible=(dx*dx+dz*dz)<2025; /* 45m */
+  }
+}
+function applySettings(){
+  QUALITY=(SETTINGS.tex&&SETTINGS.shadows)?'high':'low';
+  try{localStorage.setItem('bt_settings',JSON.stringify(SETTINGS));}catch(e){}
   scene.traverse(function(o){
     if(o.userData&&o.userData.texKey&&o.material&&'map' in o.material){
-      o.material.map=(q==='high')?getTex(o.userData.texKey,o.userData.texRep||1):null;
+      o.material.map=SETTINGS.tex?getTex(o.userData.texKey,o.userData.texRep||1):null;
       o.material.needsUpdate=true;
     }
   });
-  sun.castShadow=(q==='high');
-  renderer.setPixelRatio(q==='high'?Math.min(2,window.devicePixelRatio||1):1);
+  sun.castShadow=SETTINGS.shadows;
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1)*SETTINGS.scale);
+  if(SETTINGS.view==='near'){scene.fog.near=26;scene.fog.far=68;camera.far=75;}
+  else{scene.fog.near=70;scene.fog.far=190;camera.far=400;}
+  camera.updateProjectionMatrix();
+  cullDecor();
   resize();
-  styleQualityButtons();
+  paintSettingsUI();
+}
+function applyQuality(q){ /* back-compat shim: high=BEST, low=POTATO */
+  SETTINGS=Object.assign({},q==='high'?GFX_PRESETS.best:GFX_PRESETS.potato);
+  applySettings();
+}
+function loadSettings(){
+  var s=null;
+  try{s=JSON.parse(localStorage.getItem('bt_settings')||'null');}catch(e){}
+  if(s&&typeof s==='object'){SETTINGS=Object.assign({},GFX_PRESETS.best,s);}
+  else{
+    var old=null;
+    try{old=localStorage.getItem('bt_quality');}catch(e){}
+    if(old==='low')SETTINGS=Object.assign({},GFX_PRESETS.potato);
+  }
+  applySettings();
 }
 $('setBtn').addEventListener('click',function(){$('setPanel').classList.toggle('hidden');});
-$('qHigh').addEventListener('click',function(){applyQuality('high');});
-$('qLow').addEventListener('click',function(){applyQuality('low');});
+$('tTex').addEventListener('click',function(){SETTINGS.tex=!SETTINGS.tex;applySettings();});
+$('tShadows').addEventListener('click',function(){SETTINGS.shadows=!SETTINGS.shadows;applySettings();});
+$('tView').addEventListener('click',function(){SETTINGS.view=SETTINGS.view==='far'?'near':'far';applySettings();});
+document.querySelectorAll('[data-scale]').forEach(function(b){
+  b.addEventListener('click',function(){SETTINGS.scale=Number(b.getAttribute('data-scale'));applySettings();});
+});
+document.querySelectorAll('[data-preset]').forEach(function(b){
+  b.addEventListener('click',function(){
+    SETTINGS=Object.assign({},GFX_PRESETS[b.getAttribute('data-preset')]);
+    applySettings();
+  });
+});
 </script>
 <script>
 /* ================= avatars ================= */
@@ -668,8 +751,26 @@ function initLua(){
     var lua=fengari.lua, lauxlib=fengari.lauxlib, lualib=fengari.lualib, S=fengari.to_luastring;
     LUA=lauxlib.luaL_newstate();
     lualib.luaL_openlibs(LUA);
-    /* scrub anything dangerous: scripts live in the bt sandbox only */
-    lauxlib.luaL_dostring(LUA,S('os=nil io=nil package=nil require=nil dofile=nil loadfile=nil load=nil debug=nil coroutine=nil print=nil'));
+    /* Sandbox policy (Joslyn's call, 2026-10-21): keep MOST of Lua.
+       Full language + math/string/table stay. Coroutines stay (timed
+       scripting). os shrinks to its read-only clock. Removed: anything
+       that reaches outside the world (io, os.execute), loads unreviewed
+       code at runtime (require/package/load/loadfile/dofile), or can pry
+       open the engine bridge (debug). */
+    lauxlib.luaL_dostring(LUA,S([
+      'do local _os=os os={time=_os.time,clock=_os.clock,date=_os.date,difftime=_os.difftime} end',
+      'io=nil package=nil require=nil dofile=nil loadfile=nil load=nil loadstring=nil',
+      'debug=nil print=nil'
+    ].join('\n')));
+    /* Fengari's native os.clock() errors when called — replace it with a
+       working engine clock (seconds since the world loaded). */
+    lua.lua_getglobal(LUA,S('os'));
+    lua.lua_pushjsfunction(LUA,function(L){
+      lua.lua_pushnumber(L,performance.now()/1000);
+      return 1;
+    });
+    lua.lua_setfield(LUA,-2,S('clock'));
+    lua.lua_settop(LUA,0);
     lauxlib.luaL_dostring(LUA,S('bt={}'));
     function reg(name,fn){
       lua.lua_getglobal(LUA,S('bt'));
@@ -840,11 +941,20 @@ $('startBtn').addEventListener('click',function(){
 
 /* ================= main loop ================= */
 var lastT=performance.now(), padCooldown=0;
+var fpsFrames=0, fpsTime=0, cullT=0;
 function loop(){
   requestAnimationFrame(loop);
   var now=performance.now();
   var dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
   var t=now/1000;
+  fpsFrames++; fpsTime+=dt;
+  if(fpsTime>=0.5){
+    FPSNOW=Math.round(fpsFrames/fpsTime);
+    fpsFrames=0; fpsTime=0;
+    $('fpsStat').textContent='FPS: '+FPSNOW;
+  }
+  cullT-=dt;
+  if(cullT<=0){cullT=0.35;if(SETTINGS.view==='near')cullDecor();}
   luaCallBt('onTick',[dt]); /* world scripts run even on the menu — the town is alive */
   if(playing){
     stepPlayer(dt);
@@ -898,11 +1008,7 @@ function loop(){
   renderer.render(scene,camera);
 }
 resize();
-(function(){
-  var saved='high';
-  try{saved=localStorage.getItem('bt_quality')||'high';}catch(e){}
-  applyQuality(saved==='low'?'low':'high');
-})();
+loadSettings();
 initLua();
 loadScores();
 requestAnimationFrame(function(){resize();loop();});
@@ -924,7 +1030,13 @@ window.__bt={
   setCam:function(yaw,pitch){camYaw=yaw;if(pitch!==undefined)camPitch=pitch;},
   get quality(){return QUALITY;},
   setQuality:function(q){applyQuality(q);},
-  textured:function(){return texturedCount();}
+  textured:function(){return texturedCount();},
+  get settings(){return Object.assign({},SETTINGS);},
+  setSettings:function(patch){Object.assign(SETTINGS,patch);applySettings();},
+  get fps(){return FPSNOW;},
+  get pixelRatio(){return renderer.getPixelRatio();},
+  get shadowsOn(){return sun.castShadow;},
+  decorHidden:function(){var n=0;for(var i=0;i<decorList.length;i++)if(!decorList[i].visible)n++;return n;}
 };
 </script>
 </body>
