@@ -166,8 +166,8 @@
 <script>
 (function () {
   "use strict";
-  // toy lock — client-side only, keeps honest visitors out
-  var ADMIN_PASSWORD = 'Admin1@';
+  // the password is checked server-side by Supabase (Arcade.checkAdmin) —
+  // it no longer lives in this page's code
 
   var gate = document.getElementById("gate");
   var panel = document.getElementById("panel");
@@ -311,14 +311,20 @@
   }
 
   function tryUnlock() {
-    var pw = document.getElementById("pw").value;
-    if (pw === ADMIN_PASSWORD) {
-      rememberAuth();
-      showPanel();
-    } else {
-      document.getElementById("gateErr").textContent = "nope.";
-      document.getElementById("pw").value = "";
-    }
+    var pwEl = document.getElementById("pw");
+    var errEl = document.getElementById("gateErr");
+    errEl.textContent = "checking…";
+    Arcade.checkAdmin(pwEl.value).then(function (ok) {
+      if (ok === true) {
+        rememberAuth();
+        showPanel();
+      } else if (ok === false) {
+        errEl.textContent = "nope.";
+        pwEl.value = "";
+      } else {
+        errEl.textContent = "can't reach the checker — try again.";
+      }
+    });
   }
 
   document.getElementById("unlock").addEventListener("click", tryUnlock);
