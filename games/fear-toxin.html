@@ -49,6 +49,11 @@ h1{color:#c00000;letter-spacing:5px;font-size:1.7rem;text-align:center;margin:6p
 button.big{font-family:inherit;background:#0a0a0a;color:#ff4444;border:2px solid #a00;border-radius:8px;padding:12px 26px;font-size:1.05rem;cursor:pointer;letter-spacing:2px;text-shadow:0 0 8px #f00;box-shadow:0 0 14px #f00444;margin:4px}
 button.big:hover:not(:disabled){background:#400;color:#ffb3b3}
 button.big:disabled{opacity:.35;cursor:default}
+#modeBar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px auto 4px;max-width:640px}
+#modeBar .modeLbl{align-self:center;color:#8a7a4a;font-size:.72rem;letter-spacing:2px}
+.modeChip{font-family:inherit;background:#0a0a0a;color:#777;border:2px solid #333;border-radius:8px;padding:8px 14px;font-size:.78rem;cursor:pointer;letter-spacing:1px}
+.modeChip.on{color:#ffd94d;border-color:#ffd94d;box-shadow:0 0 12px #ffd94d55;text-shadow:0 0 6px #ffd94d88}
+#modeHint{color:#666;font-size:.74rem;max-width:600px;margin:2px auto 6px;line-height:1.5;min-height:2.2em}
 #gameover{background:#050505;border:2px solid #a00;border-radius:12px;padding:22px 30px;text-align:center;box-shadow:0 0 30px #f0000088;margin-top:14px;max-width:94vw}
 #gameover h2{color:#7dff8a;letter-spacing:3px;text-shadow:0 0 14px #0f0,0 0 50px #080;margin-bottom:10px}
 #gameover p{color:#999}
@@ -88,6 +93,13 @@ button.big:disabled{opacity:.35;cursor:default}
   <button id="interactBtn" class="off">&#128273; TAKE</button>
 </div>
 <div class="msg" id="msg">A mansion swallowed by fear toxin. Find the key hidden in each room, unlock all 5 doors, and escape.<br>Anyone else inside appears as a glowing ghost &mdash; race them out.</div>
+<div id="modeBar">
+  <span class="modeLbl">MAKE IT HARDER:</span>
+  <button class="modeChip" id="modeNightmare">&#9760; NIGHTMARE</button>
+  <button class="modeChip" id="modeScrambled">&#128256; SCRAMBLED KEYS</button>
+  <button class="modeChip" id="modeStalker">&#128100; THE STALKER</button>
+</div>
+<div id="modeHint">Classic run — each key hides in its own room.</div>
 <button class="big" id="startBtn">&#9654; ENTER THE MANSION</button>
 <div id="gameover" class="hidden">
   <h2>&#128682; YOU ESCAPED!</h2>
@@ -644,7 +656,7 @@ function scanInteract(){
     btn.innerHTML='&#128682; OPEN';btn.className='';}
   else if(nearDoor&&nearDoor.unlocked){setMsgOnce('Unlocked — '+(isTouch?'tap OPEN':'press E')+' to open it.');
     btn.innerHTML='&#128682; OPEN';btn.className='';}
-  else if(nearDoor){setMsgOnce('Locked tight. The key is hidden somewhere in this room.');
+  else if(nearDoor){setMsgOnce(MODES.scrambled?'Locked tight. Scrambled: the key could be hiding in ANY room you can reach.':'Locked tight. The key is hidden somewhere in this room.');
     btn.innerHTML='&#128682; LOCKED';btn.className='off';}
   else{setMsgOnce(defaultMsg());btn.innerHTML='&#128273; TAKE';btn.className='off';}
 }
@@ -654,6 +666,7 @@ function defaultMsg(){
   if(escaped)return 'You made it out.';
   if(doorsOpened>=NROOMS)return 'The way out is open — RUN!';
   if(holdingKey)return 'Key in hand — get to door '+(doorsOpened+1)+'.';
+  if(MODES.scrambled)return 'Scrambled: the key for door '+(doorsOpened+1)+' can hide in ANY room you can reach.';
   return 'Find the key hidden in room '+(doorsOpened+1)+'.';
 }
 function tryInteract(){
@@ -697,10 +710,19 @@ function tryInteract(){
 $('startBtn').addEventListener('click',function(){
   initAudio();
   $('startBtn').style.display='none';
+  $('modeBar').style.display='none';
+  $('modeHint').style.display='none';
+  placeKeys();
+  if(MODES.nightmare)buildWall();
+  if(MODES.stalker)buildStalker();
   playing=true; startT=performance.now();
   if(isTouch){joyEl.style.display='block';interactBtn.style.display='block';}
   setMsgOnce(defaultMsg());
   textflash('FIND THE KEYS',1500);
+  if(MODES.nightmare||MODES.scrambled||MODES.stalker){
+    var mn=[]; if(MODES.nightmare)mn.push('&#9760; NIGHTMARE'); if(MODES.scrambled)mn.push('&#128256; SCRAMBLED'); if(MODES.stalker)mn.push('&#128100; STALKER');
+    setTimeout(function(){if(playing&&!escaped)textflash(mn.join(' + '),1500);},1700);
+  }
   MP_heartbeat();
 });
 $('againBtn').addEventListener('click',function(){location.reload();});
@@ -720,7 +742,8 @@ function winGame(){
   var name='Player';
   try{name=Arcade.playerName();}catch(e){}
   $('who').textContent=name;
-  try{Arcade.saveScore(GAME_ID,name,score);}catch(e){}
+  var badges=(MODES.nightmare?' \u9760':'')+(MODES.scrambled?' \uD83D\uDD00':'')+(MODES.stalker?' \uD83D\uDC64':'');
+  try{Arcade.saveScore(GAME_ID,name+badges,score);}catch(e){}
   loadScores();
   MP_heartbeat();
 }
@@ -820,12 +843,18 @@ function loop(){
   var targetQ=new THREE.Quaternion().setFromEuler(camera.rotation);
   torchGroup.quaternion.slerp(targetQ,1-Math.pow(0.0001,dt));
   glow.position.copy(camera.position);
-  /* rare flashlight flicker */
+  /* flashlight flicker — nightmare mode: dimmer torch, meaner flicker */
   flickerT-=dt;
-  if(flickerT<-6-Math.random()*14)flickerT=0.14;
-  torch.intensity=flickerT>0?(Math.random()<0.5?1.1:2.7):2.7;
+  if(MODES.nightmare){
+    if(flickerT<-2.5-Math.random()*5)flickerT=0.22;
+    torch.intensity=flickerT>0?(Math.random()<0.5?0.5:1.55):1.55;
+  }else{
+    if(flickerT<-6-Math.random()*14)flickerT=0.14;
+    torch.intensity=flickerT>0?(Math.random()<0.5?1.1:2.7):2.7;
+  }
 
   if(window.__ftDetails)window.__ftDetails(dt,t);
+  updateModes(dt,t);
   MP_update(dt);
   renderer.render(scene,camera);
 }
@@ -2455,6 +2484,221 @@ function MP_update(dt){
 }
 MP_init();
 
+/* ================= DIFFICULTY MODES (Joslyn: "why not all 3", 2026-10-21) =================
+ * Three combinable start-screen toggles. All default OFF: a classic run is
+ * byte-for-byte the game as shipped, and the classic leaderboard is sacred. */
+var MODES={nightmare:false,scrambled:false,stalker:false};
+
+var MODE_HINTS={
+  none:'Classic run — each key hides in its own room.',
+  nightmare:'\u9760 NIGHTMARE: toxin creeps up the mansion behind you. Get caught and it drags you back to the Foyer — keys kept, time lost. Your flashlight is weaker here and it knows it.',
+  scrambled:'\uD83D\uDD00 SCRAMBLED KEYS: every key can hide in ANY room you can already reach \u2014 not just its own. The memorized sprint is dead. Search everywhere.',
+  stalker:'\uD83D\uDC64 THE STALKER: the hooded figure patrols the dark. If it catches you holding a key, it steals it and re-hides it somewhere in the mansion.'
+};
+function syncModeChips(){
+  $('modeNightmare').className='modeChip'+(MODES.nightmare?' on':'');
+  $('modeScrambled').className='modeChip'+(MODES.scrambled?' on':'');
+  $('modeStalker').className='modeChip'+(MODES.stalker?' on':'');
+  var parts=[];
+  if(MODES.nightmare)parts.push(MODE_HINTS.nightmare);
+  if(MODES.scrambled)parts.push(MODE_HINTS.scrambled);
+  if(MODES.stalker)parts.push(MODE_HINTS.stalker);
+  $('modeHint').textContent=parts.length?parts.join(' '):MODE_HINTS.none;
+}
+function wireMode(id,key){
+  $(id).addEventListener('click',function(){MODES[key]=!MODES[key];syncModeChips();});
+}
+wireMode('modeNightmare','nightmare');
+wireMode('modeScrambled','scrambled');
+wireMode('modeStalker','stalker');
+syncModeChips();
+
+/* ---- key placement (classic + scrambled) ---- */
+function spotTakenByOther(x,z,self){
+  for(var i=0;i<keys.length;i++){
+    if(keys[i]===self||keys[i].taken)continue;
+    var p=keys[i].mesh.position;
+    if(Math.abs(p.x-x)<0.01&&Math.abs(p.z-z)<0.01)return true;
+  }
+  return false;
+}
+function freeSpots(maxRoom,self){
+  var out=[];
+  for(var r=0;r<=maxRoom;r++)for(var s=0;s<KEY_SPOTS[r].length;s++){
+    var sp=KEY_SPOTS[r][s];
+    if(!spotTakenByOther(sp[0],sp[2],self))out.push({room:r,spot:sp});
+  }
+  return out;
+}
+function placeKeys(){
+  for(var ki=0;ki<keys.length;ki++){
+    var k=keys[ki];
+    var cands;
+    if(MODES.scrambled){
+      cands=freeSpots(ki,k);
+    }else{
+      cands=KEY_SPOTS[ki].map(function(sp){return {room:ki,spot:sp};});
+    }
+    var pick=cands[Math.floor(Math.random()*cands.length)];
+    k.mesh.position.set(pick.spot[0],pick.spot[1],pick.spot[2]);
+    k.baseY=pick.spot[1];
+    k.homeRoom=pick.room;
+  }
+}
+function rehideKey(k){
+  var cands=freeSpots(k.room-1,k);
+  if(!cands.length)return;
+  var pick=cands[Math.floor(Math.random()*cands.length)];
+  k.mesh.position.set(pick.spot[0],pick.spot[1],pick.spot[2]);
+  k.baseY=pick.spot[1];
+  k.homeRoom=pick.room;
+  k.taken=false;
+  k.mesh.visible=true;
+}
+
+/* ---- NIGHTMARE: the creeping toxin wall ---- */
+var wallGroup=null,wallMat=null,wallCoreMat=null,wallZ=1.2,wallGrace=0;
+var WALL_START=1.2,WALL_SPEED=0.45,WALL_GRACE=8;
+function buildWall(){
+  if(wallGroup)return;
+  wallGroup=new THREE.Group();
+  wallMat=new THREE.MeshBasicMaterial({color:0x46ff70,transparent:true,opacity:0.30,side:THREE.DoubleSide,depthWrite:false});
+  var plane=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W,WALL_H),wallMat);
+  plane.position.y=WALL_H/2;
+  wallGroup.add(plane);
+  wallCoreMat=new THREE.MeshBasicMaterial({color:0xbaffd0,transparent:true,opacity:0.20,side:THREE.DoubleSide,depthWrite:false});
+  var core=new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W*0.7,WALL_H*0.8),wallCoreMat);
+  core.position.set(0,WALL_H/2,-0.06);
+  wallGroup.add(core);
+  var wl=new THREE.PointLight(0x51ff7a,1.3,10);
+  wl.position.set(0,1.8,0.6);
+  wallGroup.add(wl);
+  wallGroup.position.z=wallZ;
+  wallGroup.visible=false;
+  scene.add(wallGroup);
+}
+function resetWall(){wallZ=WALL_START;wallGrace=0;if(wallGroup)wallGroup.position.z=wallZ;}
+function updateWall(dt,t){
+  if(!wallGroup)return;
+  wallGroup.visible=true;
+  wallGrace+=dt;
+  if(wallGrace>WALL_GRACE)wallZ-=WALL_SPEED*dt;
+  wallGroup.position.z=wallZ;
+  wallGroup.position.y=Math.sin(t*1.7)*0.03;
+  if(wallMat)wallMat.opacity=0.28+Math.sin(t*2.3)*0.06;
+  if(wallCoreMat)wallCoreMat.opacity=0.16+Math.sin(t*3.1)*0.05;
+  if(player.z>=wallZ-0.35){
+    /* caught: dragged back to the Foyer. Keys and doors stay as they were;
+       only time is lost. The wall restarts its creep. */
+    player.x=0;player.z=-2;player.yaw=0;player.pitch=0;
+    resetWall();
+    flashScreen(0.35);
+    textflash('&#9760; THE TOXIN TAKES YOU BACK',1600);
+    tone(220,49,0.5,'sawtooth',0.12); noiseHit(0.25,500,0.18);
+  }
+}
+
+/* ---- THE STALKER: he wants your key ---- */
+var stalker=null;
+function buildStalker(){
+  if(stalker)return;
+  var g=new THREE.Group();
+  var robeMat=new THREE.MeshStandardMaterial({color:0x07070a,roughness:1});
+  var robe=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.46,1.5,10),robeMat);
+  robe.position.y=0.75; robe.castShadow=true;
+  g.add(robe);
+  var hood=new THREE.Mesh(new THREE.SphereGeometry(0.26,12,10),robeMat);
+  hood.position.y=1.62;
+  g.add(hood);
+  var eyeMat=new THREE.MeshBasicMaterial({color:0xff2a1a});
+  var e1=new THREE.Mesh(new THREE.SphereGeometry(0.032,6,6),eyeMat); e1.position.set(-0.09,1.64,0.22); g.add(e1);
+  var e2=new THREE.Mesh(new THREE.SphereGeometry(0.032,6,6),eyeMat); e2.position.set(0.09,1.64,0.22); g.add(e2);
+  var gl=new THREE.PointLight(0xff2a1a,0.55,4.5);
+  gl.position.y=1.6;
+  g.add(gl);
+  g.visible=false;
+  scene.add(g);
+  stalker={group:g,x:0,z:-30,active:false,respawnT:10,wpX:0,wpZ:-30,whisperT:0};
+}
+function spawnStalkerNow(){
+  if(!stalker)return;
+  stalker.z=clamp(player.z-22,-63,-3);
+  stalker.x=(Math.random()<0.5?-1:1)*(1.5+Math.random()*2.5);
+  stalker.active=true;
+  stalker.group.visible=true;
+  stalker.wpX=stalker.x; stalker.wpZ=stalker.z;
+}
+function stalkerCatch(){
+  flashScreen(0.3);
+  tone(392,49,0.55,'sawtooth',0.13); noiseHit(0.3,700,0.2);
+  if(holdingKey){
+    var held=keys[doorsOpened];
+    if(held&&held.taken){
+      rehideKey(held);
+      holdingKey=false;
+      $('keyStat').textContent='no key';
+      textflash('&#128100; THE FIGURE TOOK THE KEY!',1800);
+    }
+  }else{
+    textflash('&#128100; IT FOUND YOU!',1300);
+    var ax=player.x-stalker.x,az=player.z-stalker.z;
+    var al=Math.sqrt(ax*ax+az*az)||1;
+    player.x+=ax/al*1.4; player.z+=az/al*1.4;
+    resolveCollisions(player);
+  }
+  stalker.active=false;
+  stalker.group.visible=false;
+  stalker.respawnT=16;
+  scanInteract();
+}
+function updateStalker(dt,t){
+  if(!stalker)return;
+  if(!stalker.active){
+    stalker.respawnT-=dt;
+    if(stalker.respawnT<=0)spawnStalkerNow();
+    return;
+  }
+  var dx=player.x-stalker.x,dz=player.z-stalker.z;
+  var dist=Math.sqrt(dx*dx+dz*dz);
+  var tx,tz,spd;
+  if(dist<10.5){tx=player.x;tz=player.z;spd=2.5;}
+  else{
+    tx=stalker.wpX; tz=stalker.wpZ; spd=1.5;
+    var wx=tx-stalker.x,wz=tz-stalker.z;
+    if(wx*wx+wz*wz<1.2){
+      stalker.wpX=(Math.random()-0.5)*8;
+      stalker.wpZ=-4-Math.random()*58;
+    }
+  }
+  var mx=tx-stalker.x,mz=tz-stalker.z,ml=Math.sqrt(mx*mx+mz*mz);
+  if(ml>0.01){
+    stalker.x+=mx/ml*spd*dt;
+    stalker.z+=mz/ml*spd*dt;
+    stalker.group.rotation.y=Math.atan2(mx,mz);
+  }
+  stalker.x=clamp(stalker.x,-5.3,5.3);
+  stalker.z=clamp(stalker.z,-64.5,-0.6);
+  stalker.group.position.set(stalker.x,0.05+Math.sin(t*2.1)*0.045,stalker.z);
+  stalker.whisperT-=dt;
+  if(dist<5.5&&stalker.whisperT<=0){
+    textflash('&#128100; something is moving in the dark\u2026',900);
+    tone(1400,900,0.3,'sine',0.015);
+    stalker.whisperT=7;
+  }
+  if(dist<0.95)stalkerCatch();
+}
+
+/* ---- per-frame mode driver ---- */
+function updateModes(dt,t){
+  if(!playing||escaped){
+    if(wallGroup)wallGroup.visible=false;
+    if(stalker)stalker.group.visible=false;
+    return;
+  }
+  if(MODES.nightmare)updateWall(dt,t);
+  if(MODES.stalker)updateStalker(dt,t);
+}
+
 /* debug/test handle */
 window.__ft={
   get playing(){return playing;},
@@ -2470,7 +2714,21 @@ window.__ft={
   interact:function(){scanInteract();tryInteract();},
   keyPos:function(){var k=currentKeyObj();return k?{x:k.mesh.position.x,y:k.mesh.position.y,z:k.mesh.position.z,room:k.room}:null;},
   doorPos:function(){if(doorsOpened>=NROOMS)return null;var d=doors[doorsOpened];return {x:d.x,z:d.wallZ};},
-  keySpots:function(){return keys.map(function(k){return {room:k.room,x:k.mesh.position.x,z:k.mesh.position.z,taken:k.taken};});}
+  keySpots:function(){return keys.map(function(k){return {room:k.room,x:k.mesh.position.x,z:k.mesh.position.z,taken:k.taken};});},
+  get modes(){return MODES;},
+  setModes:function(m){
+    if(m){if('nightmare'in m)MODES.nightmare=!!m.nightmare;if('scrambled'in m)MODES.scrambled=!!m.scrambled;if('stalker'in m)MODES.stalker=!!m.stalker;}
+    syncModeChips();
+  },
+  placeKeys:function(){placeKeys();},
+  get wallZ(){return wallZ;},
+  get wallVisible(){return !!(wallGroup&&wallGroup.visible);},
+  setWall:function(z){wallZ=z;if(wallGroup)wallGroup.position.z=z;},
+  get stalkerState(){return stalker?{active:stalker.active,x:stalker.x,z:stalker.z}:null;},
+  spawnStalker:function(){buildStalker();spawnStalkerNow();},
+  stalkerTo:function(x,z){if(stalker){stalker.x=x;stalker.z=z;stalker.active=true;stalker.group.visible=true;}},
+  get keyVisible(){var k=keys[doorsOpened];return k?k.mesh.visible:null;},
+  get torchI(){return torch.intensity;}
 };
 </script>
 </body>
