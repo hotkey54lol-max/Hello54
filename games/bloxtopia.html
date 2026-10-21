@@ -175,6 +175,8 @@ function cnv(w,h,fn){var c=document.createElement('canvas');c.width=w;c.height=h
 
 /* ---- W4: worlds. ?w=CODE loads a player world; no code = Hometown ---- */
 var WCODE=new URLSearchParams(location.search).get('w');
+var EDITW=new URLSearchParams(location.search).get('edit');
+if(EDITW){WCODE=EDITW;window.__BT_EDIT=true;}
 window.__BT_CUSTOM=!!WCODE;
 window.__BT_DEF=null;
 window.__BT_SPAWN=null;
@@ -1568,6 +1570,7 @@ function loop(){
   var now=performance.now();
   var dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
   var t=now/1000;
+  if(window.__BT_EDIT&&window.edTick){ if(window.updateLife)updateLife(dt,t); window.edTick(dt); renderer.render(scene,camera); return; }
   fpsFrames++; fpsTime+=dt;
   if(fpsTime>=0.5){
     FPSNOW=Math.round(fpsFrames/fpsTime);
@@ -1632,8 +1635,8 @@ function loop(){
     camera.position.set(Math.sin(a)*30,13,Math.cos(a)*30);
     camera.lookAt(0,2,0);
   }
-  water.position.y=-0.75+Math.sin(t*0.8)*0.05;
-  if(water.material.map){water.material.map.offset.x=(t*0.008)%1;water.material.map.offset.y=(t*0.005)%1;}
+  if(water){ water.position.y=-0.75+Math.sin(t*0.8)*0.05;
+    if(water.material.map){water.material.map.offset.x=(t*0.008)%1;water.material.map.offset.y=(t*0.005)%1;} }
   renderer.render(scene,camera);
 }
 resize();
@@ -1697,14 +1700,18 @@ $('wcodeGo').addEventListener('click',function(){
         }
       }catch(e){}
     }
-    if(def){buildCustom(def);applyCustomMeta(def);}
+    if(window.__BT_EDIT){
+      var __tryEd=function(){ if(window.startEditor)window.startEditor(def); else setTimeout(__tryEd,60); };
+      __tryEd();
+    }
+    else if(def){buildCustom(def);applyCustomMeta(def);}
     else{
       buildHometown();
       var m=$('msg'); if(m)m.textContent='⚠ World "'+WCODE+'" not found — welcome to Hometown instead.';
     }
   }
   loadSettings();
-  initLua();
+  if(!window.__BT_EDIT)initLua();
   loadScores();
   loadWorldDir();
 })();
@@ -1736,5 +1743,407 @@ window.__bt={
   decorHidden:function(){var n=0;for(var i=0;i<decorList.length;i++)if(!decorList[i].visible)n++;return n;}
 };
 </script>
+<script>
+/* ================= 3D STUDIO (S2 W4 — Joslyn's ruling: build in 3D) =================
+ * Edit mode for Bloxtopia: ?edit=DRAFT or ?edit=BLOX-XXXXXX.
+ * Roblox-Studio-style: orbit camera, ghost preview, click/drag to build in
+ * the world itself. Scripts do NOT run in edit mode (same as Roblox Studio).
+ * Saves to the same bt_draft the classic Studio page publishes from. */
+window.__BT_ED=null;
+var ED=null;
+var ED_STARTER_SCRIPT=[
+"-- My world's brain — plain Lua, all optional.",
+"print(\"hello from my world!\")",
+"",
+"function onTick(dt)",
+"  spinCoins(0.05)",
+"end",
+"",
+"function onPad()",
+"  launch(13.5)",
+"  playTone(520)",
+"end"
+].join("\n");
+function edKey(x,z){return x+','+z;}
+function edStarterDef(){
+  var blocks=[];
+  for(var x=-1;x<=1;x++)for(var z=-1;z<=1;z++)blocks.push({x:x,z:z,h:1,m:'grass'});
+  return {name:'My World',author:'',blocks:blocks,pads:[],spawn:{x:0,z:0},script:ED_STARTER_SCRIPT,sounds:{},listed:false};
+}
+window.startEditor=function(def){
+  if(!def||!def.blocks)def=edStarterDef();
+  document.body.classList.add('editing');
+  document.title='🎨 3D Studio — '+(def.name||'My World');
+  ED={ def:def, cells:{}, pads:{}, spawn:def.spawn||{x:0,z:0}, meshes:{}, hitList:[],
+    tool:'build', shape:'box', mat:'grass', h:2, r:0, color:null,
+    cam:{tx:(def.spawn?def.spawn.x*3:0),tz:(def.spawn?def.spawn.z*3:0),yaw:0.8,pitch:0.92,dist:36},
+    hover:null, orbitMode:false, saveT:null, grid:null, ghost:null, ring:null };
+  window.__BT_ED=ED;
+  (def.blocks||[]).forEach(function(b){ ED.cells[edKey(b.x,b.z)]=b; });
+  (def.pads||[]).forEach(function(p){ ED.pads[edKey(p.x,p.z)]=p; });
+  /* ground + sea, same as buildCustom */
+  box(0,-1.05,0,66,2,66,0x58a83c,{collide:false,tex:'grass',texRep:12});
+  box(0,-1.35,0,78,1.6,78,0xe8d28a,{collide:false,tex:'sand',texRep:10});
+  var wtr=new THREE.Mesh(new THREE.PlaneGeometry(500,500),
+    new THREE.MeshStandardMaterial({color:0x2e7fc9,transparent:true,opacity:0.88,roughness:0.4}));
+  wtr.rotation.x=-Math.PI/2; wtr.position.y=-0.75; scene.add(wtr);
+  water=wtr; /* the menu loop animates the global water — keep it non-null in edit mode */
+  wtr.userData.texKey='water'; wtr.userData.texRep=26;
+  ED.grid=new THREE.GridHelper(93,31,0xffffff,0xaad4ee);
+  ED.grid.material.transparent=true; ED.grid.material.opacity=0.16;
+  ED.grid.position.y=0.06; scene.add(ED.grid);
+  Object.keys(ED.cells).forEach(edBuildCell);
+  Object.keys(ED.pads).forEach(function(k){ if(!ED.cells[k])edBuildCell(k); });
+  /* spawn ring */
+  ED.ring=new THREE.Mesh(new THREE.CylinderGeometry(1.45,1.45,0.12,24),
+    new THREE.MeshStandardMaterial({color:0x2ed573,roughness:0.4,emissive:0x0a5a2a}));
+  scene.add(ED.ring); edMoveRing();
+  if(typeof myAvatar!=='undefined'&&myAvatar)myAvatar.visible=false;
+  edBuildUI();
+  edMakeGhost();
+  edBindInput();
+  edSetStatus('Studio ready — click the world to build. Right-drag (or ORBIT mode) to look around.');
+};
+function edMoveRing(){
+  if(!ED||!ED.ring)return;
+  var b=ED.cells[edKey(ED.spawn.x,ED.spawn.z)];
+  var top=b?Math.max(1,Math.min(8,b.h|0)):0;
+  ED.ring.position.set(ED.spawn.x*3,top+0.06,ED.spawn.z*3);
+}
+function edRemoveCell(key){
+  var arr=ED.meshes[key]||[];
+  arr.forEach(function(m){ scene.remove(m); if(m.geometry)m.geometry.dispose(); });
+  delete ED.meshes[key];
+  ED.hitList=ED.hitList.filter(function(m){return m.userData.cell!==key;});
+}
+function edBuildCell(key){
+  edRemoveCell(key);
+  var b=ED.cells[key]; var arr=[];
+  if(b){
+    var wx=b.x*3, wz=b.z*3, h=Math.max(1,Math.min(8,b.h|0));
+    var mt=CUSTOM_MATS[b.m]||CUSTOM_MATS.grass;
+    var col=(typeof b.c==='number')?b.c:mt[0];
+    var shaped=b.s&&b.s!=='box'&&b.m!=='lava'&&b.m!=='disco';
+    var mesh;
+    if(shaped&&b.s==='wedge'){
+      var wm=new THREE.MeshStandardMaterial({color:col,roughness:0.9});
+      mesh=wedgeMesh(h,wm); mesh.position.set(wx,0,wz); mesh.rotation.y=(b.r|0)*Math.PI/2; scene.add(mesh);
+      if(mt[1]){wm.map=getTex(mt[1],1); mesh.userData.texKey=mt[1]; mesh.userData.texRep=1;}
+    } else if(shaped&&b.s==='cyl'){
+      mesh=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,h,20),new THREE.MeshStandardMaterial({color:col,roughness:0.9}));
+      mesh.position.set(wx,h/2,wz); mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh);
+      if(mt[1]){mesh.material.map=getTex(mt[1],1); mesh.userData.texKey=mt[1]; mesh.userData.texRep=1;}
+    } else if(shaped&&b.s==='ball'){
+      var sc=h/3;
+      mesh=new THREE.Mesh(new THREE.SphereGeometry(1.5,20,16),new THREE.MeshStandardMaterial({color:col,roughness:0.55}));
+      mesh.scale.set(1,sc,1); mesh.position.set(wx,1.5*sc,wz); mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh);
+      if(mt[1]){mesh.material.map=getTex(mt[1],1); mesh.userData.texKey=mt[1]; mesh.userData.texRep=1;}
+    } else {
+      mesh=box(wx,h/2,wz,3,h,3,col,mt[1]?{tex:mt[1],texRep:1}:{});
+      if(b.m==='lava')mesh.material.emissive=new THREE.Color(0x7a1e00);
+      if(b.m==='glass'){mesh.material.transparent=true;mesh.material.opacity=0.72;}
+      if(b.m==='disco'){mesh.material=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.4,emissive:0x222222});}
+    }
+    mesh.userData.cell=key; arr.push(mesh); ED.hitList.push(mesh);
+    if(b.coin){
+      coin(wx,h+1.15,wz,false);
+      var cg=coins[coins.length-1].mesh; cg.userData.cell=key; arr.push(cg);
+    }
+  }
+  var pd=ED.pads[key];
+  if(pd){
+    var bb=ED.cells[key];
+    var base=bb?Math.max(1,Math.min(8,bb.h|0)):0;
+    var pm=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.45,0.3,18),
+      new THREE.MeshStandardMaterial({color:0xe23b3b,roughness:0.5,emissive:0x550000}));
+    pm.position.set(pd.x*3,base+0.15,pd.z*3); pm.receiveShadow=true; scene.add(pm);
+    pm.userData.cell=key; arr.push(pm); ED.hitList.push(pm);
+  }
+  ED.meshes[key]=arr;
+}
+function edSerialize(){
+  return { name:ED.def.name||'My World', author:ED.def.author||'',
+    blocks:Object.keys(ED.cells).map(function(k){return ED.cells[k];}),
+    pads:Object.keys(ED.pads).map(function(k){return ED.pads[k];}),
+    spawn:ED.spawn, script:ED.def.script||'', sounds:ED.def.sounds||{}, listed:!!ED.def.listed };
+}
+function edSave(quiet){
+  try{ localStorage.setItem('bt_draft',JSON.stringify(edSerialize())); }catch(e){}
+  if(!quiet)edSetStatus('💾 Draft saved on this device.');
+}
+function edAutosave(){
+  clearTimeout(ED.saveT);
+  ED.saveT=setTimeout(function(){ edSave(true); edSetStatus('💾 Autosaved.'); },700);
+}
+function edSetStatus(t){
+  var el=document.getElementById('edStatus');
+  if(el)el.textContent=t;
+}
+function edHoverText(){
+  if(!ED.hover)return '—';
+  var k=edKey(ED.hover.x,ED.hover.z), b=ED.cells[k];
+  var s='Cell ('+ED.hover.x+', '+ED.hover.z+')';
+  if(b)s+=' — '+b.m+(b.s&&b.s!=='box'?' '+b.s:'')+' h'+b.h+(b.coin?' +coin':'');
+  else s+=' — empty';
+  if(ED.pads[k])s+=' +pad';
+  return s;
+}
+/* ---------- ghost preview ---------- */
+function edMakeGhost(){
+  if(ED.ghost){ scene.remove(ED.ghost); if(ED.ghost.geometry)ED.ghost.geometry.dispose(); ED.ghost=null; }
+  if(ED.tool!=='build')return;
+  var mat=new THREE.MeshBasicMaterial({color:ED.color!==null?ED.color:0xffffff,transparent:true,opacity:0.38,depthWrite:false});
+  var h=ED.h, m;
+  if(ED.shape==='wedge'){ m=wedgeMesh(h,mat); }
+  else if(ED.shape==='cyl'){ m=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,h,20),mat); m.position.y=h/2; }
+  else if(ED.shape==='ball'){ var sc=h/3; m=new THREE.Mesh(new THREE.SphereGeometry(1.5,20,16),mat); m.scale.set(1,sc,1); m.position.y=1.5*sc; }
+  else { m=new THREE.Mesh(new THREE.BoxGeometry(3,h,3),mat); m.position.y=h/2; }
+  m.castShadow=false; m.receiveShadow=false;
+  var grp=new THREE.Group(); grp.add(m); scene.add(grp);
+  ED.ghost=grp; edMoveGhost();
+}
+function edMoveGhost(){
+  if(!ED||!ED.ghost)return;
+  if(!ED.hover||ED.tool!=='build'){ ED.ghost.visible=false; return; }
+  ED.ghost.visible=true;
+  ED.ghost.position.set(ED.hover.x*3,0,ED.hover.z*3);
+  ED.ghost.rotation.y=(ED.shape==='wedge')?(ED.r*Math.PI/2):0;
+}
+/* ---------- tools ---------- */
+function edApply(key){
+  var x=ED.hover.x, z=ED.hover.z;
+  if(ED.tool==='build'){
+    var old=ED.cells[key];
+    var nb={x:x,z:z,h:ED.h,m:ED.mat};
+    if(ED.shape!=='box')nb.s=ED.shape;
+    if(ED.shape==='wedge')nb.r=ED.r;
+    if(ED.color!==null)nb.c=ED.color;
+    if(old&&old.coin)nb.coin=true;
+    ED.cells[key]=nb; edBuildCell(key);
+    if(ED.spawn.x===x&&ED.spawn.z===z)edMoveRing();
+  } else if(ED.tool==='erase'){
+    delete ED.cells[key]; delete ED.pads[key]; edBuildCell(key);
+    if(ED.spawn.x===x&&ED.spawn.z===z)edMoveRing();
+  } else if(ED.tool==='coin'){
+    var b2=ED.cells[key]; if(!b2){ edSetStatus('Coins need a block — build one first.'); return; }
+    if(b2.coin)delete b2.coin; else b2.coin=true;
+    edBuildCell(key);
+  } else if(ED.tool==='pad'){
+    if(ED.pads[key])delete ED.pads[key]; else ED.pads[key]={x:x,z:z,p:13.5};
+    edBuildCell(key);
+  } else if(ED.tool==='spawn'){
+    ED.spawn={x:x,z:z}; edMoveRing();
+  }
+  edAutosave();
+  edSetStatus(edHoverText());
+}
+/* ---------- input ---------- */
+function edBindInput(){
+  var el=renderer.domElement;
+  el.style.touchAction='none';
+  var ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), plane=new THREE.Plane(new THREE.Vector3(0,1,0),0), hitP=new THREE.Vector3();
+  var pointers={}, downInfo=null, orbiting=false, lastPinch=0;
+  function setNDC(e){ var r=el.getBoundingClientRect(); ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1; }
+  function pick(){
+    ray.setFromCamera(ndc,camera);
+    var hits=ray.intersectObjects(ED.hitList,false);
+    if(hits.length){
+      var cell=hits[0].object.userData.cell;
+      var p=cell.split(','); var cx=Number(p[0]), cz=Number(p[1]);
+      var n=hits[0].face?hits[0].face.normal:null;
+      if(n&&Math.abs(n.y)<0.5){
+        /* side face: build into the neighbouring cell */
+        var wx=hits[0].object.getWorldPosition(new THREE.Vector3());
+        var wn=n.clone().applyMatrix4(new THREE.Matrix4().extractRotation(hits[0].object.matrixWorld));
+        if(Math.abs(wn.x)>Math.abs(wn.z))cx+=Math.sign(wn.x); else cz+=Math.sign(wn.z);
+      }
+      if(Math.abs(cx)<=15&&Math.abs(cz)<=15){ ED.hover={x:cx,z:cz}; edMoveGhost(); return; }
+    }
+    if(ray.ray.intersectPlane(plane,hitP)){
+      var cx2=Math.round(hitP.x/3), cz2=Math.round(hitP.z/3);
+      if(Math.abs(cx2)<=15&&Math.abs(cz2)<=15){ ED.hover={x:cx2,z:cz2}; edMoveGhost(); return; }
+    }
+    ED.hover=null; edMoveGhost();
+  }
+  el.addEventListener('pointerdown',function(e){
+    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    downInfo={x:e.clientX,y:e.clientY,t:performance.now(),moved:false};
+    orbiting=(e.button===2)||ED.orbitMode;
+    setNDC(e); pick();
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove',function(e){
+    setNDC(e);
+    var pt=pointers[e.pointerId];
+    if(pt){
+      var dx=e.clientX-pt.x, dy=e.clientY-pt.y;
+      pt.x=e.clientX; pt.y=e.clientY;
+      if(downInfo&&(Math.abs(e.clientX-downInfo.x)>7||Math.abs(e.clientY-downInfo.y)>7))downInfo.moved=true;
+      var ids=Object.keys(pointers);
+      if(ids.length===2){
+        var a=pointers[ids[0]], b=pointers[ids[1]];
+        var d=Math.hypot(a.x-b.x,a.y-b.y);
+        if(lastPinch>0){ ED.cam.dist=Math.max(9,Math.min(95,ED.cam.dist*(lastPinch/d))); }
+        lastPinch=d; orbiting=true; if(downInfo)downInfo.moved=true;
+        return;
+      }
+      if(orbiting&&downInfo&&downInfo.moved){
+        ED.cam.yaw-=dx*0.0055;
+        ED.cam.pitch=Math.max(0.14,Math.min(1.5,ED.cam.pitch+dy*0.004));
+        return;
+      }
+    }
+    pick();
+    if(downInfo&&!orbiting&&ED.tool==='build'&&downInfo.moved&&ED.hover){
+      var k=edKey(ED.hover.x,ED.hover.z);
+      var cur=ED.cells[k];
+      if(!cur||cur.h!==ED.h||cur.m!==ED.mat||(cur.s||'box')!==ED.shape)edApply(k);
+    }
+  });
+  function endPointer(e){
+    delete pointers[e.pointerId];
+    if(Object.keys(pointers).length<2)lastPinch=0;
+    if(downInfo&&!downInfo.moved&&!orbiting&&performance.now()-downInfo.t<600){
+      setNDC(e); pick();
+      if(ED.hover)edApply(edKey(ED.hover.x,ED.hover.z));
+    }
+    if(Object.keys(pointers).length===0){ downInfo=null; orbiting=false; }
+  }
+  el.addEventListener('pointerup',endPointer);
+  el.addEventListener('pointercancel',endPointer);
+  el.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+  el.addEventListener('wheel',function(e){
+    e.preventDefault();
+    ED.cam.dist=Math.max(9,Math.min(95,ED.cam.dist*(e.deltaY>0?1.1:0.9)));
+  },{passive:false});
+  window.addEventListener('keydown',function(e){
+    if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
+    if(e.code==='KeyR'){ ED.r=(ED.r+1)%4; edMakeGhost(); edSyncBrush(); }
+    if(e.code==='KeyQ'){ ED.h=Math.max(1,ED.h-1); edMakeGhost(); edSyncBrush(); }
+    if(e.code==='KeyE'){ ED.h=Math.min(8,ED.h+1); edMakeGhost(); edSyncBrush(); }
+    if(e.code==='KeyG'&&ED.grid)ED.grid.visible=!ED.grid.visible;
+    var tools={Digit1:'build',Digit2:'coin',Digit3:'pad',Digit4:'spawn',Digit5:'erase'};
+    if(tools[e.code])edSetTool(tools[e.code]);
+  });
+}
+window.edTick=function(dt){
+  if(!ED)return;
+  var sp=(keysDown.ShiftLeft||keysDown.ShiftRight)?26:13;
+  var fx=Math.sin(ED.cam.yaw), fz=Math.cos(ED.cam.yaw);
+  var mx=0,mz=0;
+  if(keysDown.KeyW||keysDown.ArrowUp){mx-=fx;mz-=fz;}
+  if(keysDown.KeyS||keysDown.ArrowDown){mx+=fx;mz+=fz;}
+  if(keysDown.KeyA||keysDown.ArrowLeft){mx-=fz;mz+=fx;}
+  if(keysDown.KeyD||keysDown.ArrowRight){mx+=fz;mz-=fx;}
+  var il=Math.hypot(mx,mz);
+  if(il>0){ ED.cam.tx+=mx/il*sp*dt; ED.cam.tz+=mz/il*sp*dt; }
+  ED.cam.tx=Math.max(-60,Math.min(60,ED.cam.tx));
+  ED.cam.tz=Math.max(-60,Math.min(60,ED.cam.tz));
+  var cp=Math.cos(ED.cam.pitch), spp=Math.sin(ED.cam.pitch);
+  camera.position.set(
+    ED.cam.tx+ED.cam.dist*cp*Math.sin(ED.cam.yaw),
+    ED.cam.dist*spp,
+    ED.cam.tz+ED.cam.dist*cp*Math.cos(ED.cam.yaw));
+  camera.lookAt(ED.cam.tx,0,ED.cam.tz);
+  if(ED.ghost)ED.ghost.children.forEach(function(m){ if(m.material)m.material.opacity=0.32+0.1*Math.sin(performance.now()/280); });
+};
+/* ---------- UI ---------- */
+function edSetTool(t){
+  ED.tool=t; ED.orbitMode=false;
+  document.querySelectorAll('#edTools button').forEach(function(b){ b.classList.toggle('on',b.dataset.tool===t); });
+  var om=document.getElementById('edOrbitBtn'); if(om)om.classList.remove('on');
+  edMakeGhost();
+}
+function edSyncBrush(){
+  var hEl=document.getElementById('edHVal'); if(hEl)hEl.textContent=String(ED.h);
+  var rEl=document.getElementById('edRVal'); if(rEl)rEl.textContent=['⬆ north','➡ east','⬇ south','⬅ west'][ED.r];
+  document.querySelectorAll('#edShapes button').forEach(function(b){ b.classList.toggle('on',b.dataset.shape===ED.shape); });
+  document.querySelectorAll('#edMats button').forEach(function(b){ b.classList.toggle('on',b.dataset.mat===ED.mat); });
+  document.querySelectorAll('#edColors button').forEach(function(b){ b.classList.toggle('on',(b.dataset.c==='none'&&ED.color===null)||(ED.color!==null&&Number(b.dataset.c)===ED.color)); });
+}
+function edBuildUI(){
+  var st=document.createElement('style');
+  st.textContent=
+  'body.editing .scorebar,body.editing h1,body.editing .back,body.editing #setPanel,body.editing #overlay,body.editing #mpPanel,body.editing #joy,body.editing #jumpBtn,body.editing #waveBtn,body.editing #resetBtn,body.editing .leaderboard,body.editing #msg,body.editing .hint{display:none!important}'+
+  '#edUI{position:fixed;inset:0;pointer-events:none;z-index:60;font-family:inherit}'+
+  '#edUI button{pointer-events:auto;font-family:inherit;cursor:pointer;background:#0d2438;color:#cfe6f5;border:2px solid #2e5d8a;border-radius:8px;padding:6px 10px;font-size:.8rem}'+
+  '#edUI button.on{background:#ffd94d;color:#000;border-color:#ffd94d;font-weight:bold}'+
+  '#edTop{position:absolute;top:0;left:0;right:0;display:flex;gap:6px;align-items:center;background:rgba(6,20,34,.88);padding:7px 10px;pointer-events:auto;flex-wrap:wrap}'+
+  '#edTop b{color:#ffd94d;font-size:.9rem;margin-right:4px}'+
+  '#edTools{position:absolute;left:8px;top:64px;display:flex;flex-direction:column;gap:6px}'+
+  '#edBrush{position:absolute;right:8px;top:64px;width:172px;background:rgba(6,20,34,.88);border:2px solid #2e5d8a;border-radius:10px;padding:9px;pointer-events:auto;color:#cfe6f5;font-size:.75rem}'+
+  '#edBrush h5{margin:7px 0 4px;color:#ffd94d;font-size:.72rem}'+
+  '#edBrush .row{display:flex;flex-wrap:wrap;gap:4px}'+
+  '#edBrush button{padding:4px 7px;font-size:.72rem}'+
+  '#edStatus{position:absolute;left:0;right:0;bottom:0;background:rgba(6,20,34,.88);color:#cfe6f5;padding:6px 12px;font-size:.78rem;pointer-events:auto}'+
+  '#edColors .sw{width:22px;height:22px;padding:0;border-radius:6px}'+
+  '@media (max-width:760px){#edBrush{width:138px;top:auto;bottom:34px;right:6px}#edTools{top:110px}}';
+  document.head.appendChild(st);
+  var mats=Object.keys(CUSTOM_MATS);
+  var matBtns=mats.map(function(m){ return '<button data-mat="'+m+'">'+m+'</button>'; }).join('');
+  var swatches=[['none','natural'],['#e23b3b','red'],['#ffa502','orange'],['#ffd94d','yellow'],['#2ed573','green'],['#1e90ff','blue'],['#9b59b6','purple'],['#ff6b81','pink'],['#ffffff','white'],['#2f3542','black']];
+  var swBtns=swatches.map(function(sw){
+    var val=sw[0]==='none'?'none':String(parseInt(sw[0].slice(1),16));
+    return '<button class="sw" data-c="'+val+'" title="'+sw[1]+'" style="background:'+(sw[0]==='none'?'repeating-linear-gradient(45deg,#333,#333 4px,#555 4px,#555 8px)':sw[0])+'"></button>';
+  }).join('');
+  var ui=document.createElement('div');
+  ui.id='edUI';
+  ui.innerHTML=
+  '<div id="edTop"><b>🎨 3D STUDIO</b><span style="color:#cfe6f5;font-size:.8rem">'+(ED.def.name||'My World')+'</span>'+
+  '<button id="edSave">💾 Save draft</button>'+
+  '<button id="edTest">▶ Test play</button>'+
+  '<button id="edTop2">⬆ Top view</button>'+
+  '<button id="edPub">📝 Script & publish</button>'+
+  '<button id="edExit">🏠 Exit</button></div>'+
+  '<div id="edTools">'+
+  '<button data-tool="build">🧱 Build</button>'+
+  '<button data-tool="coin">🪙 Coin</button>'+
+  '<button data-tool="pad">🚀 Pad</button>'+
+  '<button data-tool="spawn">🏁 Spawn</button>'+
+  '<button data-tool="erase">🧽 Erase</button>'+
+  '<button id="edOrbitBtn">🎥 Orbit</button></div>'+
+  '<div id="edBrush"><h5>SHAPE</h5><div class="row" id="edShapes">'+
+  '<button data-shape="box">⬛ Box</button><button data-shape="wedge">◢ Wedge</button><button data-shape="cyl">🛢 Cyl</button><button data-shape="ball">⚪ Ball</button></div>'+
+  '<h5>HEIGHT <span id="edHVal">2</span> (Q/E)</h5><div class="row"><button id="edHMinus">−</button><button id="edHPlus">+</button></div>'+
+  '<h5>WEDGE TURN (R)</h5><div class="row"><button id="edRot">↻ <span id="edRVal">⬆ north</span></button></div>'+
+  '<h5>MATERIAL</h5><div class="row" id="edMats">'+matBtns+'</div>'+
+  '<h5>COLOR TINT</h5><div class="row" id="edColors">'+swBtns+'</div>'+
+  '<div class="row" style="margin-top:5px"><input type="color" id="edCustomColor" value="#e23b3b" style="pointer-events:auto;width:40px;height:26px;background:none;border:none"> custom</div>'+
+  '<h5>HELP</h5><div style="line-height:1.7">Click: build &middot; drag: paint<br>Right-drag / 🎥: orbit &middot; wheel: zoom<br>WASD: move &middot; 1-5: tools &middot; G: grid</div></div>'+
+  '<div id="edStatus">…</div>';
+  document.body.appendChild(ui);
+  document.querySelectorAll('#edTools button[data-tool]').forEach(function(b){
+    b.addEventListener('click',function(){ edSetTool(b.dataset.tool); });
+  });
+  document.getElementById('edOrbitBtn').addEventListener('click',function(){
+    ED.orbitMode=!ED.orbitMode;
+    this.classList.toggle('on',ED.orbitMode);
+    if(ED.orbitMode){ ED.ghost&&(ED.ghost.visible=false); } else edMakeGhost();
+  });
+  document.querySelectorAll('#edShapes button').forEach(function(b){
+    b.addEventListener('click',function(){ ED.shape=b.dataset.shape; edMakeGhost(); edSyncBrush(); });
+  });
+  document.querySelectorAll('#edMats button').forEach(function(b){
+    b.addEventListener('click',function(){ ED.mat=b.dataset.mat; edSyncBrush(); });
+  });
+  document.querySelectorAll('#edColors button').forEach(function(b){
+    b.addEventListener('click',function(){ ED.color=b.dataset.c==='none'?null:Number(b.dataset.c); edMakeGhost(); edSyncBrush(); });
+  });
+  document.getElementById('edCustomColor').addEventListener('input',function(){
+    ED.color=parseInt(this.value.slice(1),16); edMakeGhost(); edSyncBrush();
+  });
+  document.getElementById('edHMinus').addEventListener('click',function(){ ED.h=Math.max(1,ED.h-1); edMakeGhost(); edSyncBrush(); });
+  document.getElementById('edHPlus').addEventListener('click',function(){ ED.h=Math.min(8,ED.h+1); edMakeGhost(); edSyncBrush(); });
+  document.getElementById('edRot').addEventListener('click',function(){ ED.r=(ED.r+1)%4; edMakeGhost(); edSyncBrush(); });
+  document.getElementById('edSave').addEventListener('click',function(){ edSave(false); });
+  document.getElementById('edTest').addEventListener('click',function(){ edSave(true); window.open('bloxtopia.html?w=DRAFT','_blank'); });
+  document.getElementById('edPub').addEventListener('click',function(){ edSave(true); location.href='bloxtopia-studio.html'; });
+  document.getElementById('edExit').addEventListener('click',function(){ edSave(true); location.href='../index.html'; });
+  document.getElementById('edTop2').addEventListener('click',function(){ ED.cam.pitch=1.45; ED.cam.dist=44; });
+  edSetTool('build');
+  edSyncBrush();
+}
+</script>
+
 </body>
 </html>
