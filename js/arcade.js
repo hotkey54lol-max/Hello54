@@ -1158,7 +1158,87 @@ window.Arcade = (function () {
     set: setSetting,
   };
 
+  /* ================= Auto-update watcher =================
+   * Joslyn's idea (2026-10-21): visitors shouldn't have to manually
+   * refresh to receive site updates. Every page quietly polls the tiny
+   * version.json against the build baked into this file. When a new
+   * deploy lands: the hub reloads itself; in-game pages show a gold
+   * "tap to update" bar instead, so a run is never force-interrupted.
+   * IMPORTANT for future deploys: bump ARCADE_BUILD here AND version.json
+   * to the same new value, or every open page will nag/reload forever.
+   * Pages can opt out with window.ARCADE_NO_UPDATE=true.
+   */
+  const ARCADE_BUILD = "2026-10-21.1";
+  let _updateHandled = false;
+
+  function _siteBase() {
+    try {
+      var tag = document.querySelector('script[src$="js/arcade.js"]');
+      if (tag) {
+        var src = tag.getAttribute("src") || "";
+        return src.slice(0, src.length - "js/arcade.js".length);
+      }
+    } catch (e) { /* no tag — use relative root */ }
+    return "";
+  }
+
+  function _showUpdateBar() {
+    _fxSafe(function () {
+      if (document.getElementById("arcade-update-bar")) return;
+      var bar = document.createElement("button");
+      bar.id = "arcade-update-bar";
+      bar.textContent = "* ✦ A NEWER ARCADE JUST DROPPED — TAP TO UPDATE";
+      bar.setAttribute("style",
+        "position:fixed;top:0;left:0;right:0;z-index:99999;background:#ffff00;" +
+        "color:#000;border:0;border-bottom:3px solid #000;padding:12px 8px;" +
+        "font-family:'Press Start 2P',monospace;font-size:10px;line-height:1.6;" +
+        "cursor:pointer;text-align:center;width:100%;");
+      bar.addEventListener("click", function () { location.reload(); });
+      document.body.appendChild(bar);
+    });
+  }
+
+  async function _checkForUpdate() {
+    try {
+      if (window.ARCADE_NO_UPDATE || _updateHandled) return;
+      const r = await fetch(_siteBase() + "version.json?cb=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data || !data.build || data.build === ARCADE_BUILD) return;
+      _updateHandled = true;
+      const path = location.pathname || "";
+      const isHub = path === "/" || /\/index\.html$/.test(path);
+      if (isHub) {
+        let already = null;
+        try { already = sessionStorage.getItem("arcade_reloaded_for"); } catch (e) {}
+        if (already !== data.build) {
+          try { sessionStorage.setItem("arcade_reloaded_for", data.build); } catch (e) {}
+          location.reload();
+          return;
+        }
+      }
+      _showUpdateBar();
+    } catch (e) { /* offline or no version.json — stay silent */ }
+  }
+
+  _fxSafe(function () {
+    if (typeof document === "undefined") return;
+    const start = function () {
+      _checkForUpdate();
+      setInterval(_checkForUpdate, 45000);
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) _checkForUpdate();
+      });
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", start);
+    } else {
+      start();
+    }
+  });
+
   return {
+    build: ARCADE_BUILD,
     SUPABASE_URL: SUPABASE_URL,
     SUPABASE_ANON: SUPABASE_ANON,
     saveScore: saveScore,
