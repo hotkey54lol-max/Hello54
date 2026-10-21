@@ -100,6 +100,15 @@
     display: inline-block; background: var(--ut-yellow); color: #000;
     font-size: 11px; letter-spacing: 1px; padding: 10px 26px; margin-top: 14px;
   }
+  .card .thumb {
+    width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block;
+    margin-bottom: 12px; border: 2px solid var(--ut-dark); background: #111;
+  }
+  .card.featured .thumb { aspect-ratio: 21 / 9; }
+  .hofthumb {
+    width: 40px; height: 25px; object-fit: cover; vertical-align: middle;
+    margin-right: 8px; border: 1px solid var(--ut-dark); background: #111;
+  }
   .card:hover .playbtn { background: var(--ut-white); }
   .leaders {
     max-width: 900px; margin: 8px auto 40px;
@@ -193,7 +202,7 @@
     a.href = "games/" + g.id + ".html";
     a.innerHTML =
       (g.featured ? '<span class="badge">★ FEATURED</span>' : "") +
-      '<span class="emoji">' + g.emoji + "</span>" +
+      '<img class="thumb" src="img/thumbs/' + g.id + '.jpg" alt="' + g.title + '" loading="lazy">' +
       '<span class="title">' + g.title + "</span>" +
       (g.sub ? '<div class="sub">' + g.sub + "</div>" : "") +
       (g.featured ? '<span class="playbtn">▶ PLAY</span>' : "") +
@@ -219,7 +228,7 @@
     GAMES.map(function (g) {
       return Arcade.getScores(g.id, 1).then(function (rows) {
         return rows.length
-          ? { game: g.title, emoji: g.emoji, name: rows[0].player_name, score: rows[0].score }
+          ? { game: g.title, id: g.id, name: rows[0].player_name, score: rows[0].score }
           : null;
       });
     })
@@ -233,7 +242,7 @@
     rows.slice(0, 10).forEach(function (r) {
       const li = document.createElement("li");
       li.innerHTML =
-        "<span>" + r.emoji + " " + r.game + ' <span class="who">— ' +
+        '<span><img class="hofthumb" src="img/thumbs/' + r.id + '.jpg" alt="">' + r.game + ' <span class="who">— ' +
         r.name + "</span></span>" +
         '<span class="pts">' + r.score + "</span>";
       hof.appendChild(li);
