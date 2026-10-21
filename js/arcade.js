@@ -1158,6 +1158,26 @@ window.Arcade = (function () {
     set: setSetting,
   };
 
+  // Server-side admin password check (Joslyn's idea, 2026-10-21): the
+  // guess goes to a Supabase RPC that answers only true/false; the stored
+  // hash lives in a locked table no visitor can read, and the password
+  // itself appears nowhere in the site's code. Resolves true/false, or
+  // null when the checker could not be reached.
+  async function checkAdminPassword(guess) {
+    try {
+      const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/check_admin_password", {
+        method: "POST",
+        headers: baseHeaders(),
+        body: JSON.stringify({ guess: String(guess == null ? "" : guess) }),
+      });
+      if (!r.ok) return null;
+      const v = await r.json();
+      return v === true;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /* ================= Auto-update watcher =================
    * Joslyn's idea (2026-10-21): visitors shouldn't have to manually
    * refresh to receive site updates. Every page quietly polls the tiny
@@ -1168,7 +1188,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-21.4";
+  const ARCADE_BUILD = "2026-10-21.5";
   let _updateHandled = false;
 
   function _siteBase() {
@@ -1252,6 +1272,7 @@ window.Arcade = (function () {
       tell: _storyTell,
     },
     settings: settingsApi,
+    checkAdmin: checkAdminPassword,
     fullscreen: { toggle: _fsToggle },
   };
 })();
