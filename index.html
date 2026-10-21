@@ -96,6 +96,11 @@
     font-size: 9px; letter-spacing: 1px; padding: 5px 10px; margin-bottom: 12px;
   }
   .card .sub { margin-top: 8px; font-size: 9px; color: var(--ut-gray); line-height: 1.8; }
+  .card .playbtn {
+    display: inline-block; background: var(--ut-yellow); color: #000;
+    font-size: 11px; letter-spacing: 1px; padding: 10px 26px; margin-top: 14px;
+  }
+  .card:hover .playbtn { background: var(--ut-white); }
   .leaders {
     max-width: 900px; margin: 8px auto 40px;
     background: #000; border: 3px solid var(--ut-white); border-radius: 0;
@@ -191,6 +196,7 @@
       '<span class="emoji">' + g.emoji + "</span>" +
       '<span class="title">' + g.title + "</span>" +
       (g.sub ? '<div class="sub">' + g.sub + "</div>" : "") +
+      (g.featured ? '<span class="playbtn">▶ PLAY</span>' : "") +
       '<div class="best" id="best-' + g.id + '">…</div>';
     grid.appendChild(a);
     bestEls[g.id] = a.querySelector(".best");
