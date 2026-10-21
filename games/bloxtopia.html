@@ -1183,8 +1183,12 @@ window.__btW3={
 </script>
 <script>
 /* ================= LUA ENGINE (Fengari, sandboxed) =================
- * World scripts get ONLY the `bt` table: no os/io/package/network.
- * This is the same sandbox future player-made worlds will run in. */
+ * World scripts are PLAIN LUA first (Joslyn's call, 2026-10-21): the full
+ * language, print(), math/string/table, coroutines — all normal. Only the
+ * extreme functions are stripped (io, os.execute, require/load, debug).
+ * The game powers (onTick/onPad hooks, spinCoins, launch, playTone,
+ * playSound, setDisco, log) are OPTIONAL extras, available both as plain
+ * globals and under the `bt` table for the namespaced style. */
 var LUA=null, luaOkFlag=false, luaTickErrs=0, pendingLaunch=0;
 var SOUND_CACHE={};
 var WORLD_SCRIPT=[
@@ -1209,7 +1213,12 @@ function luaCallBt(field,args){
   var fengari=window.fengari, lua=fengari.lua, S=fengari.to_luastring;
   lua.lua_getglobal(LUA,S('bt'));
   lua.lua_getfield(LUA,-1,S(field));
-  if(lua.lua_type(LUA,-1)!==lua.LUA_TFUNCTION){lua.lua_settop(LUA,0);return false;}
+  if(lua.lua_type(LUA,-1)!==lua.LUA_TFUNCTION){
+    /* plain-Lua style: a global function with the same name (onTick, onPad) */
+    lua.lua_settop(LUA,0);
+    lua.lua_getglobal(LUA,S(field));
+    if(lua.lua_type(LUA,-1)!==lua.LUA_TFUNCTION){lua.lua_settop(LUA,0);return false;}
+  }
   (args||[]).forEach(function(a){lua.lua_pushnumber(LUA,a);});
   var rc=lua.lua_pcall(LUA,(args||[]).length,0,0);
   lua.lua_settop(LUA,0);
@@ -1232,7 +1241,25 @@ function initLua(){
     lauxlib.luaL_dostring(LUA,S([
       'do local _os=os os={time=_os.time,clock=_os.clock,date=_os.date,difftime=_os.difftime} end',
       'io=nil package=nil require=nil dofile=nil loadfile=nil load=nil loadstring=nil',
-      'debug=nil print=nil'
+      'debug=nil'
+    ].join('\n')));
+    /* print() stays — it's plain Lua's most basic tool. Route it through a
+       JS sink with real Lua semantics (tostring on every argument). */
+    window.__BT_LUA_LOG=[];
+    lua.lua_pushjsfunction(LUA,function(L){
+      var s=lua.lua_tostring(L,1);
+      var msg=s?fengari.to_jsstring(s):'';
+      window.__BT_LUA_LOG.push(msg);
+      console.log('[lua]',msg);
+      return 0;
+    });
+    lua.lua_setglobal(LUA,S('__bt_print'));
+    lauxlib.luaL_dostring(LUA,S([
+      'function print(...)',
+      '  local parts={}',
+      '  for i=1,select("#",...) do parts[i]=tostring(select(i,...)) end',
+      '  __bt_print(table.concat(parts,"\\t"))',
+      'end'
     ].join('\n')));
     /* Fengari's native os.clock() errors when called — replace it with a
        working engine clock (seconds since the world loaded). */
@@ -1245,10 +1272,14 @@ function initLua(){
     lua.lua_settop(LUA,0);
     lauxlib.luaL_dostring(LUA,S('bt={}'));
     function reg(name,fn){
+      /* registered twice: as bt.<name> AND as a plain global <name>,
+         so scripts written in original-Lua style never have to use bt */
       lua.lua_getglobal(LUA,S('bt'));
       lua.lua_pushjsfunction(LUA,fn);
       lua.lua_setfield(LUA,-2,S(name));
       lua.lua_settop(LUA,0);
+      lua.lua_pushjsfunction(LUA,fn);
+      lua.lua_setglobal(LUA,S(name));
     }
     reg('setDisco',function(L){
       var i=lua.lua_tonumber(L,1), c=lua.lua_tonumber(L,2);
