@@ -192,10 +192,10 @@ function coin(x,y,z,big){
   coins.push({mesh:grp,x:x,y:y,z:z,taken:false,respawn:0,big:!!big});
 }
 var SHOPS=[
-  {x:-17,z:-17,c:0xe86a4f,roof:0x8a3b2a},
-  {x:17,z:-17,c:0x4fa3e8,roof:0x2a4f8a},
-  {x:-17,z:17,c:0x63c94f,roof:0x2a6e35},
-  {x:17,z:17,c:0xe8c94f,roof:0x8a6d2a}
+  {x:-17,z:-17,c:0xe2574c,roof:0x94351f},
+  {x:17,z:-17,c:0x3f8fe0,roof:0x2c4f9e},
+  {x:-17,z:17,c:0x53b83f,roof:0x2f7a38},
+  {x:17,z:17,c:0xf0b93e,roof:0x9e5f1f}
 ];
 var TOWER={x:-36,z:-36};
 
@@ -220,7 +220,7 @@ box(0,0.01,0,7,0.06,100,0x6f6f68,{collide:false,tex:'asphalt',texRep:12});
   base.userData.texKey='stone'; base.userData.texRep=3;
   colliders.push({x0:-3.2,x1:3.2,z0:-3.2,z1:3.2,top:0.9,bottom:0});
   var w=new THREE.Mesh(new THREE.CylinderGeometry(2.9,2.9,0.25,20),
-    new THREE.MeshStandardMaterial({color:0x3aa7c9,roughness:0.2,metalness:0.1}));
+    new THREE.MeshStandardMaterial({color:0x2fa8dd,roughness:0.2,metalness:0.1,emissive:0x06283d}));
   w.position.set(0,0.85,0); scene.add(w);
   box(0,1.5,0,0.7,1.6,0.7,0xb8b8ae);
   var ball=new THREE.Mesh(new THREE.SphereGeometry(0.55,14,12),
@@ -262,9 +262,10 @@ SHOPS.forEach(function(s){
 
 /* trees + lamps in the park (south-west) and around */
 function tree(x,z){
-  decorList.push(box(x,1.0,z,0.7,2,0.7,0x7a4a26,{tex:'bark',texRep:1}));
-  decorList.push(box(x,3.1,z,2.6,2.2,2.6,0x2c7a2c,{tex:'leaf',texRep:1}));
-  decorList.push(box(x,4.4,z,1.8,1.2,1.8,0x359935,{tex:'leaf',texRep:1}));
+  decorList.push(box(x,1.0,z,0.7,2,0.7,0xffffff,{tex:'bark',texRep:1}));
+  decorList.push(box(x,3.1,z,2.6,2.2,2.6,0xf2fff0,{tex:'leaf',texRep:1}));
+  decorList.push(box(x,4.4,z,1.8,1.2,1.8,0xffffff,{tex:'leaf',texRep:1}));
+  decorList.push(box(x,5.35,z,1.15,0.75,1.15,0xeaffea,{tex:'leaf',texRep:1,collide:false}));
 }
 [[-30,26],[-24,32],[-36,34],[30,30],[36,24],[26,-30],[-28,-24],[8,34],[-8,36],[34,-8]].forEach(function(p){tree(p[0],p[1]);});
 function lamp(x,z){
@@ -939,6 +940,64 @@ bench(7.5,0,false); bench(-7.5,0,false); bench(0,7.5,true); bench(0,-7.5,true);
   }
 })();
 
+/* grass tufts (S2 W2: the meadow reference — lush painted grass you can stand in) */
+(function(){
+  function tuftCanvas(withFlower){
+    return cnv(128,128,function(g){
+      g.clearRect(0,0,128,128);
+      var cols=['#3e7d29','#579f3a','#68b44b','#7cc45e','#8fd06c'];
+      var seed=withFlower?4242:987;
+      function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647;}
+      for(var i=0;i<30;i++){
+        var bx=12+rnd()*104, bend=(rnd()*30-15), top=14+rnd()*52;
+        g.strokeStyle=cols[(rnd()*cols.length)|0];
+        g.lineWidth=3.6; g.lineCap='round';
+        g.beginPath(); g.moveTo(bx,128);
+        g.quadraticCurveTo(bx+bend*0.3,128-(128-top)*0.6,bx+bend,top); g.stroke();
+      }
+      if(withFlower){
+        var fc=['#ff6b9d','#ffd94d','#ffffff'][(rnd()*3)|0];
+        for(var k=0;k<3;k++){
+          var fx=24+rnd()*80, fy=30+rnd()*40;
+          g.fillStyle=fc;
+          for(var p=0;p<5;p++){g.beginPath();g.arc(fx+Math.cos(p*1.26)*3.4,fy+Math.sin(p*1.26)*3.4,2.6,0,7);g.fill();}
+          g.fillStyle='#f7b731'; g.beginPath(); g.arc(fx,fy,1.8,0,7); g.fill();
+        }
+      }
+    });
+  }
+  function tuftMat(withFlower){
+    var t=new THREE.CanvasTexture(tuftCanvas(withFlower));
+    t.encoding=THREE.sRGBEncoding;
+    return new THREE.MeshStandardMaterial({map:t,transparent:true,alphaTest:0.42,side:THREE.DoubleSide,roughness:1});
+  }
+  var mats=[tuftMat(false),tuftMat(true)];
+  var geo=new THREE.PlaneGeometry(1.25,1.0);
+  var seed=24680;
+  function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647;}
+  var placed=0,guard=0;
+  while(placed<150&&guard++<900){
+    var x=-47+rnd()*94, z=-47+rnd()*94;
+    if(Math.abs(x)<13.5&&Math.abs(z)<13.5)continue;                 /* plaza */
+    if(Math.abs(x)<4.6||Math.abs(z)<4.6)continue;                   /* roads */
+    if(Math.abs(Math.abs(x)-17)<7.5&&Math.abs(Math.abs(z)-17)<7.5)continue; /* shops */
+    if(Math.abs(x-TOWER.x)<7.5&&Math.abs(z-TOWER.z)<7.5)continue;   /* tower */
+    var grp=new THREE.Group();
+    var m=mats[placed%3===0?1:0];
+    for(var k=0;k<2;k++){
+      var pl=new THREE.Mesh(geo,m);
+      pl.position.y=0.48; pl.rotation.y=k*Math.PI/2+rnd()*0.5;
+      grp.add(pl);
+    }
+    var sc=0.8+rnd()*0.8;
+    grp.scale.set(sc,sc*(0.85+rnd()*0.4),sc);
+    grp.position.set(x,0,z);
+    scene.add(grp);
+    decorList.push(grp);
+    placed++;
+  }
+})();
+
 } /* end hometown dressing */
 
 /* blocky clouds */
@@ -949,10 +1008,10 @@ var CLOUDS=[];
   function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647;}
   for(var i=0;i<7;i++){
     var g=new THREE.Group();
-    var n=3+((rnd()*3)|0);
+    var n=4+((rnd()*3)|0);
     for(var j=0;j<n;j++){
       var b=new THREE.Mesh(new THREE.BoxGeometry(3.5+rnd()*5,1.1+rnd()*1.1,2.6+rnd()*2.4),mat);
-      b.position.set(j*2.6-n*1.2, rnd()*0.7, rnd()*1.6-0.8);
+      b.position.set(j*2.4-n*1.1, rnd()*1.1, rnd()*1.8-0.9);
       g.add(b);
     }
     g.position.set(-70+rnd()*140, 26+rnd()*9, -58+rnd()*116);
