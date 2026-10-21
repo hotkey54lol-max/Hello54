@@ -166,7 +166,7 @@ if(muted)$('muteBtn').innerHTML='&#128263;';
 
 /* ================= textures (procedural) ================= */
 function cnv(w,h,fn){var c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);return c;}
-function tex(c,rx,ry){var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx||1,ry||1);t.encoding=THREE.sRGBEncoding;return t;}
+function tex(c,rx,ry){var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx||1,ry||1);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t;}
 var floorTexC=cnv(512,512,function(g){
   g.fillStyle='#2a1a10';g.fillRect(0,0,512,512);
   var rows=4,bh=512/rows;
@@ -178,10 +178,22 @@ var floorTexC=cnv(512,512,function(g){
       g.fillRect(px+3,r*bh+3,334,bh-6);
       g.strokeStyle='rgba(0,0,0,.25)';
       for(var i=0;i<7;i++){g.beginPath();var gy=r*bh+8+Math.random()*(bh-16);g.moveTo(px+8,gy);g.bezierCurveTo(px+110,gy+3,px+220,gy-3,px+326,gy+2);g.stroke();}
+      /* detail pass: finer grain, knots, wear */
+      g.strokeStyle='rgba(0,0,0,.16)';g.lineWidth=1;
+      for(var i2=0;i2<9;i2++){g.beginPath();var gy2=r*bh+6+Math.random()*(bh-12);g.moveTo(px+6,gy2);g.bezierCurveTo(px+100,gy2+2,px+230,gy2-2,px+328,gy2+1);g.stroke();}
+      g.strokeStyle='rgba(255,214,150,.05)';
+      for(var i3=0;i3<4;i3++){g.beginPath();var gy3=r*bh+10+Math.random()*(bh-20);g.moveTo(px+10,gy3);g.lineTo(px+324,gy3+(Math.random()*4-2));g.stroke();}
+      for(var kn=0;kn<2;kn++){
+        var kx=px+40+Math.random()*260,ky=r*bh+16+Math.random()*(bh-32);
+        g.strokeStyle='rgba(16,8,2,.55)';g.beginPath();g.ellipse(kx,ky,7,4.5,0.3,0,7);g.stroke();
+        g.strokeStyle='rgba(16,8,2,.35)';g.beginPath();g.ellipse(kx,ky,12,7.5,0.3,0,7);g.stroke();
+        g.fillStyle='rgba(10,5,1,.7)';g.beginPath();g.ellipse(kx,ky,2.6,1.8,0.3,0,7);g.fill();
+      }
       g.fillStyle='rgba(0,0,0,.8)';g.beginPath();g.arc(px+20,r*bh+bh/2,3,0,7);g.arc(px+318,r*bh+bh/2,3,0,7);g.fill();
     }
     g.fillStyle='#120a05';g.fillRect(0,r*bh-2,512,4);
   }
+  for(var sp=0;sp<1100;sp++){g.fillStyle=Math.random()<0.7?'rgba(0,0,0,.14)':'rgba(255,220,160,.05)';g.fillRect(Math.random()*512,Math.random()*512,2,2);}
 });
 var wallTexC=cnv(512,512,function(g){
   g.fillStyle='#232d23';g.fillRect(0,0,512,512);
@@ -194,6 +206,21 @@ var wallTexC=cnv(512,512,function(g){
   g.fillStyle='#3a2a16';g.fillRect(0,342,512,10);g.fillRect(0,502,512,10);
   g.fillStyle='rgba(0,0,0,.35)';
   for(var px=42;px<512;px+=128)g.fillRect(px,360,4,132);
+  /* detail pass: wallpaper stripes + motif dots, wainscot bevels, grime */
+  g.fillStyle='rgba(255,255,255,.022)';
+  for(var sx=0;sx<512;sx+=32)g.fillRect(sx,0,13,342);
+  g.fillStyle='rgba(214,188,120,.12)';
+  for(var mx=56;mx<512;mx+=64)for(var my=62;my<330;my+=64){g.beginPath();g.arc(mx,my,3,0,7);g.fill();}
+  for(var bx=42;bx<512;bx+=128){
+    g.strokeStyle='rgba(255,230,170,.08)';g.lineWidth=2;g.strokeRect(bx+5,365,86,124);
+    g.strokeStyle='rgba(0,0,0,.5)';g.strokeRect(bx+10,370,76,114);
+  }
+  g.fillStyle='rgba(255,230,170,.05)';g.fillRect(0,424,512,3);
+  for(var gs=0;gs<26;gs++){
+    var gx=Math.random()*512,gl=60+Math.random()*180;
+    var gg=g.createLinearGradient(0,0,0,gl);gg.addColorStop(0,'rgba(0,0,0,.10)');gg.addColorStop(1,'rgba(0,0,0,0)');
+    g.save();g.translate(gx,0);g.fillStyle=gg;g.fillRect(-2,0,4,gl);g.restore();
+  }
   var grd=g.createLinearGradient(0,0,0,512);grd.addColorStop(0,'rgba(0,0,0,.35)');grd.addColorStop(.5,'rgba(0,0,0,0)');grd.addColorStop(1,'rgba(0,0,0,.5)');
   g.fillStyle=grd;g.fillRect(0,0,512,512);
 });
@@ -201,17 +228,34 @@ function doorTexC(num){
   return cnv(256,400,function(g){
     g.fillStyle='#33200f';g.fillRect(0,0,256,400);
     g.strokeStyle='rgba(0,0,0,.5)';for(var i=0;i<26;i++){g.beginPath();var x=Math.random()*256;g.moveTo(x,0);g.lineTo(x+(Math.random()*8-4),400);g.stroke();}
+    /* detail pass: plank seams, fine grain, knots, panel bevels */
+    g.fillStyle='rgba(0,0,0,.55)';g.fillRect(84,0,3,400);g.fillRect(169,0,3,400);
+    g.strokeStyle='rgba(0,0,0,.22)';for(var i4=0;i4<34;i4++){g.beginPath();var x4=Math.random()*256;g.moveTo(x4,0);g.bezierCurveTo(x4+3,130,x4-3,270,x4+2,400);g.stroke();}
+    g.strokeStyle='rgba(20,10,2,.6)';for(var k2=0;k2<3;k2++){var kx2=30+Math.random()*196,ky2=40+Math.random()*320;g.beginPath();g.ellipse(kx2,ky2,5,8,0.1,0,7);g.stroke();g.beginPath();g.ellipse(kx2,ky2,9,14,0.1,0,7);g.stroke();}
     g.fillStyle='#241605';g.fillRect(24,30,208,150);g.fillRect(24,216,208,150);
     g.strokeStyle='#57401e';g.lineWidth=5;g.strokeRect(24,30,208,150);g.strokeRect(24,216,208,150);
+    g.strokeStyle='rgba(255,214,140,.14)';g.lineWidth=2;g.strokeRect(31,37,194,136);g.strokeRect(31,223,194,136);
+    g.strokeStyle='rgba(0,0,0,.45)';g.strokeRect(20,26,216,158);g.strokeRect(20,212,216,158);
+    g.strokeStyle='rgba(255,220,160,.10)';for(var s5=0;s5<7;s5++){g.beginPath();var sx5=14+Math.random()*228;g.moveTo(sx5,398);g.lineTo(sx5+8-Math.random()*16,382);g.stroke();}
     g.fillStyle='#0d0d0d';g.fillRect(78,6,100,26);
     g.fillStyle='#ffd94d';g.font='bold 19px Georgia';g.textAlign='center';g.fillText(num,128,26);
     g.fillStyle='rgba(0,0,0,.3)';g.fillRect(0,386,256,14);
   });
 }
-var ceilTexC=cnv(256,256,function(g){
-  g.fillStyle='#191919';g.fillRect(0,0,256,256);
-  g.fillStyle='rgba(0,0,0,.3)';for(var i=0;i<300;i++)g.fillRect(Math.random()*256,Math.random()*256,3,3);
-  g.strokeStyle='#0c0c0c';g.lineWidth=6;g.strokeRect(0,0,256,256);
+var ceilTexC=cnv(512,512,function(g){
+  g.fillStyle='#1b1b1b';g.fillRect(0,0,512,512);
+  g.fillStyle='rgba(0,0,0,.3)';for(var i=0;i<900;i++)g.fillRect(Math.random()*512,Math.random()*512,3,3);
+  /* detail pass: coffered panels with bevels + water-stain rings */
+  g.strokeStyle='#0c0c0c';g.lineWidth=10;g.strokeRect(0,0,512,512);
+  g.strokeStyle='rgba(0,0,0,.55)';g.lineWidth=5;g.strokeRect(36,36,440,440);
+  g.strokeStyle='rgba(255,255,255,.05)';g.lineWidth=2;g.strokeRect(46,46,420,420);
+  g.beginPath();g.moveTo(256,0);g.lineTo(256,512);g.moveTo(0,256);g.lineTo(512,256);
+  g.strokeStyle='rgba(0,0,0,.4)';g.lineWidth=6;g.stroke();
+  for(var st=0;st<4;st++){
+    var cx=Math.random()*512,cy=Math.random()*512;
+    for(var ring=0;ring<3;ring++){g.strokeStyle='rgba(74,60,32,'+(0.13-ring*0.035)+')';g.lineWidth=3;
+      g.beginPath();g.ellipse(cx,cy,16+ring*13,11+ring*9,0.4,0,7);g.stroke();}
+  }
 });
 
 /* ================= world layout ================= */
