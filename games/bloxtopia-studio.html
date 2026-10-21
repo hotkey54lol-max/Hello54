@@ -66,8 +66,21 @@
     <textarea id="wScript" maxlength="4000" spellcheck="false"></textarea>
     <p class="hint">Your script gets the <code>bt</code> API only — sandboxed, no internet, no data access:
     <code>bt.onTick(dt)</code>, <code>bt.onPad()</code>, <code>bt.setDisco(i, 0xRRGGBB)</code>,
-    <code>bt.spinCoins(delta)</code>, <code>bt.launch(power)</code>, <code>bt.playTone(freq)</code>, <code>bt.log(msg)</code>.
+    <code>bt.spinCoins(delta)</code>, <code>bt.launch(power)</code>, <code>bt.playTone(freq)</code>, <code>bt.log(msg)</code>,
+    <code>bt.playSound("name")</code> for uploaded sounds.
     Coroutines and <code>os.time</code>/<code>os.clock</code> work too.</p>
+
+    <h3 style="margin-top:16px">SOUNDS</h3>
+    <div id="soundList" class="hint">No sounds yet.</div>
+    <div class="row">
+      <input type="text" id="sndName" placeholder="sound name (e.g. boing)" maxlength="24" style="flex:1">
+    </div>
+    <div class="row">
+      <input type="file" id="sndFile" accept="audio/*" style="flex:1;color:#cfe6f5;font-size:.75rem">
+      <button class="tool" id="sndUp">&#11014; UPLOAD</button>
+    </div>
+    <p class="hint">MP3 / OGG / WAV, max 2MB. Play them from Lua with <code>bt.playSound("name")</code>.
+    Uploaded sounds are public files — keep them friendly; the admin can review them.</p>
 
     <div class="row">
       <button class="act blue" id="testBtn">&#9654; TEST PLAY</button>
@@ -104,6 +117,7 @@ var MATS={
 };
 var cells={};           /* "x,z" -> {h,m,coin} */
 var pads={};            /* "x,z" -> power */
+var SOUNDS={};          /* name -> public URL (uploaded audio) */
 var spawn={x:0,z:0};
 var brush={tool:'paint', mat:'grass', h:1};
 
@@ -239,6 +253,7 @@ function serialize(){
     author:document.getElementById('wAuthor').value.trim(),
     blocks:blocks, pads:pd, spawn:{x:spawn.x,z:spawn.z},
     script:document.getElementById('wScript').value,
+    sounds:SOUNDS,
     listed:document.getElementById('wListed').checked
   };
 }
@@ -251,6 +266,8 @@ function loadDef(d){
   document.getElementById('wAuthor').value=d.author||'';
   document.getElementById('wScript').value=d.script||STARTER_SCRIPT;
   document.getElementById('wListed').checked=!!d.listed;
+  SOUNDS=d.sounds||{};
+  renderSounds();
   draw();
 }
 function status(msg,err){
@@ -290,6 +307,48 @@ function starterWorld(){
     listed:false
   };
 }
+
+/* sounds: upload to the bt-sounds bucket, reference by name */
+function renderSounds(){
+  var el=document.getElementById('soundList');
+  var names=Object.keys(SOUNDS);
+  if(!names.length){el.textContent='No sounds yet.';return;}
+  el.innerHTML='';
+  names.forEach(function(n){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;gap:6px;align-items:center;margin:3px 0';
+    var lbl=document.createElement('span'); lbl.textContent='🔊 '+n; lbl.style.flex='1';
+    var test=document.createElement('button'); test.className='tool'; test.textContent='▶';
+    test.addEventListener('click',function(){try{new Audio(SOUNDS[n]).play();}catch(e){}});
+    var del=document.createElement('button'); del.className='tool'; del.textContent='✕';
+    del.addEventListener('click',function(){delete SOUNDS[n];renderSounds();queueDraft();});
+    row.appendChild(lbl); row.appendChild(test); row.appendChild(del);
+    el.appendChild(row);
+  });
+}
+document.getElementById('sndUp').addEventListener('click',async function(){
+  var name=document.getElementById('sndName').value.trim();
+  var f=document.getElementById('sndFile').files[0];
+  if(!name){status('Name your sound first (that is how scripts call it).',true);return;}
+  if(!/^[a-zA-Z0-9 _-]+$/.test(name)){status('Sound names: letters, numbers, spaces, - and _ only.',true);return;}
+  if(!f){status('Pick an audio file first.',true);return;}
+  if(f.size>2*1024*1024){status('That file is over 2MB — trim it down.',true);return;}
+  if(!SB_URL){status('Not connected to the world server right now.',true);return;}
+  status('Uploading sound…');
+  var safe=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  var path=Date.now()+'-'+safe;
+  try{
+    var r=await fetch(SB_URL+'/storage/v1/object/bt-sounds/'+encodeURIComponent(path),{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':f.type||'application/octet-stream','x-upsert':'false'},
+      body:f
+    });
+    if(!r.ok){status('Upload failed ('+r.status+') — maybe the bucket is still warming up.',true);return;}
+    SOUNDS[name]=SB_URL+'/storage/v1/object/public/bt-sounds/'+path;
+    renderSounds(); queueDraft();
+    status('🔊 Sound "'+name+'" uploaded! Scripts can play it: bt.playSound("'+name+'")');
+  }catch(e){status('Upload failed — connection hiccup.',true);}
+});
 
 /* publish / load via Supabase */
 var SB_URL=(window.Arcade&&Arcade.SUPABASE_URL)||'', SB_KEY=(window.Arcade&&Arcade.SUPABASE_ANON)||'';
