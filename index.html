@@ -265,18 +265,22 @@
       clicks = [];
       var pw = null;
       try { pw = window.prompt("password:"); } catch (e) {}
-      if (pw === "Admin1@") { /* toy lock — client-side only */
-        try { localStorage.setItem("arcade_admin_until", String(Date.now() + 30 * 864e5)); } catch (e) {}
-        location.href = "admin.html";
-      } else if (pw !== null) {
-        try {
-          tag.animate(
-            [{ transform: "translateX(0)" }, { transform: "translateX(-4px)" },
-             { transform: "translateX(4px)" }, { transform: "translateX(0)" }],
-            { duration: 220 }
-          );
-        } catch (e) {}
-      }
+      if (pw === null) return;
+      /* password is checked server-side by Supabase — not in this page */
+      Arcade.checkAdmin(pw).then(function (ok) {
+        if (ok === true) {
+          try { localStorage.setItem("arcade_admin_until", String(Date.now() + 30 * 864e5)); } catch (e) {}
+          location.href = "admin.html";
+        } else {
+          try {
+            tag.animate(
+              [{ transform: "translateX(0)" }, { transform: "translateX(-4px)" },
+               { transform: "translateX(4px)" }, { transform: "translateX(0)" }],
+              { duration: 220 }
+            );
+          } catch (e) {}
+        }
+      });
     }
   });
 })();
