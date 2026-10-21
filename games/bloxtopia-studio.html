@@ -64,11 +64,13 @@
 
     <h3 style="margin-top:16px">LUA SCRIPT</h3>
     <textarea id="wScript" maxlength="4000" spellcheck="false"></textarea>
-    <p class="hint">Your script gets the <code>bt</code> API only — sandboxed, no internet, no data access:
-    <code>bt.onTick(dt)</code>, <code>bt.onPad()</code>, <code>bt.setDisco(i, 0xRRGGBB)</code>,
-    <code>bt.spinCoins(delta)</code>, <code>bt.launch(power)</code>, <code>bt.playTone(freq)</code>, <code>bt.log(msg)</code>,
-    <code>bt.playSound("name")</code> for uploaded sounds.
-    Coroutines and <code>os.time</code>/<code>os.clock</code> work too.</p>
+    <p class="hint">This is <b>plain Lua</b> — if you know Lua, you already know this. Variables, loops,
+    functions, <code>print()</code>, <code>math</code>/<code>string</code>/<code>table</code>, coroutines:
+    all normal. Only the extreme stuff is removed (no <code>io</code>, no <code>os.execute</code>, no loading outside code).
+    The game powers are <b>optional extras</b>: define <code>onTick(dt)</code> / <code>onPad()</code> to react to the world,
+    and call <code>spinCoins(delta)</code>, <code>launch(power)</code>, <code>playTone(freq)</code>,
+    <code>setDisco(i, 0xRRGGBB)</code>, <code>playSound("name")</code> when you want them.
+    Prefer namespaces? They all exist as <code>bt.onTick</code>, <code>bt.spinCoins</code>, etc. too — same functions.</p>
 
     <h3 style="margin-top:16px">SOUNDS</h3>
     <div id="soundList" class="hint">No sounds yet.</div>
@@ -79,7 +81,7 @@
       <input type="file" id="sndFile" accept="audio/*" style="flex:1;color:#cfe6f5;font-size:.75rem">
       <button class="tool" id="sndUp">&#11014; UPLOAD</button>
     </div>
-    <p class="hint">MP3 / OGG / WAV, max 2MB. Play them from Lua with <code>bt.playSound("name")</code>.
+    <p class="hint">MP3 / OGG / WAV, max 2MB. Play them from Lua with <code>playSound("name")</code> (or <code>bt.playSound</code>).
     Uploaded sounds are public files — keep them friendly; the admin can review them.</p>
 
     <div class="row">
@@ -216,23 +218,28 @@ document.getElementById('hPlus').addEventListener('click',function(){brush.h=Mat
 
 /* data <-> editor */
 var STARTER_SCRIPT=[
-"-- Welcome to your world's brain! This is Lua.",
-"-- bt is your only superpower — it's sandboxed on purpose.",
+"-- Welcome to your world's brain! This is plain Lua.",
+"-- If you know Lua, you already know how this works —",
+"-- the game powers (onTick, spinCoins, launch...) are OPTIONAL extras.",
 "",
 "local palette = {0xe23b3b, 0xffa502, 0xffd94d, 0x2ed573, 0x3aa7e8, 0xc56cf0}",
 "local t = 0",
 "",
-"function bt.onTick(dt)",
+"print(\"world script started!\")",
+"",
+"-- runs every frame (optional)",
+"function onTick(dt)",
 "  t = t + dt",
 "  for i = 0, 15 do",
-"    bt.setDisco(i, palette[(math.floor(t * 3) + i) % #palette + 1])",
+"    setDisco(i, palette[(math.floor(t * 3) + i) % #palette + 1])",
 "  end",
-"  bt.spinCoins(0.06)",
+"  spinCoins(0.06)",
 "end",
 "",
-"function bt.onPad()",
-"  bt.launch(13.5)",
-"  bt.playTone(520)",
+"-- runs when a player hits a launch pad (optional)",
+"function onPad()",
+"  launch(13.5)",
+"  playTone(520)",
 "end"
 ].join("\n");
 function serialize(){
@@ -346,7 +353,7 @@ document.getElementById('sndUp').addEventListener('click',async function(){
     if(!r.ok){status('Upload failed ('+r.status+') — maybe the bucket is still warming up.',true);return;}
     SOUNDS[name]=SB_URL+'/storage/v1/object/public/bt-sounds/'+path;
     renderSounds(); queueDraft();
-    status('🔊 Sound "'+name+'" uploaded! Scripts can play it: bt.playSound("'+name+'")');
+    status('🔊 Sound "'+name+'" uploaded! Scripts can play it: playSound("'+name+'")');
   }catch(e){status('Upload failed — connection hiccup.',true);}
 });
 
