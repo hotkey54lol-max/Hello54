@@ -88,6 +88,14 @@
     content: "♥ "; color: var(--ut-red);
   }
   .card .best { margin-top: 10px; font-size: 9px; color: var(--ut-gray); min-height: 1.1em; line-height: 1.8; }
+  .card.featured { grid-column: 1 / -1; border-color: var(--ut-yellow); padding: 22px 8px 18px; }
+  .card.featured .emoji { font-size: 3rem; }
+  .card.featured .title { font-size: 13px; }
+  .card .badge {
+    display: inline-block; background: var(--ut-yellow); color: #000;
+    font-size: 9px; letter-spacing: 1px; padding: 5px 10px; margin-bottom: 12px;
+  }
+  .card .sub { margin-top: 8px; font-size: 9px; color: var(--ut-gray); line-height: 1.8; }
   .leaders {
     max-width: 900px; margin: 8px auto 40px;
     background: #000; border: 3px solid var(--ut-white); border-radius: 0;
@@ -139,6 +147,7 @@
 (function () {
   "use strict";
   const GAMES = [
+    { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin", featured: true, sub: "* FEAR TOXIN: ESCAPE — a haunted mansion. Find the keys. Get out." },
     { id: "snake",       emoji: "🐍", title: "Snake" },
     { id: "2048",        emoji: "🔢", title: "2048" },
     { id: "minesweeper", emoji: "💣", title: "Minesweeper" },
@@ -161,7 +170,6 @@
     { id: "connectfour", emoji: "⭕", title: "Connect Four" },
     { id: "mp-tictactoe",emoji: "🌐", title: "Tic-Tac-Toe Online" },
     // ---- END AGENT-B ----
-    { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin" },
   ];
 
   const grid = document.getElementById("grid");
@@ -176,11 +184,13 @@
   const bestEls = {};
   GAMES.forEach(function (g) {
     const a = document.createElement("a");
-    a.className = "card";
+    a.className = "card" + (g.featured ? " featured" : "");
     a.href = "games/" + g.id + ".html";
     a.innerHTML =
+      (g.featured ? '<span class="badge">★ FEATURED</span>' : "") +
       '<span class="emoji">' + g.emoji + "</span>" +
       '<span class="title">' + g.title + "</span>" +
+      (g.sub ? '<div class="sub">' + g.sub + "</div>" : "") +
       '<div class="best" id="best-' + g.id + '">…</div>';
     grid.appendChild(a);
     bestEls[g.id] = a.querySelector(".best");
