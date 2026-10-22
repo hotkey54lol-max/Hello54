@@ -963,7 +963,7 @@ window.Arcade = (function () {
    */
   var FS_GAMES = ["fear-toxin.html", "snake.html", "tetris.html", "pong.html",
     "breakout.html", "flappy.html", "asteroids.html", "dodge.html",
-    "whackamole.html", "reaction.html", "sandbox-of-nexus.html"];
+    "whackamole.html", "reaction.html", "sandbox-of-nexus.html", "demolition-day.html"];
   var _fsBtn = null, _fsStarted = false;
 
   function _fsActive() {
@@ -1188,7 +1188,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-21.36";
+  const ARCADE_BUILD = "2026-10-22.37";
   let _updateHandled = false;
 
   function _siteBase() {
