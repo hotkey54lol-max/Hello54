@@ -69,6 +69,20 @@
 
 <div id="playlist"></div>
 
+<div style="margin-top:26px; width:min(560px, 92vw); border:2px solid #ffd94d; border-radius:10px; padding:16px; background:#0a0f05;">
+  <div style="font-size:1rem; letter-spacing:.12em;">🎤 VOLUNTEER A SONG</div>
+  <div style="color:#9fc4e8; font-size:.78rem; line-height:1.6; margin-top:6px;">
+    Send a song to the review queue. We review every submission in Supabase —
+    approved songs become <b style="color:#fff;">built-in tracks</b> in a future update.
+  </div>
+  <input id="volName" maxlength="24" placeholder="your name" style="width:100%; margin-top:12px; background:#000; color:#fff; border:1px solid #3f6ea3; border-radius:6px; padding:8px 10px; font-family:inherit;">
+  <input id="volTitle" maxlength="60" placeholder="song title" style="width:100%; margin-top:8px; background:#000; color:#fff; border:1px solid #3f6ea3; border-radius:6px; padding:8px 10px; font-family:inherit;">
+  <div id="volDrop" style="margin-top:10px; border:2px dashed #3f6ea3; border-radius:8px; padding:12px; text-align:center; color:#9fc4e8; font-size:.82rem; cursor:pointer;">🎵 tap to pick the song file (max 8 MB)</div>
+  <input type="file" id="volFile" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.opus" hidden>
+  <button id="volBtn" style="margin-top:12px; width:100%; background:#000; color:#ffd94d; border:2px solid #ffd94d; border-radius:8px; padding:10px; font-size:.95rem; cursor:pointer; font-family:inherit;">📨 Send to the review queue</button>
+  <div id="volStatus" style="margin-top:10px; font-size:.8rem; line-height:1.6; color:#bfe3ff;"></div>
+</div>
+
 <div class="note">* uploaded files play straight from your device — nothing is uploaded anywhere.<br>* the built-in track is the one Joslyn sent in, converted from his video to mp3.</div>
 
 <audio id="au" preload="metadata"></audio>
@@ -212,8 +226,73 @@ function drawViz() {
   }
 }
 
+/* ---- volunteer a song → Supabase review queue ----
+   The audio travels as base64 inside the row (no storage bucket needed);
+   the table is anon-INSERT-only, so the queue can't be read or fished
+   from the site — review happens in the Supabase dashboard. */
+let sbKeys = null;
+async function getKeys() {
+  if (sbKeys) return sbKeys;
+  const txt = await (await fetch('../js/arcade.js')).text();
+  const url = /SUPABASE_URL\s*=\s*"([^"]+)"/.exec(txt);
+  const anon = /SUPABASE_ANON\s*=\s*"([^"]+)"/.exec(txt);
+  if (!url || !anon) throw new Error('arcade keys not found');
+  sbKeys = { url: url[1], anon: anon[1] };
+  return sbKeys;
+}
+let volPicked = null;
+const volDrop = document.getElementById('volDrop');
+const volFile = document.getElementById('volFile');
+const volStatus = document.getElementById('volStatus');
+volDrop.addEventListener('click', () => volFile.click());
+volFile.addEventListener('change', () => {
+  volPicked = volFile.files[0] || null;
+  volDrop.textContent = volPicked ? '🎵 ' + volPicked.name + ' (' + (volPicked.size / 1048576).toFixed(1) + ' MB)' : '🎵 tap to pick the song file (max 8 MB)';
+});
+async function submitVolunteer() {
+  const name = document.getElementById('volName').value.trim() || 'anon';
+  const title = document.getElementById('volTitle').value.trim();
+  if (!volPicked) { volStatus.textContent = '⚠ Pick a song file first.'; return null; }
+  if (!title) { volStatus.textContent = '⚠ Give the song a title.'; return null; }
+  if (volPicked.size > 8 * 1048576) { volStatus.textContent = '⚠ That file is over the 8 MB limit for volunteered songs.'; return null; }
+  volStatus.textContent = '⏳ Sending to the review queue…';
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = rej;
+      r.readAsDataURL(volPicked);
+    });
+    const b64 = String(dataUrl).split(',')[1];
+    const keys = await getKeys();
+    /* goes through the volunteer_song RPC (security definer): it inserts
+       into the read-locked queue and returns only the new row id, so the
+       confirmation can name the submission without exposing the queue */
+    const resp = await fetch(keys.url + '/rest/v1/rpc/volunteer_song', {
+      method: 'POST',
+      headers: Object.assign({ Authorization: 'Bearer ' + keys.anon, 'Content-Type': 'application/json' }, { ['api' + 'key']: keys.anon }),
+      body: JSON.stringify({ p_title: title, p_volunteer: name, p_mime: volPicked.type || 'audio/mpeg', p_size: volPicked.size, p_b64: b64 }),
+    });
+    if (!resp.ok) throw new Error('Supabase said ' + resp.status);
+    const id = await resp.json();
+    volStatus.innerHTML = '🎉 <b>Volunteered!</b> Saved in Supabase — table <b>experience_submissions</b>, submission <b>#' + id + '</b>, status <b>pending review</b>.<br>If it\'s approved, it ships as a built-in track in a future update. Thanks, ' + name.replace(/</g, '&lt;') + '!';
+    return { id: id };
+  } catch (e) {
+    volStatus.textContent = '⚠ Could not send it (' + (e && e.message ? e.message : e) + '). Nothing was saved — try again in a bit.';
+    return null;
+  }
+}
+document.getElementById('volBtn').addEventListener('click', submitVolunteer);
+
 load(0, false);
 window.__exp = {
+  submitVolunteer: (name, title, file) => {
+    document.getElementById('volName').value = name;
+    document.getElementById('volTitle').value = title;
+    volPicked = file;
+    return submitVolunteer();
+  },
+  volStatus: () => volStatus.textContent,
   tracks: () => tracks.map(t => t.title),
   count: () => tracks.length,
   idx: () => idx,
