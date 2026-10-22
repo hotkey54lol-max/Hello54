@@ -10,7 +10,9 @@ export class Character {
   constructor(scene, physics, input, gltf) {
     this.gltf = gltf;
     this.scene = scene; this.physics = physics; this.input = input;
-    this.spawn = new THREE.Vector3(0, heightAt(0, 6) + CAP_LIFT + 0.35, 6);
+    // small per-client spawn jitter so two fresh players never spawn inside each other
+    const jx = (Math.random() - 0.5) * 3.2, jz = (Math.random() - 0.5) * 3.2;
+    this.spawn = new THREE.Vector3(jx, heightAt(jx, 6 + jz) + CAP_LIFT + 0.35, 6 + jz);
     this.vel = new THREE.Vector3();
     this.vy = 0;
     this.faceYaw = 0; // faces +Z (north), away from the spawn camera; matches movement-facing math
