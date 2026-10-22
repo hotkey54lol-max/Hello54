@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🎧 The Experience — Joslyn's Arcade</title>
+<link rel="icon" href="data:,">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { min-height:100%; background:#000; color:#fff; font-family:'Courier New', monospace; }
+  body { display:flex; flex-direction:column; align-items:center; padding:18px 14px 40px; }
+  .back { align-self:flex-start; color:#ffd94d; text-decoration:none; border:2px solid #ffd94d; border-radius:6px; padding:4px 10px; font-weight:700; font-size:.8rem; }
+  h1 { font-size:1.5rem; letter-spacing:.22em; margin:16px 0 2px; text-align:center; }
+  .tag { color:#9fc4e8; font-size:.82rem; margin-bottom:20px; text-align:center; }
+  #cover { width:min(340px, 78vw); aspect-ratio:1; border:3px solid #fff; border-radius:6px; object-fit:cover; background:#111; image-rendering:pixelated; }
+  #cover.spin { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 0 #ffd94d00; } 50% { box-shadow:0 0 34px #ffd94d55; } }
+  #viz { width:min(560px, 92vw); height:74px; margin-top:14px; }
+  #nowTitle { margin-top:14px; font-size:1.05rem; text-align:center; max-width:92vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #nowSub { color:#9fc4e8; font-size:.75rem; margin-top:3px; }
+  .seekrow { display:flex; align-items:center; gap:10px; width:min(560px, 92vw); margin-top:14px; font-size:.75rem; }
+  #seek { flex:1; accent-color:#ffd94d; }
+  .controls { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; justify-content:center; }
+  .controls button { background:#000; color:#fff; border:2px solid #fff; border-radius:8px; padding:9px 16px; font-size:1rem; cursor:pointer; font-family:inherit; }
+  .controls button:hover { border-color:#ffd94d; color:#ffd94d; }
+  #btnPlay { font-size:1.25rem; padding:10px 24px; }
+  .controls button.on { border-color:#ffd94d; color:#ffd94d; }
+  .controls label { font-size:.75rem; color:#9fc4e8; display:flex; align-items:center; gap:6px; }
+  #vol { accent-color:#ffd94d; width:90px; }
+  #drop { margin-top:24px; width:min(560px, 92vw); border:2px dashed #3f6ea3; border-radius:10px; padding:16px; text-align:center; color:#9fc4e8; font-size:.85rem; cursor:pointer; }
+  #drop.over { border-color:#ffd94d; color:#ffd94d; }
+  #drop b { color:#fff; }
+  #playlist { margin-top:14px; width:min(560px, 92vw); }
+  .track { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid #2c4a66; border-radius:8px; margin-top:7px; cursor:pointer; background:#050a10; }
+  .track:hover { border-color:#ffd94d; }
+  .track.playing { border-color:#ffd94d; background:#141d0a; }
+  .track .t { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.85rem; }
+  .track .d { color:#9fc4e8; font-size:.72rem; }
+  .track .rm { background:none; border:none; color:#c22f4e; font-size:1rem; cursor:pointer; padding:2px 6px; }
+  .note { margin-top:18px; color:#5f7d9c; font-size:.7rem; text-align:center; max-width:560px; line-height:1.6; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← HUB</a>
+<h1>🎧 THE EXPERIENCE</h1>
+<div class="tag">* not a game. a listening room. bring your own music, or press play.</div>
+
+<img id="cover" src="../img/exp-undertale.jpg" alt="cover art">
+<canvas id="viz" width="560" height="74"></canvas>
+<div id="nowTitle">UNDERTALE Soundtrack</div>
+<div id="nowSub">built-in · uploaded by Joslyn</div>
+
+<div class="seekrow">
+  <span id="tCur">0:00</span>
+  <input type="range" id="seek" min="0" max="1000" value="0">
+  <span id="tDur">0:00</span>
+</div>
+
+<div class="controls">
+  <button id="btnPrev" title="Previous">⏮</button>
+  <button id="btnPlay" title="Play / pause">▶</button>
+  <button id="btnNext" title="Next">⏭</button>
+  <button id="btnLoop" title="Loop track">🔂</button>
+  <label>Vol <input type="range" id="vol" min="0" max="100" value="90"></label>
+</div>
+
+<div id="drop">🎵 <b>Drop music files here</b> or tap to browse<br>mp3 · wav · ogg · m4a · flac — they never leave your device</div>
+<input type="file" id="filePick" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.opus" multiple hidden>
+
+<div id="playlist"></div>
+
+<div class="note">* uploaded files play straight from your device — nothing is uploaded anywhere.<br>* the built-in track is the one Joslyn sent in, converted from his video to mp3.</div>
+
+<audio id="au" preload="metadata"></audio>
+<script>
+'use strict';
+const au = document.getElementById('au');
+const cover = document.getElementById('cover');
+const nowTitle = document.getElementById('nowTitle');
+const nowSub = document.getElementById('nowSub');
+const seek = document.getElementById('seek');
+const tCur = document.getElementById('tCur');
+const tDur = document.getElementById('tDur');
+const btnPlay = document.getElementById('btnPlay');
+const playlistEl = document.getElementById('playlist');
+
+const BUILTIN_COVER = '../img/exp-undertale.jpg';
+const tracks = [
+  { title: 'UNDERTALE Soundtrack', sub: 'built-in · uploaded by Joslyn', src: '../audio/undertale-soundtrack.mp3', cover: BUILTIN_COVER, builtin: true, dur: 0 },
+];
+let idx = 0;
+let seeking = false;
+
+function fmt(s) { if (!isFinite(s) || s < 0) s = 0; const m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ':' + String(r).padStart(2, '0'); }
+
+function renderPlaylist() {
+  playlistEl.innerHTML = '';
+  tracks.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'track' + (i === idx && !au.paused ? ' playing' : '');
+    row.innerHTML = '<span>' + (i === idx && !au.paused ? '🎵' : '🎶') + '</span><span class="t"></span><span class="d">' + (t.dur ? fmt(t.dur) : '') + '</span>';
+    row.querySelector('.t').textContent = t.title;
+    row.addEventListener('click', () => load(i, true));
+    if (!t.builtin) {
+      const rm = document.createElement('button');
+      rm.className = 'rm'; rm.textContent = '✖'; rm.title = 'Remove';
+      rm.addEventListener('click', e => { e.stopPropagation(); removeTrack(i); });
+      row.appendChild(rm);
+    }
+    playlistEl.appendChild(row);
+  });
+}
+
+function load(i, autoplay) {
+  if (i < 0 || i >= tracks.length) return;
+  idx = i;
+  const t = tracks[i];
+  au.src = t.src;
+  nowTitle.textContent = t.title;
+  nowSub.textContent = t.sub;
+  cover.src = t.cover || BUILTIN_COVER;
+  if (autoplay) au.play().catch(() => {});
+  renderPlaylist();
+}
+
+function removeTrack(i) {
+  const wasPlaying = i === idx;
+  if (tracks[i].src.startsWith('blob:')) URL.revokeObjectURL(tracks[i].src);
+  tracks.splice(i, 1);
+  if (idx >= tracks.length) idx = tracks.length - 1;
+  if (wasPlaying) { if (tracks.length) load(idx, false); else { au.removeAttribute('src'); au.load(); } }
+  renderPlaylist();
+}
+
+function addFiles(files) {
+  let first = -1;
+  for (const f of files) {
+    if (!/audio|\.(mp3|wav|ogg|m4a|flac|opus)$/i.test(f.type + ' ' + f.name)) continue;
+    const url = URL.createObjectURL(f);
+    tracks.push({ title: f.name.replace(/\.[^.]+$/, ''), sub: 'your file · ' + Math.round(f.size / 1024) + ' KB', src: url, cover: '', builtin: false, dur: 0 });
+    if (first < 0) first = tracks.length - 1;
+    // probe duration for the playlist label
+    const probe = new Audio();
+    probe.preload = 'metadata';
+    probe.src = url;
+    const mine = tracks[tracks.length - 1];
+    probe.addEventListener('loadedmetadata', () => { mine.dur = probe.duration; renderPlaylist(); });
+  }
+  if (first >= 0) { load(first, true); }
+  renderPlaylist();
+}
+
+/* transport */
+btnPlay.addEventListener('click', () => { if (au.paused) au.play().catch(() => {}); else au.pause(); });
+document.getElementById('btnNext').addEventListener('click', () => load((idx + 1) % tracks.length, true));
+document.getElementById('btnPrev').addEventListener('click', () => { if (au.currentTime > 3) au.currentTime = 0; else load((idx - 1 + tracks.length) % tracks.length, true); });
+const btnLoop = document.getElementById('btnLoop');
+btnLoop.addEventListener('click', () => { au.loop = !au.loop; btnLoop.classList.toggle('on', au.loop); });
+document.getElementById('vol').addEventListener('input', e => { au.volume = e.target.value / 100; });
+au.volume = 0.9;
+
+au.addEventListener('play', () => { btnPlay.textContent = '⏸'; cover.classList.add('spin'); renderPlaylist(); ensureViz(); });
+au.addEventListener('pause', () => { btnPlay.textContent = '▶'; cover.classList.remove('spin'); renderPlaylist(); });
+au.addEventListener('ended', () => { if (!au.loop) load((idx + 1) % tracks.length, true); });
+au.addEventListener('loadedmetadata', () => { tDur.textContent = fmt(au.duration); tracks[idx].dur = au.duration; renderPlaylist(); });
+au.addEventListener('timeupdate', () => {
+  if (!seeking && au.duration) seek.value = Math.round(au.currentTime / au.duration * 1000);
+  tCur.textContent = fmt(au.currentTime);
+});
+seek.addEventListener('input', () => { seeking = true; });
+seek.addEventListener('change', () => { if (au.duration) au.currentTime = seek.value / 1000 * au.duration; seeking = false; });
+
+/* upload: picker + drag & drop */
+const drop = document.getElementById('drop');
+const filePick = document.getElementById('filePick');
+drop.addEventListener('click', () => filePick.click());
+filePick.addEventListener('change', () => { addFiles(filePick.files); filePick.value = ''; });
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+/* visualizer: WebAudio analyser → bars (created lazily on first play) */
+let actx = null, analyser = null;
+function ensureViz() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    const srcNode = actx.createMediaElementSource(au);
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 128;
+    srcNode.connect(analyser);
+    analyser.connect(actx.destination);
+    drawViz();
+  } catch (e) { /* visualizer is decoration; audio still plays */ }
+}
+const viz = document.getElementById('viz').getContext('2d');
+function drawViz() {
+  requestAnimationFrame(drawViz);
+  const W = 560, H = 74;
+  viz.clearRect(0, 0, W, H);
+  if (!analyser) return;
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  const bars = 42, bw = W / bars;
+  for (let i = 0; i < bars; i++) {
+    const v = data[Math.floor(i / bars * data.length * 0.72)] / 255;
+    const h = Math.max(2, v * (H - 6));
+    viz.fillStyle = i % 5 === 0 ? '#ffd94d' : '#3f6ea3';
+    viz.fillRect(i * bw + 1, H - h, bw - 2, h);
+  }
+}
+
+load(0, false);
+window.__exp = {
+  tracks: () => tracks.map(t => t.title),
+  count: () => tracks.length,
+  idx: () => idx,
+  playing: () => !au.paused,
+  time: () => au.currentTime,
+  dur: () => au.duration || 0,
+  play: () => au.play(),
+  addFiles: files => addFiles(files),
+};
+</script>
+</body>
+</html>
