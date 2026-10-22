@@ -1,13 +1,15 @@
 /* Project Nexus — boot: engine + environment + physics + character + sandbox. */
 import { Engine } from './core/engine.js';
 import { Input } from './core/input.js';
-import { Environment } from './world/environment.js';
+import { Environment, heightAt } from './world/environment.js';
+import * as THREE from 'three';
 import { Physics } from './world/physics.js';
 import { Character } from './game/character.js';
 import { Sandbox } from './game/sandbox.js';
 import { Net } from './services/net.js';
 import { AudioService } from './services/audio.js';
 import { Particles } from './services/particles.js';
+import { Npc } from './services/npc.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export async function boot() {
@@ -43,6 +45,9 @@ export async function boot() {
   }, myName);
   net.init();
 
+  /* ambient NPC: a bot who lives on the island (the AI stand-in) */
+  const npc = new Npc(engine.scene, gltf);
+
   engine.addSystem({ beginFrame: () => physics.beginFrame(), step: dt => { physics.step(dt); } });
   engine.addSystem({ step: dt => { env.update(dt); } });
   /* render trap: every render system runs behind a seatbelt. An exception in
@@ -64,9 +69,28 @@ export async function boot() {
       trap('particles', () => particles.update(dt, character.pos, env.daylight ?? 1, env.effWet, env.effWind));
       trap('audio', () => audio.update(dt, { speed: character.speed2d, grounded: character.grounded, vy: character.vy, wet: env.effWet, wind: env.effWind }));
       trap('net', () => net.update(dt, performance.now()));
+      trap('npc', () => npc.update(dt));
       trap('shadows', () => env.followShadows(character.model.position));
+      if (cine.on) trap('cine', () => {
+        /* Sequencer stand-in: a slow cinematic orbit + breathing dolly
+           around the player, with letterbox bars (body.cine in the page) */
+        cine.t += dt;
+        const p = character.model.position;
+        const a = cine.t * 0.11, r = 8.5 + Math.sin(cine.t * 0.05) * 2.5;
+        const cx = p.x + Math.sin(a) * r, cz = p.z + Math.cos(a) * r;
+        const cy = Math.max(heightAt(cx, cz) + 1.3, p.y + 1.7 + Math.sin(cine.t * 0.07) * 1.1);
+        engine.camera.position.lerp(_cineTmp.set(cx, cy, cz), 1 - Math.pow(0.001, dt));
+        engine.camera.lookAt(p.x, p.y + 1.4, p.z);
+      });
     },
   });
+  const _cineTmp = new THREE.Vector3();
+  const cine = { on: false, t: 0 };
+  function setCine(on) {
+    cine.on = !!on; cine.t = 0;
+    character.camLock = cine.on;
+    document.body.classList.toggle('cine', cine.on);
+  }
 
   /* governor announcements */
   const toast = document.getElementById('nxToast');
@@ -105,7 +129,11 @@ export async function boot() {
   if (clearBtn) clearBtn.addEventListener('click', () => sandbox.clearProps());
   const stormBtn = document.getElementById('nxStorm');
   if (stormBtn) stormBtn.addEventListener('click', () => env.summonStorm(true));
+  const cineBtn = document.getElementById('nxCine');
+  if (cineBtn) cineBtn.addEventListener('click', () => setCine(!cine.on));
   window.addEventListener('keydown', e => {
+    if (e.code === 'KeyC') setCine(!cine.on);
+    else if (cine.on && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'].includes(e.code)) setCine(false);
     const map = { Digit1: 'crate', Digit2: 'ball', Digit3: 'barrel', Digit4: 'plank', Digit5: 'tower', Digit6: 'bomb', Digit7: 'dominoes', Digit8: 'bigball' };
     if (map[e.code]) sandbox.spawn(map[e.code]);
     if (e.code === 'KeyR') {
@@ -208,6 +236,14 @@ export async function boot() {
     weather: () => ({ state: env.weather.state, mode: env.weather.mode, wet: +env.weather.wet.toFixed(2), cloud: +env.weather.cloud.toFixed(2), wind: +env.weather.wind.toFixed(2), flash: +env.weather.flash.toFixed(2) }),
     ao: () => engine.ao.enabled,
     particles: () => particles.mode,
+    npc: () => ({ x: +npc.pos.x.toFixed(1), z: +npc.pos.z.toFixed(1), state: npc.state }),
+    npcDebug: () => ({ state: npc.state, wait: +npc.wait.toFixed(2), hasTarget: !!npc.target, modelY: +npc.model.position.y.toFixed(2), renderErr: engine._renderErr || '' }),
+    setCine: on => setCine(on),
+    cineOn: () => cine.on,
+    grass: () => ({ visible: env.grassChunks.filter(c => c.mesh.visible).length, total: env.grassChunks.length }),
+    setGrassCull: d => { env.grassCull = d; },
+    kinds: () => physics.props.map(p => p.kind),
+    camPos: () => { const c = engine.camera.position; return { x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2) }; },
     setWeather: n => env.setWeather(n),
     tilts: () => physics.props.filter(p => p.kind === 'domino').map(p => {
       /* rotation SINCE spawn (dominoes stand flush on slopes, so absolute
