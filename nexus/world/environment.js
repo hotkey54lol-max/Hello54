@@ -2,6 +2,7 @@
    One deterministic height function feeds BOTH the visual mesh and the
    physics collider, so what you see is exactly what you collide with. */
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 /* deterministic value noise (shared everywhere; seeded, stable) */
 function hash(ix, iz) { let n = ix * 374761393 + iz * 668265263; n = (n ^ (n >> 13)) * 1274126177; return ((n ^ (n >> 16)) >>> 0) / 4294967295; }
@@ -44,8 +45,15 @@ function keyLerp(h) {
 }
 
 export class Environment {
-  constructor(scene) {
+  constructor(scene, renderer) {
     this.scene = scene;
+    /* image-based lighting: a neutral studio environment baked to a PMREM
+       gives every standard material believable reflections (the Lumen-stand-in) */
+    if (renderer) {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      scene.environmentIntensity = 0.32;
+    }
     this.timeOfDay = 10.5;
     this.autoCycle = false;
     this.cycleSpeed = 24 / 240; // full day in 4 minutes when auto
@@ -227,6 +235,7 @@ export class Environment {
     if (this.autoCycle) this.timeOfDay = (this.timeOfDay + dt * this.cycleSpeed) % 24;
     const h = this.timeOfDay;
     const k = keyLerp(h);
+    this.scene.environmentIntensity = 0.05 + Math.min(0.3, k.sunI * 0.15);
     const ang = ((h - 6) / 12) * Math.PI; // sunrise 6h, sunset 18h
     const sunDir = new THREE.Vector3(Math.cos(ang) * 0.55, Math.sin(ang), 0.38).normalize();
     this.skyUniforms.topColor.value.copy(k.top);
