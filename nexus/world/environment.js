@@ -238,6 +238,62 @@ export class Environment {
     rocks.castShadow = true; rocks.receiveShadow = true;
     scene.add(rocks);
 
+    /* foliage (Nanite / World Partition stand-ins): ~1500 instanced grass
+       tufts in 8 sector chunks. Each chunk streams by distance from the
+       camera focus — walk away and it unmounts. Tufts sway in the wind via
+       a vertex-shader patch whose strength follows the weather's wind. */
+    this.grassChunks = [];
+    this.grassCull = 78;
+    {
+      const tuft = new THREE.ConeGeometry(0.16, 0.55, 5);
+      tuft.translate(0, 0.27, 0);
+      const gm = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
+      gm.onBeforeCompile = sh => {
+        sh.uniforms.uTime = { value: 0 };
+        sh.uniforms.uWindAmp = { value: 0.15 };
+        sh.vertexShader = 'uniform float uTime; uniform float uWindAmp;\n' + sh.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          #ifdef USE_INSTANCING
+            vec4 gIp = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+            float gBend = pow(clamp(position.y / 0.55, 0.0, 1.0), 2.0);
+            float gSway = sin(uTime * 1.7 + gIp.x * 0.35 + gIp.z * 0.45) * 0.055 + sin(uTime * 3.3 + gIp.z * 0.8) * 0.02;
+            transformed.x += gSway * gBend * (0.5 + uWindAmp * 1.6);
+            transformed.z += gSway * 0.6 * gBend * (0.5 + uWindAmp * 1.6);
+          #endif`
+        );
+        this._grassShader = sh;
+      };
+      const sectors = Array.from({ length: 8 }, () => []);
+      let guard2 = 0;
+      while (sectors.flat().length < 1500 && guard2++ < 9000) {
+        const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 88;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
+        if (h < 0.9 || h > 7.6) continue;
+        if (Math.abs(heightAt(x + 1.2, z) - h) > 0.9) continue;
+        if (this.scatter.some(s2 => Math.abs(s2.x - x) < 1.1 && Math.abs(s2.z - z) < 1.1)) continue;
+        const sec = ((Math.atan2(z, x) + Math.PI) / (Math.PI * 2) * 8 | 0) % 8;
+        sectors[sec].push({ x, z, h });
+      }
+      const m4b = new THREE.Matrix4(), qb = new THREE.Quaternion(), upB = new THREE.Vector3(0, 1, 0), scB = new THREE.Vector3();
+      sectors.forEach(list => {
+        if (!list.length) return;
+        const im = new THREE.InstancedMesh(tuft, gm, list.length);
+        let cx = 0, cz = 0;
+        list.forEach((p, i) => {
+          qb.setFromAxisAngle(upB, Math.random() * Math.PI * 2);
+          const s = 0.75 + Math.random() * 1.1;
+          m4b.compose(new THREE.Vector3(p.x, p.h, p.z), qb, scB.set(s, s * (0.8 + Math.random() * 0.7), s));
+          im.setMatrixAt(i, m4b);
+          im.setColorAt(i, new THREE.Color().setHSL(0.26 + Math.random() * 0.07, 0.55, 0.3 + Math.random() * 0.16));
+          cx += p.x; cz += p.z;
+        });
+        im.receiveShadow = true;
+        scene.add(im);
+        this.grassChunks.push({ mesh: im, cx: cx / list.length, cz: cz / list.length });
+      });
+    }
+
     this.weather = {
       mode: 'auto', state: 'clear',
       wet: 0, cloud: 0.06, wind: 0.15,
@@ -502,6 +558,16 @@ export class Environment {
       if (c.position.x > 280) c.position.x = -280;
     }
     if (this.water) this.water.material.opacity = 0.82 + Math.sin(performance.now() / 900) * 0.04;
+    /* foliage streaming: unmount chunks far from the camera focus */
+    if (this.grassChunks) {
+      for (const ch of this.grassChunks) {
+        ch.mesh.visible = Math.hypot(ch.cx - this.focusX, ch.cz - this.focusZ) < (this.lowFx ? Math.min(52, this.grassCull) : this.grassCull);
+      }
+      if (this._grassShader) {
+        this._grassShader.uniforms.uTime.value += dt;
+        this._grassShader.uniforms.uWindAmp.value = wind;
+      }
+    }
     /* new render systems ride behind seatbelts: an exception here must never
        freeze the canvas while the HUD keeps ticking (the .30 lesson) */
     this._frontTrap('bank', () => this._updateBank(dt));
