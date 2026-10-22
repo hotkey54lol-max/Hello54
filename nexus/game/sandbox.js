@@ -28,8 +28,72 @@ export class Sandbox {
     this.wood = woodTexture();
     this.bombs = [];
     this.sfx = null;
+    this.lowFx = false; // governor: POTATO tier halves splash particles
     this._buildRain();
     this._buildExplosionFx();
+    this._buildSplashes();
+  }
+
+  setLowFx(v) { this.lowFx = !!v; }
+
+  /* splash pool: white-water bursts when a prop punches the surface */
+  _buildSplashes() {
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(16, 16, 1, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 32, 32);
+    const tex = new THREE.CanvasTexture(c);
+    this.splashPool = []; this._splashIdx = 0;
+    for (let s = 0; s < 6; s++) {
+      const N = 36, pos = new Float32Array(N * 3);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+        color: 0xd8ecff, size: 0.17, map: tex, transparent: true, opacity: 0, depthWrite: false,
+      }));
+      pts.visible = false; pts.frustumCulled = false;
+      this.scene.add(pts);
+      this.splashPool.push({ pts, vel: new Float32Array(N * 3), t: -1, n: N });
+    }
+  }
+
+  splash(x, z, power = 2) {
+    try {
+      const s = this.splashPool[this._splashIdx++ % this.splashPool.length];
+      const n = this.lowFx ? (s.n / 2) | 0 : s.n; // POTATO: halve the droplets
+      const pa = s.pts.geometry.attributes.position;
+      for (let i = 0; i < s.n; i++) {
+        const on = i < n;
+        const a = Math.random() * Math.PI * 2, r = Math.random() * 0.35;
+        pa.setXYZ(i, x + Math.cos(a) * r, on ? 0.12 : -10, z + Math.sin(a) * r);
+        const sp = (1.5 + Math.random() * 3) * Math.min(2.2, 0.6 + power * 0.25);
+        s.vel.set([Math.cos(a) * sp * 0.45, sp, Math.sin(a) * sp * 0.45], i * 3);
+        if (!on) { s.vel[i * 3 + 1] = 0; pa.setY(i, -10); }
+      }
+      pa.needsUpdate = true;
+      s.t = 0; s.pts.visible = true; s.pts.material.opacity = 0.9;
+    } catch (e) { /* a failed splash must never break the frame */ }
+  }
+
+  splashActiveCount() { return this.splashPool.filter(s => s.t >= 0).length; }
+
+  _updateSplashes(dt) {
+    for (const s of this.splashPool) {
+      if (s.t < 0) continue;
+      s.t += dt;
+      const pa = s.pts.geometry.attributes.position;
+      for (let i = 0; i < s.n; i++) {
+        s.vel[i * 3 + 1] -= 9.5 * dt;
+        pa.setXYZ(i,
+          pa.getX(i) + s.vel[i * 3] * dt,
+          Math.max(-9, pa.getY(i) + s.vel[i * 3 + 1] * dt),
+          pa.getZ(i) + s.vel[i * 3 + 2] * dt);
+      }
+      pa.needsUpdate = true;
+      s.pts.material.opacity = Math.max(0, 0.9 * (1 - s.t / 0.75));
+      if (s.t > 0.75) { s.t = -1; s.pts.visible = false; }
+    }
   }
 
   _buildExplosionFx() {
@@ -93,7 +157,15 @@ export class Sandbox {
     for (let i = 0; i < N; i++) posArr.set([(Math.random() - 0.5) * 52, Math.random() * 30, (Math.random() - 0.5) * 52], i * 3);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
-    this.rain = new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9fc4e8, size: 0.13, transparent: true, opacity: 0.55, depthWrite: false }));
+    // soft vertical streak sprite — rain reads as streaks, not confetti squares
+    const c = document.createElement('canvas'); c.width = 8; c.height = 32;
+    const gg = c.getContext('2d');
+    const grad = gg.createLinearGradient(0, 0, 0, 32);
+    grad.addColorStop(0, 'rgba(180,210,240,0)');
+    grad.addColorStop(0.5, 'rgba(180,210,240,0.95)');
+    grad.addColorStop(1, 'rgba(180,210,240,0)');
+    gg.fillStyle = grad; gg.fillRect(2, 0, 4, 32);
+    this.rain = new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9fc4e8, size: 0.42, map: new THREE.CanvasTexture(c), transparent: true, opacity: 0.55, depthWrite: false }));
     this.rain.visible = false;
     this.raining = false;
     this.scene.add(this.rain);
@@ -206,6 +278,17 @@ export class Sandbox {
   }
 
   render(dt) {
+    /* weather drives the rain now (the old manual toggle is a weather
+       override wired in main.js): wetness fades the rain in, wind slants it.
+       Effective values include any passing storm front. */
+    const wet = this.env.effWet !== undefined ? this.env.effWet : this.env.weather.wet;
+    const wind = this.env.effWind !== undefined ? this.env.effWind : this.env.weather.wind;
+    this.setRain(wet > 0.04);
+    if (this.raining) {
+      this.rain.material.opacity = 0.12 + wet * 0.45;
+      this.rain.rotation.z = wind * 0.16;
+    }
+    this._updateSplashes(dt);
     // bomb fuses + explosion fx
     for (const b of [...this.bombs]) {
       b.t -= dt;
