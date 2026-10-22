@@ -7,6 +7,7 @@ import { Character } from './game/character.js';
 import { Sandbox } from './game/sandbox.js';
 import { Net } from './services/net.js';
 import { AudioService } from './services/audio.js';
+import { Particles } from './services/particles.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export async function boot() {
@@ -27,8 +28,11 @@ export async function boot() {
   const gltf = await new GLTFLoader().loadAsync(new URL('./assets/models/Soldier.glb', import.meta.url).href);
   const character = new Character(engine.scene, physics, input, gltf);
   await character.init();
+  physics.trackCharacter(character.body); // render interpolation for the player too
 
   const sandbox = new Sandbox(engine.scene, physics, character, env);
+  physics.onSplash = (x, z, power) => sandbox.splash(x, z, power);
+  const particles = new Particles(engine.scene);
 
   /* multiplayer ghosts (silent solo fallback) */
   let myName = 'Player1';
@@ -39,16 +43,28 @@ export async function boot() {
   }, myName);
   net.init();
 
-  engine.addSystem({ step: dt => { physics.step(dt); } });
+  engine.addSystem({ beginFrame: () => physics.beginFrame(), step: dt => { physics.step(dt); } });
   engine.addSystem({ step: dt => { env.update(dt); } });
+  /* render trap: every render system runs behind a seatbelt. An exception in
+     any one of them must surface as a loud error, never as a silently frozen
+     canvas with a still-ticking HUD (the build .30 lesson). */
+  const trap = (name, fn) => {
+    try { fn(); } catch (e) {
+      if (!engine._renderErr) {
+        engine._renderErr = name + ': ' + (e && e.message ? e.message : e);
+        console.error('[nexus-render] ' + engine._renderErr);
+      }
+    }
+  };
   engine.addSystem({
     render: (alpha, dt) => {
-      character.render(dt, engine.camera);
-      physics.syncProps();
-      sandbox.render(dt);
-      audio.update(dt, { speed: character.speed2d, grounded: character.grounded, vy: character.vy, raining: sandbox.raining });
-      net.update(dt, performance.now());
-      env.followShadows(character.model.position);
+      trap('character', () => character.render(alpha, dt, engine.camera));
+      trap('props', () => physics.syncProps(alpha));
+      trap('sandbox', () => sandbox.render(dt));
+      trap('particles', () => particles.update(dt, character.pos, env.daylight ?? 1, env.effWet, env.effWind));
+      trap('audio', () => audio.update(dt, { speed: character.speed2d, grounded: character.grounded, vy: character.vy, wet: env.effWet, wind: env.effWind }));
+      trap('net', () => net.update(dt, performance.now()));
+      trap('shadows', () => env.followShadows(character.model.position));
     },
   });
 
@@ -56,6 +72,9 @@ export async function boot() {
   const toast = document.getElementById('nxToast');
   let toastTimer = null;
   engine.onGovernor = (factor, dir) => {
+    // POTATO tier: shed ambient particles + halve splashes, never touch gameplay
+    const low = factor <= 0.65;
+    env.setLowFx(low); sandbox.setLowFx(low); particles.setLowFx(low);
     if (!toast) return;
     toast.textContent = dir === 'down'
       ? '⚡ Auto-graphics: easing quality to ' + Math.round(factor * 100) + '% so the frame rate holds'
@@ -74,19 +93,35 @@ export async function boot() {
   function syncCycleBtn() { if (cycleBtn) cycleBtn.textContent = env.autoCycle ? '🕐 Cycle: ON' : '🕐 Cycle: off'; }
   if (cycleBtn) cycleBtn.addEventListener('click', () => { env.autoCycle = !env.autoCycle; syncCycleBtn(); });
   const rainBtn = document.getElementById('nxRain');
-  if (rainBtn) rainBtn.addEventListener('click', () => { sandbox.setRain(!sandbox.raining); rainBtn.textContent = sandbox.raining ? '🌧 Rain: ON' : '🌧 Rain: off'; });
+  const weatherModes = [['auto', '🌦 Weather: Auto'], ['clear', '☀ Weather: Clear'], ['cloudy', '☁ Weather: Cloudy'], ['rain', '🌧 Weather: Rain'], ['storm', '⛈ Weather: Storm']];
+  let weatherIdx = 0;
+  function syncWeatherBtn() { if (rainBtn) rainBtn.textContent = weatherModes[weatherIdx][1]; }
+  if (rainBtn) rainBtn.addEventListener('click', () => {
+    weatherIdx = (weatherIdx + 1) % weatherModes.length;
+    env.setWeather(weatherModes[weatherIdx][0]);
+    syncWeatherBtn();
+  });
   const clearBtn = document.getElementById('nxClear');
   if (clearBtn) clearBtn.addEventListener('click', () => sandbox.clearProps());
+  const stormBtn = document.getElementById('nxStorm');
+  if (stormBtn) stormBtn.addEventListener('click', () => env.summonStorm(true));
   window.addEventListener('keydown', e => {
     const map = { Digit1: 'crate', Digit2: 'ball', Digit3: 'barrel', Digit4: 'plank', Digit5: 'tower', Digit6: 'bomb', Digit7: 'dominoes', Digit8: 'bigball' };
     if (map[e.code]) sandbox.spawn(map[e.code]);
-    if (e.code === 'KeyR') sandbox.setRain(!sandbox.raining);
+    if (e.code === 'KeyR') {
+      const w = env.weather;
+      if (w.mode === 'manual' && w.state === 'rain') { env.setWeather('auto'); weatherIdx = 0; }
+      else { env.setWeather('rain'); weatherIdx = 3; }
+      syncWeatherBtn();
+    }
+    if (e.code === 'KeyT') env.summonStorm(true);
     if (e.code === 'KeyH') document.body.classList.toggle('ui-hidden');
   });
 
   /* audio: synthesized; starts on first gesture (browser policy) */
   const audio = new AudioService();
   sandbox.sfx = audio;
+  env.sfx = audio;
   const gesture = () => audio.ensure();
   window.addEventListener('pointerdown', gesture);
   window.addEventListener('keydown', gesture);
@@ -103,6 +138,8 @@ export async function boot() {
   const scaleSel = document.getElementById('nxScale');
   const shChk = document.getElementById('nxShadows');
   const blChk = document.getElementById('nxBloom');
+  const aoChk = document.getElementById('nxAO');
+  const filmChk = document.getElementById('nxFilm');
   function applySettings() {
     const sc = parseFloat(settings.scale || '1');
     engine.setPixelScale(sc);
@@ -112,10 +149,18 @@ export async function boot() {
     engine.userBloom = settings.bloom !== false;
     engine.bloom.enabled = engine.userBloom && engine.govFactor > 0.65;
     if (blChk) blChk.checked = settings.bloom !== false;
+    engine.userAO = settings.ao !== false;
+    engine.ao.enabled = engine.userAO && engine.govFactor > 0.85;
+    if (aoChk) aoChk.checked = settings.ao !== false;
+    engine.userFilm = settings.film !== false; // film/vignette grade toggle
+    engine.film.enabled = engine.userFilm && engine.govFactor > 0.65;
+    if (filmChk) filmChk.checked = settings.film !== false;
   }
   if (scaleSel) scaleSel.addEventListener('change', () => { settings.scale = scaleSel.value; saveSettings(); applySettings(); });
   if (shChk) shChk.addEventListener('change', () => { settings.shadows = shChk.checked; saveSettings(); applySettings(); });
   if (blChk) blChk.addEventListener('change', () => { settings.bloom = blChk.checked; saveSettings(); applySettings(); });
+  if (aoChk) aoChk.addEventListener('change', () => { settings.ao = aoChk.checked; saveSettings(); applySettings(); });
+  if (filmChk) filmChk.addEventListener('change', () => { settings.film = filmChk.checked; saveSettings(); applySettings(); });
   const setBtn = document.getElementById('nxSettingsBtn');
   const setPanel = document.getElementById('nxSettings');
   if (setBtn && setPanel) setBtn.addEventListener('click', () => {
@@ -160,6 +205,10 @@ export async function boot() {
     press: (code, down) => { input.keys[code] = !!down; },
     peers: () => net.peerCount,
     online: () => net.online,
+    weather: () => ({ state: env.weather.state, mode: env.weather.mode, wet: +env.weather.wet.toFixed(2), cloud: +env.weather.cloud.toFixed(2), wind: +env.weather.wind.toFixed(2), flash: +env.weather.flash.toFixed(2) }),
+    ao: () => engine.ao.enabled,
+    particles: () => particles.mode,
+    setWeather: n => env.setWeather(n),
     tilts: () => physics.props.filter(p => p.kind === 'domino').map(p => {
       /* rotation SINCE spawn (dominoes stand flush on slopes, so absolute
          tilt from identity is meaningless — movement is what counts) */
@@ -176,6 +225,44 @@ export async function boot() {
       const g = net.peers.get('nx-debug1');
       return g ? { visible: g.model.visible, pos: g.model.position.toArray(), children: g.model.children.length } : null;
     },
+    /* expansion chunk 2 debug surface */
+    alpha: () => engine.lastAlpha,
+    simTime: () => +engine.simTime.toFixed(2),
+    renderErr: () => engine._renderErr || '',
+    fxErr: () => env._fxErr || '',
+    film: () => ({ enabled: engine.film.enabled, user: engine.userFilm !== false }),
+    propInterp: i => { // verifies the render-interpolation contract directly
+      const p = physics.props[i];
+      if (!p || p.fixed) return null;
+      const r = v => +v.toFixed(3);
+      return {
+        mesh: [r(p.mesh.position.x), r(p.mesh.position.y), r(p.mesh.position.z)],
+        prev: [r(p.prevP.x), r(p.prevP.y), r(p.prevP.z)],
+        cur: [r(p.curP.x), r(p.curP.y), r(p.curP.z)],
+        alpha: +engine.lastAlpha.toFixed(3), stepped: physics._hadSteps,
+      };
+    },
+    charInterp: () => {
+      const o = { x: 0, y: 0, z: 0 };
+      physics.charPos(engine.lastAlpha, o);
+      const m = character.model.position;
+      return { interp: [+o.x.toFixed(3), +o.z.toFixed(3)], model: [+m.x.toFixed(3), +m.z.toFixed(3)] };
+    },
+    summonStorm: (speed) => env.summonStorm(true, speed || 0),
+    frontPlace: (x, peak) => { env.front.active = true; env.front.x = x; env.front.peak = peak == null ? 1 : peak; },
+    front: () => ({
+      active: env.front.active, x: +env.front.x.toFixed(1), peak: +env.front.peak.toFixed(2),
+      prox: +env.frontProx.toFixed(2), wet: +env.effWet.toFixed(2), cloud: +env.effCloud.toFixed(2),
+      wind: +env.effWind.toFixed(2), bankVisible: env.bank.visible,
+      bankI: +env.bankUniforms.uIntensity.value.toFixed(2),
+      bankPos: env.bank.position.toArray().map(v => +v.toFixed(1)),
+    }),
+    frontSkip: () => { env.front.x = env.front.dir * 545; }, // fast-forward the front off the island (tests)
+    splash: (x, z, p) => sandbox.splash(x === undefined ? 0 : x, z === undefined ? 8 : z, p || 3),
+    splashActive: () => sandbox.splashActiveCount(),
+    glint: () => ({ visible: env.glint.visible, strength: +env.glintUniforms.uGlint.value.toFixed(2) }),
+    setLowFx: v => { env.setLowFx(v); sandbox.setLowFx(v); particles.setLowFx(v); },
+    lowFx: () => ({ env: env.lowFx, sandbox: sandbox.lowFx, particles: particles.lowFx }),
   };
 
   status('');
