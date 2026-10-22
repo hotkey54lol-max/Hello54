@@ -36,6 +36,17 @@ const SKY_KEYS = [ // hour, top, horizon, sun, sunI, hemiI, fog
   [21.0, 0x0b1633, 0x1c2c4d, 0x8fa8ff, 0.0, 0.25],
   [24.0, 0x0a1430, 0x1a2745, 0x8fa8ff, 0.0, 0.24],
 ];
+/* dynamic weather: the sky's mood, eased continuously between states.
+   wet drives rain + fog, cloud greys the sky and dims the sun, wind
+   pushes the clouds and slants the rain. Storm adds lightning. */
+const WEATHER_STATES = {
+  clear:  { wet: 0,    cloud: 0.06, wind: 0.15 },
+  cloudy: { wet: 0,    cloud: 0.8,  wind: 0.4 },
+  rain:   { wet: 0.7,  cloud: 0.92, wind: 0.55 },
+  storm:  { wet: 1,    cloud: 1,    wind: 1 },
+};
+const GREY_TOP = new THREE.Color(0x5f7185), GREY_HOR = new THREE.Color(0x93a7ba), FLASH_C = new THREE.Color(0xe8f1ff);
+
 function keyLerp(h) {
   let a = SKY_KEYS[0], b = SKY_KEYS[SKY_KEYS.length - 1];
   for (let i = 0; i < SKY_KEYS.length - 1; i++) if (h >= SKY_KEYS[i][0] && h <= SKY_KEYS[i + 1][0]) { a = SKY_KEYS[i]; b = SKY_KEYS[i + 1]; break; }
@@ -167,6 +178,7 @@ export class Environment {
     /* clouds: merged-puff groups drifting */
     this.clouds = new THREE.Group();
     const cm = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.92 });
+    this.cloudMat = cm;
     for (let i = 0; i < 13; i++) {
       const g = new THREE.Group();
       const n = 3 + (hash(i, 7) * 3 | 0);
@@ -226,28 +238,245 @@ export class Environment {
     rocks.castShadow = true; rocks.receiveShadow = true;
     scene.add(rocks);
 
+    this.weather = {
+      mode: 'auto', state: 'clear',
+      wet: 0, cloud: 0.06, wind: 0.15,
+      t: { ...WEATHER_STATES.clear }, timer: 70,
+      flash: 0, flashTimer: 6 + Math.random() * 8,
+    };
+    /* storm front: a localized wall of weather that visibly sweeps across the
+       island (rather than the whole sky fading at once). frontProx (0..1) is
+       how overhead it is; it adds wet/cloud/wind on top of the base weather.
+       effWet/effCloud/effWind are the final values every system should read. */
+    this.front = { active: false, x: 0, dir: 1, speed: 13, peak: 0, manual: false };
+    this.frontProx = 0;
+    this.effWet = 0; this.effCloud = 0.06; this.effWind = 0.15;
+    this.lowFx = false;      // set by the governor (POTATO tier)
+    this.focusX = 0; this.focusZ = 0; // camera focus, for front proximity + motes
+    this._fxErr = '';        // first trapped render-system error (surfaces in HUD/debug)
+    this._buildCloudBank();
+    this._buildGlint();
+    this.sfx = null; // wired by main.js (thunder)
     this.update(0);
+  }
+
+  setLowFx(v) { this.lowFx = !!v; }
+
+  /* "Summon storm": a dark front rolls in from the horizon, passes overhead
+     (rain + wind scale with its proximity, thunder cracks), then moves on.
+     speed override is a test hook (headless rigs dilate sim time). */
+  summonStorm(manual = true, speed = 0) {
+    const f = this.front, w = this.weather;
+    f.dir = Math.random() < 0.5 ? 1 : -1;
+    f.x = -f.dir * 520;
+    f.speed = speed > 0 ? speed : 11 + Math.random() * 5;
+    f.peak = 0; f.active = true; f.manual = manual;
+    if (manual) w.mode = 'manual';
+    w.state = 'storm';
+    // the storm arrives WITH the front — the sky underneath just gets cloudy
+    w.t = { ...WEATHER_STATES.cloudy };
+  }
+
+  _frontTrap(name, fn) {
+    try { fn(); } catch (e) {
+      if (!this._fxErr) this._fxErr = name + ': ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  /* shader cloud bank: the visible wall of the approaching front */
+  _buildCloudBank() {
+    this.bankUniforms = {
+      uTime: { value: 0 },
+      uIntensity: { value: 0 },
+      uSeed: { value: Math.random() * 100 },
+    };
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      uniforms: this.bankUniforms,
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `
+        varying vec2 vUv; uniform float uTime, uIntensity, uSeed;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }
+        float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
+        float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * vnoise(p); a *= 0.5; p *= 2.13; } return v; }
+        void main(){
+          vec2 p = vec2(vUv.x * 14.0 + uTime * 0.010, vUv.y * 5.0);
+          float n = fbm(p);
+          float body = smoothstep(0.30, 0.72, n + (1.0 - vUv.y) * 0.30);
+          float edge = smoothstep(0.0, 0.20, vUv.y) * (1.0 - smoothstep(0.70, 1.0, vUv.y));
+          float a = body * edge * uIntensity;
+          vec3 dark = vec3(0.09, 0.11, 0.16);
+          vec3 mid  = vec3(0.22, 0.25, 0.32);
+          vec3 col = mix(dark, mid, vUv.y * 0.8 + n * 0.25);
+          col += vec3(0.50, 0.42, 0.46) * smoothstep(0.62, 1.0, vUv.y) * 0.35; // lit top rim
+          gl_FragColor = vec4(col, a * 0.96);
+        }`,
+    });
+    this.bank = new THREE.Mesh(new THREE.PlaneGeometry(1150, 260), mat);
+    this.bank.renderOrder = -5;
+    this.bank.frustumCulled = false;
+    this.bank.visible = false;
+    this.bank.rotation.y = Math.PI / 2; // wall faces along the x-axis of travel
+    this.scene.add(this.bank);
+  }
+
+  /* water glint: additive sun/moon specular sparkle + fresnel sheen */
+  _buildGlint() {
+    this.glintUniforms = {
+      uTime: { value: 0 },
+      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uSunColor: { value: new THREE.Color(0xfff2d8) },
+      uGlint: { value: 0.5 },
+    };
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      uniforms: this.glintUniforms,
+      vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+      fragmentShader: `
+        varying vec3 vW; uniform float uTime, uGlint; uniform vec3 uSunDir, uSunColor;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
+        void main(){
+          vec2 p = vW.xz * 0.35;
+          float n = vnoise(p + uTime * 0.25) * 0.6 + vnoise(p * 2.7 - uTime * 0.18) * 0.4;
+          float sparkle = pow(smoothstep(0.68, 1.0, n), 2.0);
+          vec3 vd = normalize(cameraPosition - vW);
+          float fres = pow(1.0 - max(vd.y, 0.0), 2.0);
+          vec2 sunXZ = normalize(uSunDir.xz + vec2(1e-4, 0.0));
+          vec2 viewXZ = normalize(vd.xz + vec2(1e-4, 0.0));
+          float align = pow(max(dot(sunXZ, -viewXZ), 0.0), 5.0); // glitter path toward the sun/moon
+          vec3 col = uSunColor * (sparkle * (0.25 + 2.2 * align) + fres * 0.12) * uGlint;
+          float a = clamp(sparkle * (0.3 + align) + fres * 0.35, 0.0, 1.0) * uGlint;
+          gl_FragColor = vec4(col, a);
+        }`,
+    });
+    this.glint = new THREE.Mesh(new THREE.CircleGeometry(420, 48), mat);
+    this.glint.rotation.x = -Math.PI / 2;
+    this.glint.position.y = 0.04; // just above the water; splashes fly above it
+    this.glint.renderOrder = 2;
+    this.scene.add(this.glint);
+  }
+
+  setWeather(name) {
+    const w = this.weather;
+    // a manual weather pick dismisses any travelling front
+    this.front.active = false; this.front.peak = 0; this.frontProx = 0;
+    if (name === 'auto') { w.mode = 'auto'; w.timer = Math.min(w.timer, 3); return; }
+    if (!WEATHER_STATES[name]) return;
+    w.mode = 'manual'; w.state = name; w.t = { ...WEATHER_STATES[name] };
+  }
+
+  _updateWeather(dt) {
+    const w = this.weather;
+    if (w.mode === 'auto') {
+      w.timer -= dt;
+      if (w.timer <= 0) {
+        const bag = ['clear', 'clear', 'clear', 'cloudy', 'cloudy', 'rain', 'rain', 'storm'];
+        let next = bag[Math.random() * bag.length | 0];
+        if (next === w.state) next = next === 'clear' ? 'cloudy' : 'clear';
+        if (next === 'storm') {
+          // auto weather doesn't just fade to storm — it sends a front through
+          this.summonStorm(false);
+        } else {
+          w.state = next; w.t = { ...WEATHER_STATES[next] };
+        }
+        w.timer = 80 + Math.random() * 90;
+      }
+    }
+    const k = Math.min(1, dt / 11); // ~11s ease between moods
+    w.wet += (w.t.wet - w.wet) * k;
+    w.cloud += (w.t.cloud - w.cloud) * k;
+    w.wind += (w.t.wind - w.wind) * k;
+    /* lightning: only when the sky is truly loaded (effective values, so a
+       passing storm front cracks thunder too, not just the global mood) */
+    if (this.effWet > 0.8 && this.effCloud > 0.9) {
+      w.flashTimer -= dt;
+      if (w.flashTimer <= 0) {
+        w.flash = 1;
+        w.flashTimer = 5 + Math.random() * 9;
+        if (this.sfx) { const s = this.sfx, d = 350 + Math.random() * 900; setTimeout(() => s.thunder(), d); }
+      }
+    }
+    w.flash = Math.max(0, w.flash - dt * 1.7);
   }
 
   setTime(h) { this.timeOfDay = ((h % 24) + 24) % 24; }
 
+  /* the front travels along x; proximity is measured against the camera focus */
+  _updateFront(dt) {
+    const f = this.front;
+    if (f.active) {
+      f.x += f.dir * f.speed * dt;
+      f.peak = Math.min(1, f.peak + dt / 6);
+      const dx = Math.abs(f.x - this.focusX);
+      this.frontProx = THREE.MathUtils.clamp(1 - dx / 300, 0, 1) * f.peak;
+      if ((f.dir > 0 && f.x > 560) || (f.dir < 0 && f.x < -560)) {
+        f.active = false;
+        if (this.weather.state === 'storm') { // the storm has passed: settle back to cloudy
+          this.weather.state = 'cloudy';
+          this.weather.t = { ...WEATHER_STATES.cloudy };
+        }
+      }
+    } else {
+      f.peak = Math.max(0, f.peak - dt / 8);
+      this.frontProx *= Math.max(0, 1 - dt / 4);
+    }
+  }
+
+  _updateBank(dt) {
+    const f = this.front;
+    this._bankT = (this._bankT || 0) + dt;
+    if (!f.active && f.peak < 0.02) { this.bank.visible = false; return; }
+    this.bank.visible = true;
+    this.bank.position.set(f.x, 130, this.focusZ);
+    const dx = Math.abs(f.x - this.focusX);
+    const nearFade = THREE.MathUtils.smoothstep(dx, 15, 70); // inside it: the sky itself is the storm
+    const farFade = 1 - THREE.MathUtils.smoothstep(dx, 620, 800);
+    const prox = THREE.MathUtils.clamp(1 - dx / 300, 0, 1);
+    this.bankUniforms.uIntensity.value = f.peak * (0.45 + 0.55 * Math.min(1, prox * 1.6)) * nearFade * farFade;
+    this.bankUniforms.uTime.value = this._bankT;
+  }
+
+  _updateGlint(dt, cloud) {
+    const u = this.glintUniforms;
+    u.uTime.value += dt;
+    u.uSunDir.value.copy(this.skyUniforms.sunDir.value);
+    u.uSunColor.value.copy(this.skyUniforms.sunColor.value);
+    u.uGlint.value = (0.22 + this.skyUniforms.sunI.value * 0.6) * (1 - cloud * 0.62) * (this.lowFx ? 0.55 : 1);
+  }
+
   update(dt) {
     if (this.autoCycle) this.timeOfDay = (this.timeOfDay + dt * this.cycleSpeed) % 24;
+    this._updateFront(dt);
+    if (dt > 0) this._updateWeather(dt);
+    const w = this.weather;
+    /* effective weather: the base mood plus the travelling front's local
+       contribution — every downstream system reads these, not w.* */
+    const fp = this.frontProx;
+    const wet = Math.min(1, w.wet + fp);
+    const cloud = Math.min(1, w.cloud + Math.min(1, fp * 1.5) * 0.5);
+    const wind = w.wind + fp * 1.35;
+    this.effWet = wet; this.effCloud = cloud; this.effWind = wind;
     const h = this.timeOfDay;
     const k = keyLerp(h);
-    this.scene.environmentIntensity = 0.05 + Math.min(0.3, k.sunI * 0.15);
+    this.daylight = THREE.MathUtils.clamp(k.sunI / 1.9, 0, 1);
+    if (cloud > 0.01) { k.top.lerp(GREY_TOP, cloud * 0.6); k.horizon.lerp(GREY_HOR, cloud * 0.55); }
+    const sunMul = 1 - 0.78 * cloud;
+    this.scene.environmentIntensity = (0.05 + Math.min(0.3, k.sunI * 0.15)) * (1 - 0.3 * cloud) + w.flash * 0.25;
     const ang = ((h - 6) / 12) * Math.PI; // sunrise 6h, sunset 18h
     const sunDir = new THREE.Vector3(Math.cos(ang) * 0.55, Math.sin(ang), 0.38).normalize();
     this.skyUniforms.topColor.value.copy(k.top);
     this.skyUniforms.horizonColor.value.copy(k.horizon);
-    this.hemi.intensity = k.hemiI;
+    this.hemi.intensity = k.hemiI * (1 - 0.3 * cloud) + w.flash * 1.7;
     if (k.sunI > 0.1) {
       this.skyUniforms.sunDir.value.copy(sunDir);
       this.skyUniforms.sunColor.value.copy(k.sun);
       this.skyUniforms.sunI.value = 1;
       this.sun.position.copy(sunDir).multiplyScalar(150);
       this.sun.color.copy(k.sun);
-      this.sun.intensity = k.sunI;
+      this.sun.intensity = k.sunI * sunMul + w.flash * 0.8;
     } else {
       // night: the key light becomes the moon — pale, dim, still casts shadows,
       // and the sky shader draws its disc from the same direction
@@ -258,19 +487,31 @@ export class Environment {
       this.skyUniforms.sunI.value = 0.8;
       this.sun.position.copy(moonDir).multiplyScalar(150);
       this.sun.color.set(0xaec6ff);
-      this.sun.intensity = 0.3;
+      this.sun.intensity = 0.3 * (1 - 0.4 * cloud);
     }
     this.scene.fog.color.copy(k.horizon);
-    this.stars.material.opacity = THREE.MathUtils.clamp(1 - k.sunI * 1.4, 0, 0.9);
+    if (w.flash > 0.02) this.scene.fog.color.lerp(FLASH_C, w.flash * 0.45);
+    const fDens = Math.max(cloud, wet);
+    this.scene.fog.near = 90 - 56 * fDens;
+    this.scene.fog.far = 700 - 520 * fDens;
+    this.stars.material.opacity = THREE.MathUtils.clamp(1 - k.sunI * 1.4, 0, 0.9) * (1 - cloud);
+    this.cloudMat.color.setScalar(1 - cloud * 0.52);
+    this.cloudMat.opacity = 0.92 + cloud * 0.07;
     for (const c of this.clouds.children) {
-      c.position.x += dt * 0.7;
+      c.position.x += dt * (0.7 + wind * 3.4);
       if (c.position.x > 280) c.position.x = -280;
     }
     if (this.water) this.water.material.opacity = 0.82 + Math.sin(performance.now() / 900) * 0.04;
+    /* new render systems ride behind seatbelts: an exception here must never
+       freeze the canvas while the HUD keeps ticking (the .30 lesson) */
+    this._frontTrap('bank', () => this._updateBank(dt));
+    this._frontTrap('glint', () => this._updateGlint(dt, cloud));
   }
 
-  /* keep the shadow camera centred on the action */
+  /* keep the shadow camera centred on the action (+ remember the focus for
+     front proximity and the mote field) */
   followShadows(target) {
+    this.focusX = target.x; this.focusZ = target.z;
     this.sun.target.position.copy(target);
     this.sun.position.copy(target).add(new THREE.Vector3().copy(this.skyUniforms.sunDir.value).multiplyScalar(150));
   }
