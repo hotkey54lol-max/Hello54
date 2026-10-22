@@ -52,6 +52,9 @@ export class Physics {
     } else if (kind === 'ball') {
       bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.01).setAngularDamping(0.4).setCcdEnabled(true);
       colDesc = RAPIER.ColliderDesc.ball(0.62).setDensity(0.5).setRestitution(0.55).setFriction(0.45);
+    } else if (kind === 'bomb') {
+      bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.02).setAngularDamping(0.4).setCcdEnabled(true);
+      colDesc = RAPIER.ColliderDesc.ball(0.55).setDensity(1.4).setRestitution(0.3).setFriction(0.5);
     } else if (kind === 'barrel') {
       bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.05).setAngularDamping(0.3);
       colDesc = RAPIER.ColliderDesc.cylinder(0.75, 0.48).setDensity(0.6).setFriction(0.6);
