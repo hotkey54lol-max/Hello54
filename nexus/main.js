@@ -136,7 +136,8 @@ export async function boot() {
   setInterval(() => {
     if (!hud) return;
     const f = engine.frame;
-    hud.textContent = 'FPS ' + f.fps + ' · ' + f.ms.toFixed(1) + 'ms · sim ' + f.simMs.toFixed(1) + 'ms · draws ' + f.calls + ' · tris ' + (f.tris / 1000).toFixed(0) + 'k · bodies ' + physics.bodyCount + ' · props ' + physics.props.length + ' · gov ' + Math.round(engine.govFactor * 100) + '%';
+    hud.textContent = 'FPS ' + f.fps + ' · ' + f.ms.toFixed(1) + 'ms · sim ' + f.simMs.toFixed(1) + 'ms · draws ' + f.calls + ' · tris ' + (f.tris / 1000).toFixed(0) + 'k · bodies ' + physics.bodyCount + ' · props ' + physics.props.length + ' · gov ' + Math.round(engine.govFactor * 100) + '%' +
+      ' · MP ' + (net.online ? 'on' : 'off') + ' peers ' + net.peerCount + ' rx ' + net.rxCount + (net.lastErr ? ' ERR ' + net.lastErr : '');
   }, 200);
 
   /* test/debug surface */
