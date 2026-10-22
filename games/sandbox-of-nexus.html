@@ -24,6 +24,10 @@
   .dock input[type=range] { width:110px; accent-color:#ffd94d; }
   .hint { position:fixed; left:10px; bottom:10px; font-size:.68rem; color:#9fc4e8cc; z-index:9; max-width:300px; line-height:1.5; text-shadow:0 1px 4px #000; }
   body.ui-hidden .bar, body.ui-hidden .dock, body.ui-hidden .hint, body.ui-hidden #nxToast, body.ui-hidden #nxSettings, body.ui-hidden #nxJump { display:none !important; }
+  /* cinematic letterbox (Sequencer mode, C key) */
+  #nxBarT, #nxBarB { position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 39; transition: height .8s ease; pointer-events: none; }
+  #nxBarT { top: 0; } #nxBarB { bottom: 0; }
+  body.cine #nxBarT, body.cine #nxBarB { height: 7vh; }
   #nxLoading { position:fixed; inset:0; background:#0b0f14; z-index:50; display:flex; flex-direction:column; gap:14px; align-items:center; justify-content:center; }
   #nxLoading .t { font-size:1.3rem; letter-spacing:.2em; color:#ffd94d; }
   #nxStatus { color:#9fc4e8; font-size:.85rem; }
@@ -61,8 +65,10 @@
     <button id="nxStorm">⛈ Summon storm</button>
     <button id="nxSound">🔊 Sound: on</button>
     <button id="nxSettingsBtn">⚙ Settings</button>
+    <button id="nxCine">🎬 Cine</button>
   </div>
 </div>
+<div id="nxBarT"></div><div id="nxBarB"></div>
 
 <div id="nxSettings" style="display:none; position:fixed; right:12px; bottom:76px; z-index:12; background:#0a1622f2; border:1px solid #3f6ea3; border-radius:10px; padding:12px 14px; font-size:.78rem; line-height:2;">
   <div style="color:#ffd94d; font-weight:700; letter-spacing:.08em;">⚙ NEXUS SETTINGS</div>
