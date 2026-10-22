@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🏝 Sandbox Of Nexus — Project Nexus</title>
+<link rel="icon" href="data:,">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; background:#0b0f14; font-family:'Segoe UI', system-ui, sans-serif; color:#eaf4ff; }
+  #nxCanvas { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  .bar { position:fixed; left:0; right:0; top:0; display:flex; align-items:center; gap:10px; padding:8px 12px; background:linear-gradient(180deg, rgba(5,10,18,.88), rgba(5,10,18,.55) 70%, transparent); z-index:10; pointer-events:none; }
+  .bar > * { pointer-events:auto; }
+  .back { color:#ffd94d; text-decoration:none; border:2px solid #ffd94d; border-radius:6px; padding:4px 10px; font-weight:700; font-size:.8rem; background:#0009; }
+  h1 { font-size:1.02rem; letter-spacing:.14em; color:#ffd94d; text-shadow:0 2px 10px #000; white-space:nowrap; }
+  .badge { background:#c22f4e; color:#fff; font-size:.6rem; font-weight:800; letter-spacing:.08em; padding:3px 7px; border-radius:4px; white-space:nowrap; }
+  #nxHud { margin-left:auto; font-size:.68rem; color:#bfe3ff; background:#000a; padding:5px 9px; border-radius:6px; border:1px solid #2c4a66; white-space:nowrap; overflow:hidden; }
+  #nxToast { position:fixed; top:52px; left:50%; transform:translateX(-50%); background:#10222eee; border:1px solid #ffd94d; color:#ffe9a8; padding:7px 14px; border-radius:8px; font-size:.8rem; opacity:0; transition:opacity .4s; z-index:11; pointer-events:none; }
+  .dock { position:fixed; left:50%; bottom:10px; transform:translateX(-50%); display:flex; flex-wrap:wrap; justify-content:center; gap:6px; z-index:10; max-width:96vw; }
+  .dock button { background:#101d2bee; color:#eaf4ff; border:1px solid #3f6ea3; border-radius:8px; padding:8px 11px; font-size:.78rem; cursor:pointer; font-family:inherit; }
+  .dock button:hover { border-color:#ffd94d; color:#ffd94d; }
+  .dock .grp { display:flex; gap:6px; align-items:center; background:#0a141fee; border:1px solid #274058; border-radius:10px; padding:5px 7px; }
+  .dock label { font-size:.68rem; color:#9fc4e8; }
+  .dock input[type=range] { width:110px; accent-color:#ffd94d; }
+  .hint { position:fixed; left:10px; bottom:10px; font-size:.68rem; color:#9fc4e8cc; z-index:9; max-width:300px; line-height:1.5; text-shadow:0 1px 4px #000; }
+  #nxLoading { position:fixed; inset:0; background:#0b0f14; z-index:50; display:flex; flex-direction:column; gap:14px; align-items:center; justify-content:center; }
+  #nxLoading .t { font-size:1.3rem; letter-spacing:.2em; color:#ffd94d; }
+  #nxStatus { color:#9fc4e8; font-size:.85rem; }
+  @media (max-width:700px) { .hint { display:none; } h1 { font-size:.85rem; } #nxHud { display:none; } }
+</style>
+</head>
+<body>
+<canvas id="nxCanvas"></canvas>
+
+<div class="bar">
+  <a class="back" href="../index.html">← HUB</a>
+  <h1>🏝 SANDBOX OF NEXUS</h1>
+  <span class="badge">PROJECT NEXUS</span>
+  <div id="nxHud">FPS —</div>
+</div>
+<div id="nxToast"></div>
+
+<div class="dock">
+  <div class="grp">
+    <button data-spawn="crate">📦 Crate</button>
+    <button data-spawn="ball">⚽ Ball</button>
+    <button data-spawn="barrel">🛢 Barrel</button>
+    <button data-spawn="plank">🛹 Plank</button>
+    <button data-spawn="tower">🏗 Tower</button>
+    <button id="nxClear">🗑 Clear</button>
+  </div>
+  <div class="grp">
+    <label for="nxTime">☀️ Time</label>
+    <input type="range" id="nxTime" min="0" max="24" step="0.1" value="10.5">
+    <button id="nxCycle">🕐 Cycle: off</button>
+    <button id="nxRain">🌧 Rain: off</button>
+  </div>
+</div>
+
+<div class="hint">WASD move · drag mouse to orbit · wheel zoom · SHIFT sprint · SPACE jump<br>Keys 1–5 spawn toys · R rain · Props are real physics — stack them, knock them down.</div>
+
+<div id="nxLoading">
+  <div class="t">🏝 SANDBOX OF NEXUS</div>
+  <div id="nxStatus">Booting Project Nexus…</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "../nexus/vendor/three/three.module.js",
+    "three/addons/": "../nexus/vendor/three/jsm/",
+    "rapier": "../nexus/vendor/rapier/rapier.es.js"
+  }
+}
+</script>
+<script type="module">
+  import { boot } from '../nexus/main.js';
+  boot().catch(err => {
+    const el = document.getElementById('nxStatus');
+    if (el) el.textContent = '⚠ Boot failed: ' + (err && err.message ? err.message : err);
+    console.error(err);
+  });
+</script>
+</body>
+</html>
