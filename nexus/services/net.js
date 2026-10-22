@@ -50,6 +50,7 @@ export class Net {
         if (status === 'SUBSCRIBED') {
           this.online = true;
           await ch.track({ name: this.myName });
+          this._startHeartbeat();
         }
       });
     } catch (e) { /* solo mode */ }
@@ -123,18 +124,22 @@ export class Net {
     g.current = next;
   }
 
-  /* called every frame from render */
-  update(dt, now) {
-    if (this.online && now - this._sendT > 120) {
-      this._sendT = now;
+  /* Sending rides its own timer, NOT the render loop: browsers freeze rAF in
+     background tabs, and a frozen render loop must not silence a player
+     (found live: two-tab checks where the unwatched tab simply went mute). */
+  _startHeartbeat() {
+    if (this._sendTimer) return;
+    let ticks = 0;
+    this._sendTimer = setInterval(() => {
+      if (!this.online || !this.channel) return;
       const s = this.getLocalState();
       this.channel.send({ type: 'broadcast', event: 'pos', payload: { id: this.id, n: this.myName, x: +s.x.toFixed(2), y: +s.y.toFixed(2), z: +s.z.toFixed(2), ry: +s.ry.toFixed(2), sp: +s.sp.toFixed(1) } });
-    }
-    // reconcile presence every 3s: a missed join event must not orphan a player
-    if (this.online && now - (this._syncT || 0) > 3000) {
-      this._syncT = now;
-      this._syncPresence();
-    }
+      if (++ticks % 20 === 0) this._syncPresence(); // reconcile ~every 3s
+    }, 150);
+  }
+
+  /* called every frame from render: ghost motion only */
+  update(dt, now) {
     for (const g of this.peers.values()) {
       if (g.target) {
         const p = g.model.position;
