@@ -81,6 +81,7 @@ export async function boot() {
     const map = { Digit1: 'crate', Digit2: 'ball', Digit3: 'barrel', Digit4: 'plank', Digit5: 'tower', Digit6: 'bomb' };
     if (map[e.code]) sandbox.spawn(map[e.code]);
     if (e.code === 'KeyR') sandbox.setRain(!sandbox.raining);
+    if (e.code === 'KeyH') document.body.classList.toggle('ui-hidden');
   });
 
   /* audio: synthesized; starts on first gesture (browser policy) */
