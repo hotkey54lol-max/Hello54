@@ -134,7 +134,7 @@ export async function boot() {
   window.addEventListener('keydown', e => {
     if (e.code === 'KeyC') setCine(!cine.on);
     else if (cine.on && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'].includes(e.code)) setCine(false);
-    const map = { Digit1: 'crate', Digit2: 'ball', Digit3: 'barrel', Digit4: 'plank', Digit5: 'tower', Digit6: 'bomb', Digit7: 'dominoes', Digit8: 'bigball' };
+    const map = { Digit1: 'crate', Digit2: 'ball', Digit3: 'barrel', Digit4: 'plank', Digit5: 'tower', Digit6: 'bomb', Digit7: 'dominoes', Digit8: 'bigball', Digit9: 'wrecking' };
     if (map[e.code]) sandbox.spawn(map[e.code]);
     if (e.code === 'KeyR') {
       const w = env.weather;
@@ -243,6 +243,8 @@ export async function boot() {
     grass: () => ({ visible: env.grassChunks.filter(c => c.mesh.visible).length, total: env.grassChunks.length }),
     setGrassCull: d => { env.grassCull = d; },
     kinds: () => physics.props.map(p => p.kind),
+    propY: k => { const p = physics.props.find(p => p.kind === k); return p ? +p.body.translation().y.toFixed(2) : null; },
+    wreckY: () => sandbox.wrecks.length ? { pivot: +sandbox.wrecks[0].pivot.y.toFixed(2), ball: +sandbox.wrecks[0].prop.body.translation().y.toFixed(2) } : null,
     camPos: () => { const c = engine.camera.position; return { x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2) }; },
     setWeather: n => env.setWeather(n),
     tilts: () => physics.props.filter(p => p.kind === 'domino').map(p => {
