@@ -295,31 +295,57 @@ export class Sandbox {
         this.scene.remove(old.mesh); this.physics.removeProp(old);
       }
       const yaw0 = this.character.faceYaw;
-      const dir = new THREE.Vector3(Math.sin(yaw0), 0, Math.cos(yaw0));
-      const perp = new THREE.Vector3(dir.z, 0, -dir.x);
-      const sx = f.x + dir.x * 1.4, sz = f.z + dir.z * 1.4;
+      const sx = f.x + Math.sin(yaw0) * 1.4, sz = f.z + Math.cos(yaw0) * 1.4;
       const geo = new THREE.BoxGeometry(0.7, 1.35, 0.26);
       const cA = new THREE.Color(0xff4757), cB = new THREE.Color(0x3742fa);
+      /* Ground normal at a point, from the same heightAt the physics uses. */
+      const normalAt = (px, pz) => {
+        const e = 0.35;
+        return new THREE.Vector3(
+          -(heightAt(px + e, pz) - heightAt(px - e, pz)) / (2 * e), 1,
+          -(heightAt(px, pz + e) - heightAt(px, pz - e)) / (2 * e)).normalize();
+      };
+      /* The curve's tail used to tip over during settle when the run
+         crossed a steeper patch (the player's spawn jitter moves the
+         line every time). So: try the curve at several rotations and
+         keep the one whose ground is flattest end to end. */
+      const curvePoints = rot => {
+        const dir = new THREE.Vector3(Math.sin(yaw0 + rot), 0, Math.cos(yaw0 + rot));
+        const perp = new THREE.Vector3(dir.z, 0, -dir.x);
+        const pts = [];
+        for (let i = 0; i < N; i++) {
+          const t = i * GAP;
+          const lat = Math.sin(t * 0.55) * 1.15;
+          const dLat = Math.cos(t * 0.55) * 1.15 * 0.55;
+          pts.push({
+            px: sx + dir.x * t + perp.x * lat,
+            pz: sz + dir.z * t + perp.z * lat,
+            yaw: Math.atan2(dir.x + perp.x * dLat, dir.z + perp.z * dLat),
+          });
+        }
+        return pts;
+      };
+      let best = null, bestScore = Infinity;
+      for (const rot of [0, 0.55, -0.55, 1.1, -1.1, 1.65, -1.65]) {
+        const pts = curvePoints(rot);
+        let score = 0;
+        for (const p of pts) score = Math.max(score, 1 - normalAt(p.px, p.pz).y);
+        if (score < bestScore) { bestScore = score; best = pts; }
+        if (score < 0.012) break; // flat enough — stop searching
+      }
       for (let i = 0; i < N; i++) {
-        const t = i * GAP;
-        const lat = Math.sin(t * 0.55) * 1.15;              // S-curve sideways offset
-        const dLat = Math.cos(t * 0.55) * 1.15 * 0.55;      // its slope → tangent
-        const px = sx + dir.x * t + perp.x * lat;
-        const pz = sz + dir.z * t + perp.z * lat;
-        const tx = dir.x + perp.x * dLat, tz = dir.z + perp.z * dLat;
-        const yaw = Math.atan2(tx, tz);
+        const { px, pz, yaw } = best[i];
         const col = cA.clone().lerp(cB, i / (N - 1));
         const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }));
         m.castShadow = m.receiveShadow = true;
         const gy = heightAt(px, pz);
         m.position.set(px, gy + 0.69, pz);
-        /* stand the base flush with the terrain: align the domino's up axis
-           to the ground normal (sampled from the same heightAt the physics
-           terrain uses) so runs stay standing on slopes */
-        const e = 0.35;
-        const n = new THREE.Vector3(
-          -(heightAt(px + e, pz) - heightAt(px - e, pz)) / (2 * e), 1,
-          -(heightAt(px, pz + e) - heightAt(px, pz - e)) / (2 * e)).normalize();
+        /* Stand the base toward the terrain, but only ~2/3 of the way to
+           the full ground normal: fully flush on a slope pre-loads the
+           piece toward its thin edge and it creeps over while settling.
+           Mostly-upright with a slight lean settles planted. */
+        const n = normalAt(px, pz);
+        n.lerp(new THREE.Vector3(0, 1, 0), 0.35).normalize();
         const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n)
           .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
         m.quaternion.copy(q);
