@@ -961,7 +961,7 @@ window.Arcade = (function () {
    * (Oct 20): fullscreen only makes sense for these — board/text
    * games are intentionally left out.
    */
-  var FS_GAMES = ["fear-toxin.html", "bloxtopia.html", "snake.html", "tetris.html", "pong.html",
+  var FS_GAMES = ["fear-toxin.html", "snake.html", "tetris.html", "pong.html",
     "breakout.html", "flappy.html", "asteroids.html", "dodge.html",
     "whackamole.html", "reaction.html"];
   var _fsBtn = null, _fsStarted = false;
@@ -1188,7 +1188,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-21.20";
+  const ARCADE_BUILD = "2026-10-21.21";
   let _updateHandled = false;
 
   function _siteBase() {
