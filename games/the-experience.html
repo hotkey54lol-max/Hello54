@@ -72,8 +72,8 @@
 <div style="margin-top:26px; width:min(560px, 92vw); border:2px solid #ffd94d; border-radius:10px; padding:16px; background:#0a0f05;">
   <div style="font-size:1rem; letter-spacing:.12em;">🎤 VOLUNTEER A SONG</div>
   <div style="color:#9fc4e8; font-size:.78rem; line-height:1.6; margin-top:6px;">
-    Send a song to the review queue. We review every submission in Supabase —
-    approved songs become <b style="color:#fff;">built-in tracks</b> in a future update.
+    Send a song to the review queue. When an admin approves it, it appears
+    here as a <b style="color:#fff;">built-in track</b> automatically — no site update needed.
   </div>
   <input id="volName" maxlength="24" placeholder="your name" style="width:100%; margin-top:12px; background:#000; color:#fff; border:1px solid #3f6ea3; border-radius:6px; padding:8px 10px; font-family:inherit;">
   <input id="volTitle" maxlength="60" placeholder="song title" style="width:100%; margin-top:8px; background:#000; color:#fff; border:1px solid #3f6ea3; border-radius:6px; padding:8px 10px; font-family:inherit;">
@@ -81,6 +81,18 @@
   <input type="file" id="volFile" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.opus" hidden>
   <button id="volBtn" style="margin-top:12px; width:100%; background:#000; color:#ffd94d; border:2px solid #ffd94d; border-radius:8px; padding:10px; font-size:.95rem; cursor:pointer; font-family:inherit;">📨 Send to the review queue</button>
   <div id="volStatus" style="margin-top:10px; font-size:.8rem; line-height:1.6; color:#bfe3ff;"></div>
+</div>
+
+<div style="margin-top:16px; width:min(560px, 92vw); border:1px solid #2c4a66; border-radius:10px; padding:14px 16px; background:#050a10;">
+  <div style="font-size:.9rem; letter-spacing:.12em;">🔑 ADMIN <span id="admToggle" style="color:#ffd94d; cursor:pointer; font-size:.78rem;">— sign in to review</span></div>
+  <div id="admBody" style="display:none; margin-top:10px;">
+    <div style="display:flex; gap:8px;">
+      <input id="admPw" type="password" placeholder="admin password" style="flex:1; background:#000; color:#fff; border:1px solid #3f6ea3; border-radius:6px; padding:8px 10px; font-family:inherit;">
+      <button id="admGo" style="background:#000; color:#ffd94d; border:2px solid #ffd94d; border-radius:8px; padding:8px 14px; cursor:pointer; font-family:inherit;">Open queue</button>
+    </div>
+    <div id="admStatus" style="margin-top:8px; font-size:.78rem; color:#bfe3ff; line-height:1.6;"></div>
+    <div id="admList"></div>
+  </div>
 </div>
 
 <div class="note">* uploaded files play straight from your device — nothing is uploaded anywhere.<br>* the built-in track is the one Joslyn sent in, converted from his video to mp3.</div>
@@ -125,10 +137,24 @@ function renderPlaylist() {
   });
 }
 
-function load(i, autoplay) {
+async function ensureSrc(t) {
+  if (t.src || !t.approvedId) return;
+  const b64 = await rpc('song_audio', { p_id: t.approvedId });
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+  t.src = URL.createObjectURL(new Blob([bytes], { type: t.mime || 'audio/mpeg' }));
+}
+
+async function load(i, autoplay) {
   if (i < 0 || i >= tracks.length) return;
   idx = i;
   const t = tracks[i];
+  if (t.approvedId && !t.src) {
+    nowTitle.textContent = t.title;
+    nowSub.textContent = 'loading the song…';
+    try { await ensureSrc(t); } catch (e) { nowSub.textContent = 'could not load this song'; return; }
+  }
   au.src = t.src;
   nowTitle.textContent = t.title;
   nowSub.textContent = t.sub;
@@ -284,8 +310,95 @@ async function submitVolunteer() {
 }
 document.getElementById('volBtn').addEventListener('click', submitVolunteer);
 
+/* ---- approved songs → built-in tracks, live from Supabase ----
+   The page asks an RPC for approved submissions only; the queue itself
+   stays read-locked. Approving (dashboard or the admin strip below)
+   makes a song appear here with NO site update. Audio loads lazily,
+   one song at a time, when first played. */
+async function rpc(name, body) {
+  const keys = await getKeys();
+  const r = await fetch(keys.url + '/rest/v1/rpc/' + name, {
+    method: 'POST',
+    headers: Object.assign({ Authorization: 'Bearer ' + keys.anon, 'Content-Type': 'application/json' }, { ['api' + 'key']: keys.anon }),
+    body: JSON.stringify(body || {}),
+  });
+  if (!r.ok) {
+    let msg = 'Supabase said ' + r.status;
+    try { const j = await r.json(); if (j && j.message) msg = j.message; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+async function loadApproved() {
+  try {
+    const rows = await rpc('approved_songs');
+    let added = false;
+    for (const row of rows) {
+      if (tracks.some(t => t.approvedId === row.id)) continue;
+      tracks.push({ title: row.title, sub: 'built-in · volunteered by ' + row.volunteer, src: '', cover: '', builtin: true, dur: 0, approvedId: row.id, mime: row.mime });
+      added = true;
+    }
+    if (added) renderPlaylist();
+    return rows.length;
+  } catch (e) { return -1; }
+}
+
+/* ---- admin strip: password-gated review, right on the page ---- */
+let admPw = '';
+const admBody = document.getElementById('admBody');
+const admStatus = document.getElementById('admStatus');
+const admList = document.getElementById('admList');
+document.getElementById('admToggle').addEventListener('click', () => {
+  admBody.style.display = admBody.style.display === 'none' ? '' : 'none';
+});
+async function admRefresh() {
+  admStatus.textContent = '⏳ Loading the queue…';
+  try {
+    const rows = await rpc('experience_review_list', { p_pw: admPw });
+    admStatus.textContent = rows.length ? rows.length + ' song(s) waiting for review:' : '🎉 Queue is empty — nothing waiting.';
+    admList.innerHTML = '';
+    for (const row of rows) {
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex; align-items:center; gap:8px; border:1px solid #2c4a66; border-radius:8px; padding:8px 10px; margin-top:7px; font-size:.8rem;';
+      const label = document.createElement('span');
+      label.style.flex = '1';
+      label.textContent = '🎵 ' + row.title + ' — ' + row.volunteer + ' · ' + Math.round((row.size || 0) / 1024) + ' KB';
+      const mk = (txt, status, color) => {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        b.style.cssText = 'background:#000; color:' + color + '; border:1px solid ' + color + '; border-radius:6px; padding:5px 10px; cursor:pointer; font-family:inherit;';
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          try {
+            await rpc('experience_review', { p_pw: admPw, p_id: row.id, p_status: status });
+            admStatus.textContent = (status === 'approved' ? '✅ Approved "' : '🗑 Rejected "') + row.title + '" — ' + (status === 'approved' ? 'it is now a built-in track for everyone.' : 'it stays out of the playlist.');
+            if (status === 'approved') loadApproved();
+            admRefresh();
+          } catch (e) { admStatus.textContent = '⚠ ' + (e && e.message ? e.message : e); b.disabled = false; }
+        });
+        return b;
+      };
+      div.appendChild(label);
+      div.appendChild(mk('✔ Approve', 'approved', '#8dff9a'));
+      div.appendChild(mk('✖ Reject', 'rejected', '#ff8d8d'));
+      admList.appendChild(div);
+    }
+  } catch (e) {
+    admStatus.textContent = '⚠ ' + (e && e.message ? e.message : e) + (String(e && e.message).includes('bad password') ? ' — that password did not match the admin password.' : '');
+    admList.innerHTML = '';
+  }
+}
+document.getElementById('admGo').addEventListener('click', () => {
+  admPw = document.getElementById('admPw').value;
+  admRefresh();
+});
+
 load(0, false);
+loadApproved();
 window.__exp = {
+  approvedCount: () => tracks.filter(t => t.approvedId).length,
+  approvedTitles: () => tracks.filter(t => t.approvedId).map(t => t.title),
+  loadApproved: () => loadApproved(),
   submitVolunteer: (name, title, file) => {
     document.getElementById('volName').value = name;
     document.getElementById('volTitle').value = title;
