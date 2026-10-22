@@ -74,7 +74,7 @@ export class Engine {
     } else if (realFps > 50 && this.govFactor < 1) {
       if (++this._govGood >= 2) {
         this.govFactor = Math.min(1, +(this.govFactor + 0.1).toFixed(2));
-        if (this.govFactor > 0.65) this.bloom.enabled = true;
+        if (this.govFactor > 0.65 && this.userBloom !== false) this.bloom.enabled = true;
         this.setPixelScale(this.userScale || 1);
         if (this.onGovernor) this.onGovernor(this.govFactor, 'up');
         this._govGood = 0;
