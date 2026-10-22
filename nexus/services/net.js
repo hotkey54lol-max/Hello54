@@ -144,29 +144,36 @@ export class Net {
     }, 150);
   }
 
-  /* called every frame from render: ghost motion only */
+  /* called every frame from render: ghost motion only.
+     HISTORY: this loop once read p.rotation.y where p was the model's
+     POSITION (a Vector3 has no .rotation) — it threw on any ghost with a
+     target, and since render systems run before the composer, one ghost
+     froze the whole canvas while the HUD kept ticking. Three live checks
+     chased the network layer before a local stack trace caught it. */
   update(dt, now) {
     for (const g of this.peers.values()) {
-      if (g.target) {
-        const p = g.model.position;
-        const d = Math.hypot(g.target.x - p.x, g.target.z - p.z);
-        if (d > 14) p.set(g.target.x, g.target.y, g.target.z);
-        else {
-          const k = 1 - Math.pow(0.00005, dt);
-          p.x += (g.target.x - p.x) * k;
-          p.y += (g.target.y - p.y) * k;
-          p.z += (g.target.z - p.z) * k;
+      try {
+        if (g.target) {
+          const p = g.model.position;
+          const d = Math.hypot(g.target.x - p.x, g.target.z - p.z);
+          if (d > 14) p.set(g.target.x, g.target.y, g.target.z);
+          else {
+            const k = 1 - Math.pow(0.00005, dt);
+            p.x += (g.target.x - p.x) * k;
+            p.y += (g.target.y - p.y) * k;
+            p.z += (g.target.z - p.z) * k;
+          }
+          let dr = g.ry + Math.PI - g.model.rotation.y;
+          while (dr > Math.PI) dr -= Math.PI * 2;
+          while (dr < -Math.PI) dr += Math.PI * 2;
+          g.model.rotation.y += dr * Math.min(1, 10 * dt);
         }
-        let dr = g.ry + Math.PI - p.rotation.y;
-        while (dr > Math.PI) dr -= Math.PI * 2;
-        while (dr < -Math.PI) dr += Math.PI * 2;
-        g.model.rotation.y += dr * Math.min(1, 10 * dt);
-      }
-      const s = g.sp;
-      if (s < 0.35) this._play(g, 'Idle');
-      else if (s < 5) this._play(g, 'Walk');
-      else this._play(g, 'Run');
-      g.mixer.update(dt);
+        const s = g.sp;
+        if (s < 0.35) this._play(g, 'Idle');
+        else if (s < 5) this._play(g, 'Walk');
+        else this._play(g, 'Run');
+        g.mixer.update(dt);
+      } catch (e) { if (!this.lastErr) this.lastErr = 'update: ' + (e && e.message ? e.message : e); }
     }
   }
 
