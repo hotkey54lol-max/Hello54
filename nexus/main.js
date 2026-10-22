@@ -160,6 +160,13 @@ export async function boot() {
     press: (code, down) => { input.keys[code] = !!down; },
     peers: () => net.peerCount,
     online: () => net.online,
+    debugGhost: () => {
+      const p = character.pos;
+      net._addGhost('nx-debug1', 'DebugGhost');
+      net._onPos({ id: 'nx-debug1', n: 'DebugGhost', x: p.x + 2.5, y: p.y, z: p.z, ry: 0, sp: 0 });
+      const g = net.peers.get('nx-debug1');
+      return g ? { visible: g.model.visible, pos: g.model.position.toArray(), children: g.model.children.length } : null;
+    },
   };
 
   status('');
