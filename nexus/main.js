@@ -17,7 +17,7 @@ export async function boot() {
   engine.setPixelScale(1);
 
   status('Growing the island…');
-  const env = new Environment(engine.scene);
+  const env = new Environment(engine.scene, engine.renderer);
 
   status('Waking physics (Rapier)…');
   const physics = new Physics();
