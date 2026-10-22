@@ -64,11 +64,17 @@ export class Net {
       seen.add(key);
       if (!this.peers.has(key)) this._addGhost(key, (state[key][0] || {}).name || 'Player');
     }
-    for (const id of [...this.peers.keys()]) if (!seen.has(id)) this._removeGhost(id);
+    for (const id of [...this.peers.keys()]) {
+      const g = this.peers.get(id);
+      // only reap when presence says gone AND position traffic has stopped —
+      // a self-healed ghost with live packets is never deleted by a stale roster
+      if (!seen.has(id) && performance.now() - (g.lastSeen || 0) > 6000) this._removeGhost(id);
+    }
   }
 
   _addGhost(id, name) {
     const model = skeletonClone(this.gltf.scene);
+    model.visible = false; // revealed on first position fix — never render a ghost at the world origin (it's under the terrain)
     // per-peer tint so ghosts are distinguishable (palette by id hash)
     const palette = [0xff9d7a, 0x7ac2ff, 0xa8ff9e, 0xffe27a, 0xd8a2ff, 0x7affdd];
     let hsum = 0; for (const ch of id) hsum += ch.charCodeAt(0);
@@ -85,7 +91,7 @@ export class Net {
     const actions = {};
     for (const clip of this.gltf.animations) actions[clip.name] = mixer.clipAction(clip);
     actions.Idle && actions.Idle.play();
-    this.peers.set(id, { model, mixer, actions, current: actions.Idle, target: null, ry: 0, sp: 0, name });
+    this.peers.set(id, { model, mixer, actions, current: actions.Idle, target: null, ry: 0, sp: 0, name, lastSeen: 0 });
   }
 
   _removeGhost(id) {
@@ -94,10 +100,19 @@ export class Net {
   }
 
   _onPos(p) {
-    const g = this.peers.get(p.id);
+    // self-healing: a position packet alone is enough to conjure the ghost,
+    // even if a presence event was missed (observed in the wild: the first
+    // joiner never got the second joiner's presence sync)
+    let g = this.peers.get(p.id);
+    if (!g) { this._addGhost(p.id, p.n || 'Player'); g = this.peers.get(p.id); }
     if (!g) return;
+    if (!g.target) { // first fix: snap to the real position and reveal
+      g.model.position.set(p.x, p.y, p.z);
+      g.model.visible = true;
+    }
     g.target = { x: p.x, y: p.y, z: p.z };
     g.ry = p.ry; g.sp = p.sp;
+    g.lastSeen = performance.now();
   }
 
   _play(g, name) {
@@ -113,7 +128,12 @@ export class Net {
     if (this.online && now - this._sendT > 120) {
       this._sendT = now;
       const s = this.getLocalState();
-      this.channel.send({ type: 'broadcast', event: 'pos', payload: { id: this.id, x: +s.x.toFixed(2), y: +s.y.toFixed(2), z: +s.z.toFixed(2), ry: +s.ry.toFixed(2), sp: +s.sp.toFixed(1) } });
+      this.channel.send({ type: 'broadcast', event: 'pos', payload: { id: this.id, n: this.myName, x: +s.x.toFixed(2), y: +s.y.toFixed(2), z: +s.z.toFixed(2), ry: +s.ry.toFixed(2), sp: +s.sp.toFixed(1) } });
+    }
+    // reconcile presence every 3s: a missed join event must not orphan a player
+    if (this.online && now - (this._syncT || 0) > 3000) {
+      this._syncT = now;
+      this._syncPresence();
     }
     for (const g of this.peers.values()) {
       if (g.target) {
