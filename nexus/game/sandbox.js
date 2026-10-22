@@ -28,6 +28,7 @@ export class Sandbox {
     this.wood = woodTexture();
     this.bombs = [];
     this.shards = []; // live crate debris { prop, ttl }
+    this.wrecks = []; // wrecking-ball rigs { prop, line, post, knob, pivot }
     this.sfx = null;
     this.lowFx = false; // governor: POTATO tier halves splash particles
     this._buildRain();
@@ -255,6 +256,35 @@ export class Sandbox {
       m.position.set(f.x, heightAt(f.x, f.z) + 3.4, f.z);
       this.scene.add(m);
       this.physics.addProp('bigball', m, f.x, m.position.y, f.z);
+    } else if (kind === 'wrecking') {
+      /* a wrecking ball on a real pendulum joint (Chaos demo): a heavy
+         steel ball hung from a post — walk into it and it swings through
+         whatever you built. Rope drawn as a line, updated per frame. */
+      const yaw = this.character.faceYaw;
+      const px = f.x + Math.sin(yaw) * 1.5, pz = f.z + Math.cos(yaw) * 1.5;
+      const gy = heightAt(px, pz);
+      const pivot = new THREE.Vector3(px, gy + 4.6, pz);
+      const LEN = 3.6, off = 1.4;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 4.6, 8), new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 }));
+      post.position.set(px, gy + 2.3, pz);
+      post.castShadow = true;
+      this.scene.add(post);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshStandardMaterial({ color: 0x2c2f33, roughness: 0.5, metalness: 0.6 }));
+      knob.position.copy(pivot);
+      this.scene.add(knob);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.55, 22, 16), new THREE.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.42, metalness: 0.65 }));
+      m.castShadow = true;
+      /* displaced along the facing direction, so it hangs dead ahead of
+         the player and swings in the walk plane — walk in and meet it */
+      const bx = px + Math.sin(yaw) * off, by = pivot.y - Math.sqrt(LEN * LEN - off * off), bz = pz + Math.cos(yaw) * off;
+      m.position.set(bx, by, bz);
+      this.scene.add(m);
+      const prop = this.physics.addProp('wreckball', m, bx, by, bz);
+      this.physics.addPendulum(prop, pivot.x, pivot.y, pivot.z, LEN);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([pivot, m.position]);
+      const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x1d1d1f }));
+      this.scene.add(line);
+      this.wrecks.push({ prop, line, post, knob, pivot });
     } else if (kind === 'dominoes') {
       /* a curving run of rainbow dominoes — walk into the first one (or bomb
          the line) and watch the chain reaction snake across the grass */
@@ -303,9 +333,26 @@ export class Sandbox {
   clearProps() {
     for (const p of [...this.physics.props]) { this.scene.remove(p.mesh); this.physics.removeProp(p); }
     this.shards.length = 0;
+    for (const w of this.wrecks) { this.scene.remove(w.line); this.scene.remove(w.post); this.scene.remove(w.knob); }
+    this.wrecks.length = 0;
   }
 
   render(dt) {
+    /* wrecking-ball ropes follow their balls; prune rigs whose ball was
+       removed (cleared or cap-evicted) so no orphan posts/lines remain */
+    for (let i = this.wrecks.length - 1; i >= 0; i--) {
+      const w = this.wrecks[i];
+      if (!this.physics.props.includes(w.prop)) {
+        this.scene.remove(w.line); this.scene.remove(w.post); this.scene.remove(w.knob);
+        this.wrecks.splice(i, 1);
+        continue;
+      }
+      const bp = w.prop.mesh.position;
+      const attr = w.line.geometry.attributes.position;
+      attr.setXYZ(0, w.pivot.x, w.pivot.y, w.pivot.z);
+      attr.setXYZ(1, bp.x, bp.y, bp.z);
+      attr.needsUpdate = true;
+    }
     /* crate debris ages out: shrink over the last second, then remove */
     for (let i = this.shards.length - 1; i >= 0; i--) {
       const s = this.shards[i];
