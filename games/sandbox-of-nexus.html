@@ -57,7 +57,8 @@
     <label for="nxTime">☀️ Time</label>
     <input type="range" id="nxTime" min="0" max="24" step="0.1" value="10.5">
     <button id="nxCycle">🕐 Cycle: off</button>
-    <button id="nxRain">🌧 Rain: off</button>
+    <button id="nxRain">🌦 Weather: Auto</button>
+    <button id="nxStorm">⛈ Summon storm</button>
     <button id="nxSound">🔊 Sound: on</button>
     <button id="nxSettingsBtn">⚙ Settings</button>
   </div>
@@ -74,11 +75,13 @@
   </label><br>
   <label>Shadows <input type="checkbox" id="nxShadows" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
   <label>Bloom glow <input type="checkbox" id="nxBloom" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
+  <label>Ambient occlusion <input type="checkbox" id="nxAO" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
+  <label>Film grade <input type="checkbox" id="nxFilm" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
   <div style="color:#9fc4e8; font-size:.68rem; line-height:1.45;">The auto-governor also eases quality live<br>if the frame rate dips — it never touches gameplay.</div>
 </div>
 
 <button id="nxJump" style="display:none; position:fixed; right:16px; bottom:120px; z-index:10; width:64px; height:64px; border-radius:50%; background:#101d2bcc; color:#ffd94d; border:2px solid #ffd94d; font-size:1.4rem;">⬆</button>
-<div class="hint">WASD move · drag mouse to orbit · wheel zoom · SHIFT sprint · SPACE jump<br>Keys 1–8 spawn toys · R rain · Props are real physics — stack them, knock them down.<br>Touch: left thumb moves, right thumb looks.</div>
+<div class="hint">WASD move · drag mouse to orbit · wheel zoom · SHIFT sprint · SPACE jump<br>Keys 1–8 spawn toys · R rain · T summon a storm front · The weather lives its own life — watch for storms.<br>Touch: left thumb moves, right thumb looks.</div>
 
 <div id="nxLoading">
   <div class="t">🏝 SANDBOX OF NEXUS</div>
