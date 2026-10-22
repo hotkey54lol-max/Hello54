@@ -78,7 +78,7 @@ export async function boot() {
   const clearBtn = document.getElementById('nxClear');
   if (clearBtn) clearBtn.addEventListener('click', () => sandbox.clearProps());
   window.addEventListener('keydown', e => {
-    const map = { Digit1: 'crate', Digit2: 'ball', Digit3: 'barrel', Digit4: 'plank', Digit5: 'tower', Digit6: 'bomb' };
+    const map = { Digit1: 'crate', Digit2: 'ball', Digit3: 'barrel', Digit4: 'plank', Digit5: 'tower', Digit6: 'bomb', Digit7: 'dominoes', Digit8: 'bigball' };
     if (map[e.code]) sandbox.spawn(map[e.code]);
     if (e.code === 'KeyR') sandbox.setRain(!sandbox.raining);
     if (e.code === 'KeyH') document.body.classList.toggle('ui-hidden');
@@ -160,6 +160,15 @@ export async function boot() {
     press: (code, down) => { input.keys[code] = !!down; },
     peers: () => net.peerCount,
     online: () => net.online,
+    tilts: () => physics.props.filter(p => p.kind === 'domino').map(p => {
+      /* rotation SINCE spawn (dominoes stand flush on slopes, so absolute
+         tilt from identity is meaningless — movement is what counts) */
+      if (!p.spawnQuat) return 0;
+      const q = p.mesh.quaternion, s = p.spawnQuat;
+      const dot = Math.abs(q.x * s.x + q.y * s.y + q.z * s.z + q.w * s.w);
+      return Math.round(2 * Math.acos(Math.min(1, dot)) * 57.3);
+    }),
+    propsPos: () => physics.props.map(p => [p.kind, +p.mesh.position.x.toFixed(1), +p.mesh.position.z.toFixed(1)]),
     debugGhost: () => {
       const p = character.pos;
       net._addGhost('nx-debug1', 'DebugGhost');
