@@ -30,6 +30,12 @@ export class Net {
     this.peers = new Map(); // id -> ghost
     this.online = false;
     this._sendT = 0;
+    this.lastErr = '';
+    this.rxCount = 0;
+  }
+
+  _trap(where, fn) {
+    try { fn(); } catch (e) { if (!this.lastErr) this.lastErr = where + ': ' + (e && e.message ? e.message : e); }
   }
 
   async init() {
@@ -44,8 +50,8 @@ export class Net {
         config: { presence: { key: this.id }, broadcast: { self: false } },
       });
       this.channel = ch;
-      ch.on('presence', { event: 'sync' }, () => this._syncPresence());
-      ch.on('broadcast', { event: 'pos' }, ({ payload }) => this._onPos(payload));
+      ch.on('presence', { event: 'sync' }, () => this._trap('presence', () => this._syncPresence()));
+      ch.on('broadcast', { event: 'pos' }, ({ payload }) => this._trap('pos', () => { this.rxCount++; this._onPos(payload); }));
       await ch.subscribe(async status => {
         if (status === 'SUBSCRIBED') {
           this.online = true;
