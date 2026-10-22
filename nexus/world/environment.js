@@ -26,14 +26,14 @@ export function heightAt(x, z) {
 }
 
 const SKY_KEYS = [ // hour, top, horizon, sun, sunI, hemiI, fog
-  [0.0, 0x060a1a, 0x0d1526, 0x8fa8ff, 0.0, 0.12],
-  [5.0, 0x0a1230, 0x27354f, 0xffb37a, 0.05, 0.16],
+  [0.0, 0x0a1430, 0x1a2745, 0x8fa8ff, 0.0, 0.24],
+  [5.0, 0x0e1838, 0x2a3c5c, 0xffb37a, 0.05, 0.26],
   [7.0, 0x3f7fd0, 0xffc490, 0xffd9a8, 1.15, 0.5],
   [12.0, 0x2f7fe0, 0xbfe3f2, 0xfff2d8, 1.9, 0.85],
   [17.0, 0x3574c8, 0xffc98f, 0xffe0b0, 1.5, 0.65],
-  [19.5, 0x1c2a5e, 0xff8a4a, 0xff9a55, 0.55, 0.35],
-  [21.0, 0x070c22, 0x141f3d, 0x8fa8ff, 0.0, 0.14],
-  [24.0, 0x060a1a, 0x0d1526, 0x8fa8ff, 0.0, 0.12],
+  [19.5, 0x1c2a5e, 0xff8a4a, 0xff9a55, 0.55, 0.38],
+  [21.0, 0x0b1633, 0x1c2c4d, 0x8fa8ff, 0.0, 0.25],
+  [24.0, 0x0a1430, 0x1a2745, 0x8fa8ff, 0.0, 0.24],
 ];
 function keyLerp(h) {
   let a = SKY_KEYS[0], b = SKY_KEYS[SKY_KEYS.length - 1];
@@ -140,7 +140,7 @@ export class Environment {
       sp.set([v.x, v.y, v.z], i * 3);
     }
     starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
-    this.stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfdcff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false }));
+    this.stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfdcff, size: 2.3, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false }));
     scene.add(this.stars);
 
     /* lights */
@@ -231,13 +231,26 @@ export class Environment {
     const sunDir = new THREE.Vector3(Math.cos(ang) * 0.55, Math.sin(ang), 0.38).normalize();
     this.skyUniforms.topColor.value.copy(k.top);
     this.skyUniforms.horizonColor.value.copy(k.horizon);
-    this.skyUniforms.sunDir.value.copy(sunDir);
-    this.skyUniforms.sunColor.value.copy(k.sun);
-    this.skyUniforms.sunI.value = k.sunI > 0.1 ? 1 : 0.25;
-    this.sun.position.copy(sunDir).multiplyScalar(150);
-    this.sun.color.copy(k.sun);
-    this.sun.intensity = k.sunI;
     this.hemi.intensity = k.hemiI;
+    if (k.sunI > 0.1) {
+      this.skyUniforms.sunDir.value.copy(sunDir);
+      this.skyUniforms.sunColor.value.copy(k.sun);
+      this.skyUniforms.sunI.value = 1;
+      this.sun.position.copy(sunDir).multiplyScalar(150);
+      this.sun.color.copy(k.sun);
+      this.sun.intensity = k.sunI;
+    } else {
+      // night: the key light becomes the moon — pale, dim, still casts shadows,
+      // and the sky shader draws its disc from the same direction
+      const mAng = ((h + 6) / 12) * Math.PI;
+      const moonDir = new THREE.Vector3(Math.cos(mAng) * 0.42, Math.max(0.18, Math.sin(mAng)), 0.3).normalize();
+      this.skyUniforms.sunDir.value.copy(moonDir);
+      this.skyUniforms.sunColor.value.set(0xdce8ff);
+      this.skyUniforms.sunI.value = 0.8;
+      this.sun.position.copy(moonDir).multiplyScalar(150);
+      this.sun.color.set(0xaec6ff);
+      this.sun.intensity = 0.3;
+    }
     this.scene.fog.color.copy(k.horizon);
     this.stars.material.opacity = THREE.MathUtils.clamp(1 - k.sunI * 1.4, 0, 0.9);
     for (const c of this.clouds.children) {
