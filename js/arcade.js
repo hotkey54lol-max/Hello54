@@ -1188,7 +1188,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-21.30";
+  const ARCADE_BUILD = "2026-10-21.31";
   let _updateHandled = false;
 
   function _siteBase() {
