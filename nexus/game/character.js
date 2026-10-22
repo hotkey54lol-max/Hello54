@@ -18,8 +18,10 @@ export class Character {
     this.faceYaw = 0; // faces +Z (north), away from the spawn camera; matches movement-facing math
     this.grounded = false;
     this.camYaw = Math.PI; this.camPitch = 0.34; this.camDist = 6.5;
+    this.camLock = false; // cinematic mode: someone else drives the camera
     this._jumpPrev = false;
     this.speed2d = 0;
+    this._ip = { x: 0, y: 0, z: 0 }; // scratch: interpolated sim position
   }
 
   async init() {
@@ -102,15 +104,20 @@ export class Character {
     }
   }
 
-  _snapModel() {
-    const t = this.body.translation();
-    this.model.position.set(t.x, t.y - CAP_LIFT, t.z);
+  /* render-phase: the model rides the INTERPOLATED sim position
+     (alpha = acc/step), so the 60Hz fixed step looks smooth at any refresh */
+  _snapModel(alpha) {
+    const P = this.physics;
+    let x, y, z;
+    if (P.charPos) { P.charPos(alpha == null ? 1 : alpha, this._ip); x = this._ip.x; y = this._ip.y; z = this._ip.z; }
+    else { const t = this.body.translation(); x = t.x; y = t.y; z = t.z; }
+    this.model.position.set(x, y - CAP_LIFT, z);
     this.model.rotation.y = this.faceYaw + Math.PI; // Soldier.glb is authored facing -Z
   }
 
-  render(dt, camera) {
+  render(alpha, dt, camera) {
     if (!this.model) return;
-    this._snapModel();
+    this._snapModel(alpha);
     // animation state from speed
     const s = this.speed2d;
     if (s < 0.35) this._play('Idle');
@@ -123,18 +130,21 @@ export class Character {
     this.camYaw -= look.dx * 0.0042;
     this.camPitch = THREE.MathUtils.clamp(this.camPitch + look.dy * 0.0032, -0.12, 1.25);
     this.camDist = THREE.MathUtils.clamp(this.camDist + this.input.consumeWheel() * 0.008, 2.2, 14);
-    const t = this.body.translation();
-    const target = new THREE.Vector3(t.x, t.y - CAP_LIFT + 1.55, t.z);
+    // look + orbit targets use the interpolated model position (same frame the eye sees)
+    const ix = this.model.position.x, iy = this.model.position.y + CAP_LIFT, iz = this.model.position.z;
+    const target = new THREE.Vector3(ix, iy - CAP_LIFT + 1.55, iz);
     const cp = Math.cos(this.camPitch), sp = Math.sin(this.camPitch);
     const want = new THREE.Vector3(
-      t.x + Math.sin(this.camYaw) * cp * this.camDist,
+      ix + Math.sin(this.camYaw) * cp * this.camDist,
       target.y + sp * this.camDist,
-      t.z + Math.cos(this.camYaw) * cp * this.camDist
+      iz + Math.cos(this.camYaw) * cp * this.camDist
     );
     const groundY = heightAt(want.x, want.z) + 0.45;
     if (want.y < groundY) want.y = groundY;
-    camera.position.lerp(want, 1 - Math.pow(0.0000015, dt)); // ~frame-rate independent damping
-    camera.lookAt(target);
+    if (!this.camLock) {
+      camera.position.lerp(want, 1 - Math.pow(0.0000015, dt)); // ~frame-rate independent damping
+      camera.lookAt(target);
+    }
     this.headPos = target;
   }
 
