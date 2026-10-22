@@ -27,6 +27,7 @@ export class Sandbox {
     this.scene = scene; this.physics = physics; this.character = character; this.env = env;
     this.wood = woodTexture();
     this.bombs = [];
+    this.shards = []; // live crate debris { prop, ttl }
     this.sfx = null;
     this.lowFx = false; // governor: POTATO tier halves splash particles
     this._buildRain();
@@ -110,19 +111,45 @@ export class Sandbox {
     this.scene.add(this.burst);
   }
 
+  /* Chaos-destruction stand-in: a crate caught in the inner blast doesn't
+     fly — it SHATTERS into debris shards that scatter, settle, then fade */
+  breakCrate(prop) {
+    const t = prop.body.translation();
+    const v = prop.body.linvel();
+    this.scene.remove(prop.mesh);
+    this.physics.removeProp(prop);
+    if (!this.shardMat) this.shardMat = new THREE.MeshStandardMaterial({ map: this.wood, roughness: 0.95 });
+    const geo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+    for (let i = 0; i < 5; i++) {
+      const m = new THREE.Mesh(geo, this.shardMat);
+      m.castShadow = true;
+      const px = t.x + (Math.random() - 0.5) * 0.3, py = t.y + (Math.random() - 0.5) * 0.3, pz = t.z + (Math.random() - 0.5) * 0.3;
+      m.position.set(px, py, pz);
+      this.scene.add(m);
+      const sp = this.physics.addProp('shard', m, px, py, pz);
+      sp.body.setLinvel({ x: v.x + (Math.random() - 0.5) * 3.6, y: v.y + 2.2 + Math.random() * 2.4, z: v.z + (Math.random() - 0.5) * 3.6 }, true);
+      sp.body.setAngvel({ x: (Math.random() - 0.5) * 9, y: (Math.random() - 0.5) * 9, z: (Math.random() - 0.5) * 9 }, true);
+      this.shards.push({ prop: sp, ttl: 7 });
+    }
+    if (this.sfx) this.sfx.noiseBurst(0.22, 0.32, 750);
+  }
+
   _detonate(bomb) {
     const bp = bomb.mesh.position.clone();
     const R = 8.5;
+    const toBreak = [];
     for (const p of this.physics.props) {
       if (p === bomb.prop || p.fixed) continue;
       const t = p.body.translation();
       const d = Math.hypot(t.x - bp.x, t.y - bp.y, t.z - bp.z);
       if (d > R) continue;
+      if (p.kind === 'crate' && d < R * 0.55) { toBreak.push(p); continue; }
       const f = (1 - d / R);
       const dir = new THREE.Vector3(t.x - bp.x, (t.y - bp.y) + 1.6, t.z - bp.z).normalize();
       const imp = dir.multiplyScalar(f * 13 * p.body.mass());
       p.body.applyImpulse({ x: imp.x, y: imp.y, z: imp.z }, true);
     }
+    for (const p of toBreak) this.breakCrate(p);
     const cp = this.character.pos;
     const cd = Math.hypot(cp.x - bp.x, cp.z - bp.z);
     if (cd < 7) {
@@ -275,9 +302,21 @@ export class Sandbox {
 
   clearProps() {
     for (const p of [...this.physics.props]) { this.scene.remove(p.mesh); this.physics.removeProp(p); }
+    this.shards.length = 0;
   }
 
   render(dt) {
+    /* crate debris ages out: shrink over the last second, then remove */
+    for (let i = this.shards.length - 1; i >= 0; i--) {
+      const s = this.shards[i];
+      s.ttl -= dt;
+      if (s.ttl < 1) s.prop.mesh.scale.setScalar(Math.max(0.02, s.ttl));
+      if (s.ttl <= 0) {
+        this.scene.remove(s.prop.mesh);
+        if (this.physics.props.includes(s.prop)) this.physics.removeProp(s.prop);
+        this.shards.splice(i, 1);
+      }
+    }
     /* weather drives the rain now (the old manual toggle is a weather
        override wired in main.js): wetness fades the rain in, wind slants it.
        Effective values include any passing storm front. */
