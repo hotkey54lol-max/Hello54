@@ -47,6 +47,7 @@
     <button data-spawn="barrel">🛢 Barrel</button>
     <button data-spawn="plank">🛹 Plank</button>
     <button data-spawn="tower">🏗 Tower</button>
+    <button data-spawn="bomb">💣 Bomb</button>
     <button id="nxClear">🗑 Clear</button>
   </div>
   <div class="grp">
@@ -54,16 +55,34 @@
     <input type="range" id="nxTime" min="0" max="24" step="0.1" value="10.5">
     <button id="nxCycle">🕐 Cycle: off</button>
     <button id="nxRain">🌧 Rain: off</button>
+    <button id="nxSound">🔊 Sound: on</button>
+    <button id="nxSettingsBtn">⚙ Settings</button>
   </div>
 </div>
 
-<div class="hint">WASD move · drag mouse to orbit · wheel zoom · SHIFT sprint · SPACE jump<br>Keys 1–5 spawn toys · R rain · Props are real physics — stack them, knock them down.</div>
+<div id="nxSettings" style="display:none; position:fixed; right:12px; bottom:76px; z-index:12; background:#0a1622f2; border:1px solid #3f6ea3; border-radius:10px; padding:12px 14px; font-size:.78rem; line-height:2;">
+  <div style="color:#ffd94d; font-weight:700; letter-spacing:.08em;">⚙ NEXUS SETTINGS</div>
+  <label>Render scale
+    <select id="nxScale" style="float:right; margin-left:14px; background:#12283e; color:#eaf4ff; border:1px solid #3f6ea3; border-radius:5px; padding:2px 5px;">
+      <option value="1">100% (full)</option>
+      <option value="0.75">75%</option>
+      <option value="0.5">50%</option>
+    </select>
+  </label><br>
+  <label>Shadows <input type="checkbox" id="nxShadows" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
+  <label>Bloom glow <input type="checkbox" id="nxBloom" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
+  <div style="color:#9fc4e8; font-size:.68rem; line-height:1.45;">The auto-governor also eases quality live<br>if the frame rate dips — it never touches gameplay.</div>
+</div>
+
+<button id="nxJump" style="display:none; position:fixed; right:16px; bottom:120px; z-index:10; width:64px; height:64px; border-radius:50%; background:#101d2bcc; color:#ffd94d; border:2px solid #ffd94d; font-size:1.4rem;">⬆</button>
+<div class="hint">WASD move · drag mouse to orbit · wheel zoom · SHIFT sprint · SPACE jump<br>Keys 1–6 spawn toys · R rain · Props are real physics — stack them, knock them down.<br>Touch: left thumb moves, right thumb looks.</div>
 
 <div id="nxLoading">
   <div class="t">🏝 SANDBOX OF NEXUS</div>
   <div id="nxStatus">Booting Project Nexus…</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script type="importmap">
 {
   "imports": {
