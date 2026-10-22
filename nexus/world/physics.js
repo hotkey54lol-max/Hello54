@@ -3,8 +3,32 @@
    the module boundary keeps a worker move possible later. */
 import RAPIER from 'rapier';
 
+/* plain-object lerp helpers (physics.js stays three-free) */
+function lerp3(a, b, t, out) {
+  out.x = a.x + (b.x - a.x) * t;
+  out.y = a.y + (b.y - a.y) * t;
+  out.z = a.z + (b.z - a.z) * t;
+  return out;
+}
+/* normalized lerp of quats: exact enough for one 1/60s interval, no import needed */
+function nlerpQ(a, b, t, out) {
+  const s = (a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w) < 0 ? -1 : 1;
+  out.x = a.x + (b.x * s - a.x) * t;
+  out.y = a.y + (b.y * s - a.y) * t;
+  out.z = a.z + (b.z * s - a.z) * t;
+  out.w = a.w + (b.w * s - a.w) * t;
+  const l = Math.hypot(out.x, out.y, out.z, out.w) || 1;
+  out.x /= l; out.y /= l; out.z /= l; out.w /= l;
+  return out;
+}
+
 export class Physics {
-  constructor() { this.ready = false; this.props = []; this.preStep = null; }
+  constructor() {
+    this.ready = false; this.props = []; this.preStep = null;
+    this.charBody = null;      // kinematic character body tracked for interpolation
+    this.onSplash = null;      // (x, z, power) => {} — prop hit the water
+    this._hadSteps = false;    // any sim substeps ran this render frame
+  }
 
   async init(terrainData, scatter) {
     await RAPIER.init();
@@ -62,6 +86,10 @@ export class Physics {
       bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.01).setAngularDamping(0.05);
       if (opts.quat) bodyDesc.setRotation(opts.quat);
       colDesc = RAPIER.ColliderDesc.cuboid(0.35, 0.675, 0.13).setDensity(0.9).setFriction(0.45);
+    } else if (kind === 'shard') {
+      /* debris from a shattered crate (Chaos-destruction stand-in) */
+      bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.02).setAngularDamping(0.1);
+      colDesc = RAPIER.ColliderDesc.cuboid(0.19, 0.19, 0.19).setDensity(0.5).setFriction(0.5);
     } else if (kind === 'bigball') {
       bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.01).setAngularDamping(0.25).setCcdEnabled(true);
       colDesc = RAPIER.ColliderDesc.ball(1.35).setDensity(0.3).setRestitution(0.62).setFriction(0.4);
@@ -72,9 +100,63 @@ export class Physics {
     }
     const body = this.world.createRigidBody(bodyDesc);
     this.world.createCollider(colDesc, body);
-    const prop = { kind, mesh, body, fixed: kind === 'plank', spawnQuat: opts.quat || null };
+    const t = body.translation(), r = body.rotation();
+    const prop = {
+      kind, mesh, body, fixed: kind === 'plank', spawnQuat: opts.quat || null,
+      // render-interpolation snapshots (plain objects, preallocated — no per-step garbage)
+      prevP: { x: t.x, y: t.y, z: t.z }, curP: { x: t.x, y: t.y, z: t.z },
+      prevQ: { x: r.x, y: r.y, z: r.z, w: r.w }, curQ: { x: r.x, y: r.y, z: r.z, w: r.w },
+      _prevY: y,
+    };
     this.props.push(prop);
     return prop;
+  }
+
+  /* the character is a kinematic body driven by the controller — track it so
+     the visual model interpolates exactly like the dynamic props */
+  trackCharacter(body) {
+    this.charBody = body;
+    const t = body.translation();
+    this.charPrevP = { x: t.x, y: t.y, z: t.z };
+    this.charCurP = { x: t.x, y: t.y, z: t.z };
+  }
+
+  beginFrame() { this._hadSteps = false; }
+
+  _capturePrev() {
+    for (const p of this.props) {
+      if (p.fixed) continue;
+      const t = p.body.translation(), r = p.body.rotation();
+      p.prevP.x = t.x; p.prevP.y = t.y; p.prevP.z = t.z;
+      p.prevQ.x = r.x; p.prevQ.y = r.y; p.prevQ.z = r.z; p.prevQ.w = r.w;
+    }
+    if (this.charBody) {
+      const t = this.charBody.translation();
+      this.charPrevP.x = t.x; this.charPrevP.y = t.y; this.charPrevP.z = t.z;
+    }
+  }
+
+  _captureCur() {
+    for (const p of this.props) {
+      if (p.fixed) continue;
+      const t = p.body.translation(), r = p.body.rotation();
+      p.curP.x = t.x; p.curP.y = t.y; p.curP.z = t.z;
+      p.curQ.x = r.x; p.curQ.y = r.y; p.curQ.z = r.z; p.curQ.w = r.w;
+    }
+    if (this.charBody) {
+      const t = this.charBody.translation();
+      this.charCurP.x = t.x; this.charCurP.y = t.y; this.charCurP.z = t.z;
+    }
+  }
+
+  /* interpolated character position for this render frame; out = {x,y,z} */
+  charPos(alpha, out) {
+    if (!this.charBody || !this._hadSteps) {
+      const t = this.charBody ? this.charBody.translation() : { x: 0, y: 0, z: 0 };
+      out.x = t.x; out.y = t.y; out.z = t.z;
+      return out;
+    }
+    return lerp3(this.charPrevP, this.charCurP, alpha, out);
   }
 
   removeProp(prop) {
@@ -85,16 +167,46 @@ export class Physics {
   step(dt) {
     if (!this.ready) return;
     if (this.preStep) this.preStep(dt);
+    this._capturePrev(); // sim state before this substep
     this.world.timestep = dt;
     this.world.step();
+    this._captureCur();   // sim state after this substep
+    this._detectSplash();
+    this._hadSteps = true;
   }
 
-  syncProps() {
+  /* a prop punched through the water plane this step → splash callback */
+  _detectSplash() {
+    if (!this.onSplash) return;
     for (const p of this.props) {
       if (p.fixed) continue;
-      const t = p.body.translation(), r = p.body.rotation();
-      p.mesh.position.set(t.x, t.y, t.z);
-      p.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+      const t = p.body.translation();
+      if (p._prevY !== undefined && p._prevY > 0.3 && t.y <= 0.3) {
+        const vy = p.body.linvel().y;
+        if (vy < -1.5) this.onSplash(t.x, t.z, -vy);
+      }
+      p._prevY = t.y;
+    }
+  }
+
+  /* called from the render phase: mesh transforms are the interpolation of
+     the last two sim states (alpha = acc/step). When no substep ran this
+     frame the latest sim state is drawn as-is (no backtracking). */
+  syncProps(alpha) {
+    const tmpQ = this._tmpQ || (this._tmpQ = { x: 0, y: 0, z: 0, w: 1 });
+    for (const p of this.props) {
+      if (p.fixed) continue;
+      if (this._hadSteps) {
+        p.mesh.position.set(
+          p.prevP.x + (p.curP.x - p.prevP.x) * alpha,
+          p.prevP.y + (p.curP.y - p.prevP.y) * alpha,
+          p.prevP.z + (p.curP.z - p.prevP.z) * alpha);
+        nlerpQ(p.prevQ, p.curQ, alpha, tmpQ);
+        p.mesh.quaternion.set(tmpQ.x, tmpQ.y, tmpQ.z, tmpQ.w);
+      } else {
+        p.mesh.position.set(p.curP.x, p.curP.y, p.curP.z);
+        p.mesh.quaternion.set(p.curQ.x, p.curQ.y, p.curQ.z, p.curQ.w);
+      }
     }
   }
 
