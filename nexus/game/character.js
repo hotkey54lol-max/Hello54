@@ -2,18 +2,18 @@
    A smooth skeletal model driven by the Rapier character controller,
    with an idle/walk/run animation state machine. */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { heightAt } from '../world/environment.js';
 
 const CAP_LIFT = 0.88; // capsule centre height above the feet
 
 export class Character {
-  constructor(scene, physics, input) {
+  constructor(scene, physics, input, gltf) {
+    this.gltf = gltf;
     this.scene = scene; this.physics = physics; this.input = input;
     this.spawn = new THREE.Vector3(0, heightAt(0, 6) + CAP_LIFT + 0.35, 6);
     this.vel = new THREE.Vector3();
     this.vy = 0;
-    this.faceYaw = Math.PI;
+    this.faceYaw = 0; // faces +Z (north), away from the spawn camera; matches movement-facing math
     this.grounded = false;
     this.camYaw = Math.PI; this.camPitch = 0.34; this.camDist = 6.5;
     this._jumpPrev = false;
@@ -21,7 +21,7 @@ export class Character {
   }
 
   async init() {
-    const gltf = await new GLTFLoader().loadAsync(new URL('../assets/models/Soldier.glb', import.meta.url).href);
+    const gltf = this.gltf;
     this.model = gltf.scene;
     this.model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = true; } });
     this.scene.add(this.model);
