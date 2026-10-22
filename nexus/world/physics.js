@@ -86,6 +86,10 @@ export class Physics {
       bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.01).setAngularDamping(0.05);
       if (opts.quat) bodyDesc.setRotation(opts.quat);
       colDesc = RAPIER.ColliderDesc.cuboid(0.35, 0.675, 0.13).setDensity(0.9).setFriction(0.45);
+    } else if (kind === 'wreckball') {
+      /* heavy pendulum ball — density way up so it bulldozes props */
+      bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.01).setAngularDamping(0.05).setCcdEnabled(true);
+      colDesc = RAPIER.ColliderDesc.ball(0.55).setDensity(6).setFriction(0.4).setRestitution(0.1);
     } else if (kind === 'shard') {
       /* debris from a shattered crate (Chaos-destruction stand-in) */
       bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.02).setAngularDamping(0.1);
@@ -159,7 +163,19 @@ export class Physics {
     return lerp3(this.charPrevP, this.charCurP, alpha, out);
   }
 
+  /* pin a prop to a fixed pivot with a spherical joint — a pendulum.
+     The prop-local anchor sits `len` above its centre, so the centre
+     hangs `len` below the pivot and swings freely. */
+  addPendulum(prop, px, py, pz, len) {
+    const anchor = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(px, py, pz));
+    const data = RAPIER.JointData.spherical({ x: 0, y: 0, z: 0 }, { x: 0, y: len, z: 0 });
+    prop.joint = this.world.createImpulseJoint(data, anchor, prop.body, true);
+    prop.anchorBody = anchor;
+  }
+
   removeProp(prop) {
+    if (prop.joint) { this.world.removeImpulseJoint(prop.joint); prop.joint = null; }
+    if (prop.anchorBody) { this.world.removeRigidBody(prop.anchorBody); prop.anchorBody = null; }
     this.world.removeRigidBody(prop.body);
     this.props.splice(this.props.indexOf(prop), 1);
   }
