@@ -69,7 +69,16 @@ export class Net {
 
   _addGhost(id, name) {
     const model = skeletonClone(this.gltf.scene);
-    model.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    // per-peer tint so ghosts are distinguishable (palette by id hash)
+    const palette = [0xff9d7a, 0x7ac2ff, 0xa8ff9e, 0xffe27a, 0xd8a2ff, 0x7affdd];
+    let hsum = 0; for (const ch of id) hsum += ch.charCodeAt(0);
+    const tint = new THREE.Color(palette[hsum % palette.length]);
+    model.traverse(o => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        if (o.material && o.material.map) { o.material = o.material.clone(); o.material.color.copy(tint); }
+      }
+    });
     model.add(nameSprite(name));
     this.scene.add(model);
     const mixer = new THREE.AnimationMixer(model);
