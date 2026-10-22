@@ -150,6 +150,53 @@ export class Sandbox {
       this.bombs.push({ prop, mesh: m, t: 1.7 });
     } else if (kind === 'tower') {
       for (let i = 0; i < 5; i++) setTimeout(() => this.spawn('crate'), i * 130);
+    } else if (kind === 'bigball') {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1.35, 30, 22), new THREE.MeshStandardMaterial({ color: 0xffd23e, roughness: 0.32, metalness: 0.05 }));
+      m.castShadow = true;
+      m.position.set(f.x, heightAt(f.x, f.z) + 3.4, f.z);
+      this.scene.add(m);
+      this.physics.addProp('bigball', m, f.x, m.position.y, f.z);
+    } else if (kind === 'dominoes') {
+      /* a curving run of rainbow dominoes — walk into the first one (or bomb
+         the line) and watch the chain reaction snake across the grass */
+      const N = 14, GAP = 0.55;
+      while (this.physics.props.length + N > MAX_PROPS) {
+        const old = this.physics.props.find(p => !p.fixed && p.kind !== 'bomb');
+        if (!old) break;
+        this.scene.remove(old.mesh); this.physics.removeProp(old);
+      }
+      const yaw0 = this.character.faceYaw;
+      const dir = new THREE.Vector3(Math.sin(yaw0), 0, Math.cos(yaw0));
+      const perp = new THREE.Vector3(dir.z, 0, -dir.x);
+      const sx = f.x + dir.x * 1.4, sz = f.z + dir.z * 1.4;
+      const geo = new THREE.BoxGeometry(0.7, 1.35, 0.26);
+      const cA = new THREE.Color(0xff4757), cB = new THREE.Color(0x3742fa);
+      for (let i = 0; i < N; i++) {
+        const t = i * GAP;
+        const lat = Math.sin(t * 0.55) * 1.15;              // S-curve sideways offset
+        const dLat = Math.cos(t * 0.55) * 1.15 * 0.55;      // its slope → tangent
+        const px = sx + dir.x * t + perp.x * lat;
+        const pz = sz + dir.z * t + perp.z * lat;
+        const tx = dir.x + perp.x * dLat, tz = dir.z + perp.z * dLat;
+        const yaw = Math.atan2(tx, tz);
+        const col = cA.clone().lerp(cB, i / (N - 1));
+        const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }));
+        m.castShadow = m.receiveShadow = true;
+        const gy = heightAt(px, pz);
+        m.position.set(px, gy + 0.69, pz);
+        /* stand the base flush with the terrain: align the domino's up axis
+           to the ground normal (sampled from the same heightAt the physics
+           terrain uses) so runs stay standing on slopes */
+        const e = 0.35;
+        const n = new THREE.Vector3(
+          -(heightAt(px + e, pz) - heightAt(px - e, pz)) / (2 * e), 1,
+          -(heightAt(px, pz + e) - heightAt(px, pz - e)) / (2 * e)).normalize();
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n)
+          .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)));
+        m.quaternion.copy(q);
+        this.scene.add(m);
+        this.physics.addProp('domino', m, px, gy + 0.69, pz, { quat: { x: q.x, y: q.y, z: q.z, w: q.w } });
+      }
     }
     if (this.sfx && kind !== 'tower') this.sfx.spawnPop();
   }
