@@ -58,6 +58,13 @@ export class Physics {
     } else if (kind === 'barrel') {
       bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.05).setAngularDamping(0.3);
       colDesc = RAPIER.ColliderDesc.cylinder(0.75, 0.48).setDensity(0.6).setFriction(0.6);
+    } else if (kind === 'domino') {
+      bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.01).setAngularDamping(0.05);
+      if (opts.quat) bodyDesc.setRotation(opts.quat);
+      colDesc = RAPIER.ColliderDesc.cuboid(0.35, 0.675, 0.13).setDensity(0.9).setFriction(0.45);
+    } else if (kind === 'bigball') {
+      bodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z).setLinearDamping(0.01).setAngularDamping(0.25).setCcdEnabled(true);
+      colDesc = RAPIER.ColliderDesc.ball(1.35).setDensity(0.3).setRestitution(0.62).setFriction(0.4);
     } else { // plank ramp: fixed architecture; caller supplies the exact quaternion (yaw+tilt) used by the mesh
       bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z);
       if (opts.quat) bodyDesc.setRotation(opts.quat);
@@ -65,7 +72,7 @@ export class Physics {
     }
     const body = this.world.createRigidBody(bodyDesc);
     this.world.createCollider(colDesc, body);
-    const prop = { kind, mesh, body, fixed: kind === 'plank' };
+    const prop = { kind, mesh, body, fixed: kind === 'plank', spawnQuat: opts.quat || null };
     this.props.push(prop);
     return prop;
   }
