@@ -26,7 +26,65 @@ export class Sandbox {
   constructor(scene, physics, character, env) {
     this.scene = scene; this.physics = physics; this.character = character; this.env = env;
     this.wood = woodTexture();
+    this.bombs = [];
+    this.sfx = null;
     this._buildRain();
+    this._buildExplosionFx();
+  }
+
+  _buildExplosionFx() {
+    this.flash = new THREE.PointLight(0xffa050, 0, 26, 1.6);
+    this.scene.add(this.flash);
+    const N = 260;
+    const pos = new Float32Array(N * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.burst = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffb060, size: 0.22, transparent: true, opacity: 0, depthWrite: false }));
+    this.burst.visible = false;
+    this.burstVel = new Float32Array(N * 3);
+    this.burstT = -1;
+    this.scene.add(this.burst);
+  }
+
+  _detonate(bomb) {
+    const bp = bomb.mesh.position.clone();
+    const R = 8.5;
+    for (const p of this.physics.props) {
+      if (p === bomb.prop || p.fixed) continue;
+      const t = p.body.translation();
+      const d = Math.hypot(t.x - bp.x, t.y - bp.y, t.z - bp.z);
+      if (d > R) continue;
+      const f = (1 - d / R);
+      const dir = new THREE.Vector3(t.x - bp.x, (t.y - bp.y) + 1.6, t.z - bp.z).normalize();
+      const imp = dir.multiplyScalar(f * 13 * p.body.mass());
+      p.body.applyImpulse({ x: imp.x, y: imp.y, z: imp.z }, true);
+    }
+    const cp = this.character.pos;
+    const cd = Math.hypot(cp.x - bp.x, cp.z - bp.z);
+    if (cd < 7) {
+      const f = 1 - cd / 7;
+      const dir = new THREE.Vector3(cp.x - bp.x, 0, cp.z - bp.z).normalize();
+      this.character.vel.x += dir.x * f * 11;
+      this.character.vel.z += dir.z * f * 11;
+      this.character.vy = Math.max(this.character.vy, f * 8);
+    }
+    this.flash.position.copy(bp).y += 1;
+    this.flash.intensity = 260;
+    const posAttr = this.burst.geometry.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      posAttr.setXYZ(i, bp.x, bp.y + 0.4, bp.z);
+      const v = new THREE.Vector3().randomDirection().multiplyScalar(3 + Math.random() * 9);
+      v.y = Math.abs(v.y) * 1.1 + 2;
+      this.burstVel.set([v.x, v.y, v.z], i * 3);
+    }
+    posAttr.needsUpdate = true;
+    this.burst.visible = true;
+    this.burst.material.opacity = 0.95;
+    this.burstT = 0;
+    if (this.sfx) this.sfx.boom();
+    this.scene.remove(bomb.mesh);
+    this.physics.removeProp(bomb.prop);
+    this.bombs.splice(this.bombs.indexOf(bomb), 1);
   }
 
   _buildRain() {
@@ -51,7 +109,7 @@ export class Sandbox {
 
   spawn(kind) {
     if (this.physics.props.length >= MAX_PROPS && kind !== 'plank') {
-      const old = this.physics.props.find(p => !p.fixed);
+      const old = this.physics.props.find(p => !p.fixed && p.kind !== 'bomb');
       if (old) { this.scene.remove(old.mesh); this.physics.removeProp(old); }
     }
     const f = this._front();
@@ -83,9 +141,17 @@ export class Sandbox {
       m.quaternion.copy(q);
       this.scene.add(m);
       this.physics.addProp('plank', m, f.x, gy + 1.45, f.z, { quat: { x: q.x, y: q.y, z: q.z, w: q.w } });
+    } else if (kind === 'bomb') {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.55, 22, 16), new THREE.MeshStandardMaterial({ color: 0x23272e, roughness: 0.35, metalness: 0.65, emissive: 0xff2a18, emissiveIntensity: 0.4 }));
+      m.castShadow = true;
+      m.position.set(f.x, heightAt(f.x, f.z) + 2.2, f.z);
+      this.scene.add(m);
+      const prop = this.physics.addProp('bomb', m, f.x, m.position.y, f.z);
+      this.bombs.push({ prop, mesh: m, t: 1.7 });
     } else if (kind === 'tower') {
       for (let i = 0; i < 5; i++) setTimeout(() => this.spawn('crate'), i * 130);
     }
+    if (this.sfx && kind !== 'tower') this.sfx.spawnPop();
   }
 
   clearProps() {
@@ -93,6 +159,25 @@ export class Sandbox {
   }
 
   render(dt) {
+    // bomb fuses + explosion fx
+    for (const b of [...this.bombs]) {
+      b.t -= dt;
+      b.mesh.material.emissiveIntensity = 0.4 + Math.max(0, 1.7 - b.t) * (Math.sin(performance.now() / 55) * 0.5 + 0.9);
+      if (b.t <= 0) this._detonate(b);
+    }
+    if (this.flash.intensity > 0) this.flash.intensity = Math.max(0, this.flash.intensity - dt * 900);
+    if (this.burstT >= 0) {
+      this.burstT += dt;
+      const posAttr = this.burst.geometry.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const vx = this.burstVel[i * 3], vy = this.burstVel[i * 3 + 1] - 12 * dt, vz = this.burstVel[i * 3 + 2];
+        this.burstVel[i * 3 + 1] = vy;
+        posAttr.setXYZ(i, posAttr.getX(i) + vx * dt, posAttr.getY(i) + vy * dt, posAttr.getZ(i) + vz * dt);
+      }
+      posAttr.needsUpdate = true;
+      this.burst.material.opacity = Math.max(0, 0.95 - this.burstT * 1.1);
+      if (this.burstT > 0.95) { this.burstT = -1; this.burst.visible = false; }
+    }
     if (this.raining && this.character.headPos) {
       const posAttr = this.rain.geometry.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
