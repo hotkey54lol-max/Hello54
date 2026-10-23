@@ -147,6 +147,45 @@
     </div>
 
     <div class="card">
+      <h2>* PLAN DATES</h2>
+      <div id="pdList"><p class="sub" style="text-align:left">loading…</p></div>
+      <div style="border-top:2px solid #fff;margin-top:10px;padding-top:10px">
+        <input type="text" id="pdName" placeholder="name (e.g. Halloween)" maxlength="60">
+        <input type="text" id="pdEmoji" placeholder="emoji 🎃" maxlength="4" style="margin-top:8px">
+        <select id="pdWhen" style="margin-top:8px;width:100%;padding:8px;background:#000;color:#fff;border:2px solid #fff;font-family:inherit">
+          <option value="fixed">on a fixed date…</option>
+          <option value="last_mon_may">last Monday in May (Memorial Day)</option>
+          <option value="fourth_thu_nov">fourth Thursday in Nov (Thanksgiving)</option>
+        </select>
+        <div id="pdFixedRow" style="display:flex;gap:8px;margin-top:8px">
+          <input type="number" id="pdMonth" placeholder="month 1-12" min="1" max="12">
+          <input type="number" id="pdDay" placeholder="day 1-31" min="1" max="31">
+        </div>
+        <input type="text" id="pdBanner" placeholder="banner text (optional)" maxlength="140" style="margin-top:8px">
+        <select id="pdEffect" style="margin-top:8px;width:100%;padding:8px;background:#000;color:#fff;border:2px solid #fff;font-family:inherit">
+          <option value="">effect: none</option>
+          <option value="spooky">👻 spooky</option>
+          <option value="snow">❄️ snow</option>
+          <option value="party">🎉 party</option>
+          <option value="confetti">🎊 confetti</option>
+          <option value="disco">🪩 disco</option>
+          <option value="matrix">🟢 matrix</option>
+          <option value="fog">🌫 fog</option>
+          <option value="shake">📳 shake</option>
+          <option value="invert">🔄 invert</option>
+          <option value="flashbang">💥 flashbang</option>
+        </select>
+        <div style="margin-top:10px;text-align:left;font-size:10px;line-height:2">
+          <label><input type="checkbox" id="pdChat"> 💬 chat ON that day</label><br>
+          <label><input type="checkbox" id="pdGuide"> 🤖 guide ON that day</label><br>
+          <label><input type="checkbox" id="pdStory"> 📖 storyteller ON that day</label>
+        </div>
+        <button class="cyan" id="pdAdd" style="margin-top:10px">➕ add plan date</button>
+        <p class="sub" style="margin:10px 0 0">one-day events, yearly, in the visitor's local time. setting flips switch back the next day</p>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>* PERMANENT</h2>
       <p class="sub" style="text-align:left;margin:0 0 10px">* background &amp; title survive refresh. every visitor sees them.</p>
       <input type="file" id="bgFile" accept="image/*">
@@ -313,6 +352,7 @@
     refreshStoryToggle();
     refreshAiToggle();
     setInterval(refreshAiToggle, 5000);
+    refreshPdList();
     setInterval(refreshStoryToggle, 5000);
     refreshBgToggle();
     setInterval(refreshBgToggle, 5000);
@@ -424,6 +464,62 @@
         toast(ok ? ("🤖 guide " + (!on ? "enabled" : "disabled")) : "failed — offline?");
         refreshAiToggle();
       });
+    });
+  });
+  function pdDateLabel(ev) {
+    if (ev.rule === "last_mon_may") return "last Monday in May";
+    if (ev.rule === "fourth_thu_nov") return "fourth Thursday in Nov";
+    return "month " + ev.month + " / day " + ev.day;
+  }
+  function refreshPdList() {
+    Arcade.plandates.list().then(function (rows) {
+      var box = document.getElementById("pdList");
+      box.innerHTML = "";
+      if (!rows.length) { box.innerHTML = '<p class="sub" style="text-align:left">no plan dates loaded</p>'; return; }
+      rows.forEach(function (ev) {
+        var row = document.createElement("div");
+        row.setAttribute("style", "display:flex;gap:8px;align-items:center;margin-top:6px;text-align:left");
+        var label = document.createElement("span");
+        label.textContent = (ev.emoji || "📅") + " " + ev.name + " — " + pdDateLabel(ev);
+        label.setAttribute("style", "flex:1;font-size:10px;line-height:1.7");
+        var tgl = document.createElement("button");
+        tgl.textContent = ev.active === false ? "OFF" : "ON";
+        tgl.className = "cyan";
+        tgl.setAttribute("style", "width:auto;margin:0");
+        tgl.addEventListener("click", function () {
+          Arcade.plandates.setActive(ev.id, ev.active === false).then(function (ok) { toast(ok ? "📅 updated" : "failed — offline?"); refreshPdList(); });
+        });
+        var del = document.createElement("button");
+        del.textContent = "✕";
+        del.setAttribute("style", "width:auto;margin:0");
+        del.addEventListener("click", function () {
+          if (!window.confirm("Delete plan date '" + ev.name + "'?")) return;
+          Arcade.plandates.remove(ev.id).then(function (ok) { toast(ok ? "📅 deleted" : "failed — offline?"); refreshPdList(); });
+        });
+        row.appendChild(label); row.appendChild(tgl); row.appendChild(del);
+        box.appendChild(row);
+      });
+    });
+  }
+  document.getElementById("pdWhen").addEventListener("change", function () {
+    document.getElementById("pdFixedRow").style.display = this.value === "fixed" ? "flex" : "none";
+  });
+  document.getElementById("pdAdd").addEventListener("click", function () {
+    var name = document.getElementById("pdName").value.trim();
+    if (!name) { toast("give it a name first"); return; }
+    var when = document.getElementById("pdWhen").value;
+    var ev = { name: name, emoji: document.getElementById("pdEmoji").value.trim(), banner: document.getElementById("pdBanner").value.trim() || null, effect: document.getElementById("pdEffect").value || null, settings: {}, active: true };
+    if (when === "fixed") {
+      ev.month = Number(document.getElementById("pdMonth").value);
+      ev.day = Number(document.getElementById("pdDay").value);
+      if (!(ev.month >= 1 && ev.month <= 12 && ev.day >= 1 && ev.day <= 31)) { toast("fixed dates need month 1-12 + day 1-31"); return; }
+    } else { ev.rule = when; }
+    if (document.getElementById("pdChat").checked) ev.settings.chat_enabled = "true";
+    if (document.getElementById("pdGuide").checked) ev.settings.ai_enabled = "true";
+    if (document.getElementById("pdStory").checked) ev.settings.storyteller_enabled = "true";
+    Arcade.plandates.add(ev).then(function (ok) {
+      toast(ok ? "📅 plan date added" : "failed — offline?");
+      if (ok) refreshPdList();
     });
   });
 

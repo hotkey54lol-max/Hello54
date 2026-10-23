@@ -1219,6 +1219,115 @@ window.Arcade = (function () {
     else _aiStartWatch();
   }
 
+  /* ================= Plan Dates (scheduled events) =================
+   * Yearly one-day events loaded from the admin panel (scheduled_events
+   * table). On the day, the arcade celebrates by itself: banner + effect
+   * on page load, plus any admin-power setting flips the event carries
+   * (chat_enabled / ai_enabled / storyteller_enabled) — applied when the
+   * day starts, reverted when it ends, tracked by a state marker in
+   * site_settings (plandate_state) that remembers prior values. Dates
+   * match in the VISITOR's local time. Rules: 'last_mon_may',
+   * 'fourth_thu_nov'; anything else matches on month/day.
+   */
+  const PD_URL = SUPABASE_URL + "/rest/v1/scheduled_events";
+  const PD_STATE_KEY = "plandate_state";
+  let _pdCache = null, _pdCacheAt = 0, _pdShownYmd = "", _pdBusy = false, _pdStarted = false;
+
+  async function pdList() {
+    try {
+      const r = await fetch(PD_URL + "?select=*&order=id.asc", { headers: baseHeaders() });
+      if (!r.ok) return [];
+      const rows = await r.json();
+      return Array.isArray(rows) ? rows : [];
+    } catch (e) { return []; }
+  }
+  async function _pdActiveList() {
+    const now = Date.now();
+    if (_pdCache && now - _pdCacheAt < 300000) return _pdCache;
+    const rows = await pdList();
+    _pdCache = rows.filter(function (r) { return r.active !== false; });
+    _pdCacheAt = now;
+    return _pdCache;
+  }
+  async function pdAdd(ev) {
+    try {
+      const r = await fetch(PD_URL, { method: "POST", headers: Object.assign(baseHeaders(), { Prefer: "return=minimal" }), body: JSON.stringify(ev) });
+      return r.ok;
+    } catch (e) { return false; }
+  }
+  async function pdRemove(id) {
+    try {
+      const r = await fetch(PD_URL + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: baseHeaders() });
+      return r.ok;
+    } catch (e) { return false; }
+  }
+  async function pdSetActive(id, on) {
+    try {
+      const r = await fetch(PD_URL + "?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: Object.assign(baseHeaders(), { Prefer: "return=minimal" }), body: JSON.stringify({ active: !!on }) });
+      return r.ok;
+    } catch (e) { return false; }
+  }
+
+  function _pdYmd(d) { return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+  function _pdMatches(ev, d) {
+    const m = d.getMonth() + 1, day = d.getDate();
+    if (ev.rule === "last_mon_may") return m === 5 && d.getDay() === 1 && day + 7 > 31;
+    if (ev.rule === "fourth_thu_nov") return m === 11 && d.getDay() === 4 && Math.ceil(day / 7) === 4;
+    return Number(ev.month) === m && Number(ev.day) === day;
+  }
+
+  async function _pdRevert(state) {
+    if (!state || !state.prev) return;
+    for (const k of Object.keys(state.prev)) {
+      const v = state.prev[k];
+      await setSetting(k, v == null ? "" : v);
+    }
+  }
+
+  async function _pdTick() {
+    if (_pdBusy || window.ARCADE_NO_PLANDATES) return;
+    _pdBusy = true;
+    try {
+      const now = new Date();
+      const ymd = _pdYmd(now);
+      const events = await _pdActiveList();
+      let today = null;
+      for (let i = 0; i < events.length; i++) { if (_pdMatches(events[i], now)) { today = events[i]; break; } }
+      let state = null;
+      try { state = JSON.parse((await getSetting(PD_STATE_KEY)) || "null"); } catch (e) { state = null; }
+
+      if (today && (!state || state.id !== today.id || state.ymd !== ymd)) {
+        if (state) await _pdRevert(state);
+        const prev = {};
+        const settings = today.settings || {};
+        for (const k of Object.keys(settings)) prev[k] = await getSetting(k);
+        for (const k of Object.keys(settings)) await setSetting(k, String(settings[k]));
+        await setSetting(PD_STATE_KEY, JSON.stringify({ id: today.id, ymd: ymd, prev: prev }));
+      } else if (!today && state) {
+        await _pdRevert(state);
+        await setSetting(PD_STATE_KEY, "");
+      }
+
+      if (today && _pdShownYmd !== ymd) {
+        _pdShownYmd = ymd;
+        if (today.banner) applyEvent("banner", today.banner);
+        if (today.effect) setTimeout(function () { applyEvent(today.effect); }, 1200);
+      }
+    } catch (e) { /* silent */ }
+    _pdBusy = false;
+  }
+
+  function _pdStart() {
+    if (_pdStarted) return;
+    _pdStarted = true;
+    _pdTick();
+    setInterval(_pdTick, 60000);
+  }
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", _pdStart);
+    else _pdStart();
+  }
+
   /* ================= Fullscreen button (action games) =================
    * The 10 action games get a small ⛶ button (top-right) that toggles
    * document fullscreen. Pure client-side; games keep their own
@@ -1453,7 +1562,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-22.46";
+  const ARCADE_BUILD = "2026-10-22.47";
   let _updateHandled = false;
 
   function _siteBase() {
@@ -1539,6 +1648,12 @@ window.Arcade = (function () {
     ai: {
       enabled: getAiEnabled,
       setEnabled: setAiEnabled,
+    },
+    plandates: {
+      list: pdList,
+      add: pdAdd,
+      remove: pdRemove,
+      setActive: pdSetActive,
     },
     settings: settingsApi,
     checkAdmin: checkAdminPassword,
