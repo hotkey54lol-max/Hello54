@@ -980,13 +980,14 @@ window.Arcade = (function () {
     "- Sandbox Of Nexus: playground for the Project Nexus engine — spawn physics toys, dominoes, a wrecking ball, weather and storm fronts, time control, an NPC bot, cinematic camera. Multiplayer hangout.",
     "- Demolition Day: 3 timed Nexus physics challenges — Tower Topple, Domino Day, Blast Off — earn stars, per-challenge leaderboards.",
     "- Red Light, Green Legs: you only WATCH. Four spider-bots (Oliver red, Aria yellow, Sophia green, Albert blue) with real physics bodies teach themselves to walk via evolution — moving on red sends them back to the start, first to the finish (120 m) wins the race, a giant TV on the wall runs the 2-minute clock; if it hits zero, everybody loses. Brains save per device; hopeless spiders get a factory reset.",
+    "- Lua Lab: NOT on the game grid — reached through the 🌙 LUA tab on the hub, which swaps the whole page to just the Lab (a 'back to normal page' tab returns). Visitors write REAL Lua in a strict sandbox — print, a draw API for a canvas, input(), on_tick/on_key, mouse — no files, no internet, the Lua cannot touch the arcade. Every run with ZERO errors (or 2 seconds clean with on_tick) banks +400 points; points accumulate and the total is the leaderboard score.",
     "- The Experience: not a game — a listening room with a visualizer. Built-in tracks plus visitor-volunteered songs (submit an MP3 up to 8 MB; the admin approves the good ones and they become built-in for everyone).",
     "- Classics, all with cloud leaderboards: Snake, 2048, Minesweeper, Tetris, Pong, Breakout, Memory, Tic-Tac-Toe (vs the arcade bot — it thinks 1.5–3.5 s per move on purpose), Flappy, Asteroids, Simon Says, Whack-a-Mole, Dodge, Reaction Test, Guess the Number, Rock Paper Scissors, Hangman, 15-Puzzle, Connect Four, and Tic-Tac-Toe Online (room codes, play a friend).",
     "SITE FEATURES: every game posts scores to global leaderboards; there's a live chat (bottom-left bubble, when enabled) which sometimes hosts a tiny storyteller AI; action games have a fullscreen button (top-right); scores sync to the cloud when online; your player name is set on the hub.",
     "ALSO BY JOSLYN: TinyGPT (tinygpthasahome.surge.sh) — a tiny language model in the browser whose 'chaos mode' permanently absorbs visitor prompts and retrains itself on them.",
   ].join("\n");
 
-  const AI_GAME_TITLES = { "fear-toxin": "Fear Toxin", "sandbox-of-nexus": "Sandbox Of Nexus", "dd-tower": "Demolition Day: Tower Topple", "dd-dominoes": "Demolition Day: Domino Day", "dd-blast": "Demolition Day: Blast Off", "red-light-green-legs": "Red Light, Green Legs", "snake": "Snake", "2048": "2048", "minesweeper": "Minesweeper", "tetris": "Tetris", "pong": "Pong", "breakout": "Breakout", "memory": "Memory", "tictactoe": "Tic-Tac-Toe", "flappy": "Flappy", "asteroids": "Asteroids", "simon": "Simon Says", "whackamole": "Whack-a-Mole", "dodge": "Dodge", "reaction": "Reaction Test", "guessnumber": "Guess the Number", "rps": "Rock Paper Scissors", "hangman": "Hangman", "slidepuzzle": "15-Puzzle", "connectfour": "Connect Four", "mp-tictactoe": "Tic-Tac-Toe Online" };
+  const AI_GAME_TITLES = { "fear-toxin": "Fear Toxin", "sandbox-of-nexus": "Sandbox Of Nexus", "dd-tower": "Demolition Day: Tower Topple", "dd-dominoes": "Demolition Day: Domino Day", "dd-blast": "Demolition Day: Blast Off", "red-light-green-legs": "Red Light, Green Legs", "snake": "Snake", "2048": "2048", "minesweeper": "Minesweeper", "tetris": "Tetris", "pong": "Pong", "breakout": "Breakout", "memory": "Memory", "tictactoe": "Tic-Tac-Toe", "flappy": "Flappy", "asteroids": "Asteroids", "simon": "Simon Says", "whackamole": "Whack-a-Mole", "dodge": "Dodge", "reaction": "Reaction Test", "guessnumber": "Guess the Number", "rps": "Rock Paper Scissors", "hangman": "Hangman", "slidepuzzle": "15-Puzzle", "connectfour": "Connect Four", "mp-tictactoe": "Tic-Tac-Toe Online", "lua-lab": "Lua Lab" };
 
   let _aiLiveCache = null;
   async function _aiLiveData() {
@@ -1337,7 +1338,7 @@ window.Arcade = (function () {
    */
   var FS_GAMES = ["fear-toxin.html", "snake.html", "tetris.html", "pong.html",
     "breakout.html", "flappy.html", "asteroids.html", "dodge.html",
-    "whackamole.html", "reaction.html", "sandbox-of-nexus.html", "demolition-day.html", "the-experience.html", "red-light-green-legs.html"];
+    "whackamole.html", "reaction.html", "sandbox-of-nexus.html", "demolition-day.html", "the-experience.html", "red-light-green-legs.html", "lua-lab.html"];
   var _fsBtn = null, _fsStarted = false;
 
   function _fsActive() {
@@ -1562,7 +1563,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-22.47";
+  const ARCADE_BUILD = "2026-10-23.48";
   let _updateHandled = false;
 
   function _siteBase() {

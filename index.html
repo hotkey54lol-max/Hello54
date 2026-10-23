@@ -134,6 +134,12 @@
   .leaders .who { color: var(--ut-yellow); }
   .leaders .pts { color: var(--ut-yellow); }
   footer { text-align: center; color: var(--ut-gray); font-size: 9px; padding-bottom: 24px; line-height: 1.8; }
+  .tabs { max-width: 900px; margin: 14px auto 0; display: flex; gap: 8px; padding: 0 12px; }
+  .tabs button { flex: 1; background: #000; border: 3px solid var(--ut-white); color: var(--ut-white);
+    font-family: "Press Start 2P", monospace; font-size: 10px; padding: 12px 6px; cursor: pointer; }
+  .tabs button.active { background: var(--ut-white); color: #000; }
+  #luaView { max-width: 1100px; margin: 14px auto 30px; padding: 0 12px; }
+  #luaFrame { width: 100%; height: calc(100vh - 190px); min-height: 600px; border: 3px solid var(--ut-white); background: #000; display: block; }
 </style>
 </head>
 <body>
@@ -142,6 +148,11 @@
   <p>* 22 games. The air is filled with determination.</p>
 </header>
 <div class="name-row">Playing as <strong id="pname">…</strong><button id="rename">change</button></div>
+
+<div class="tabs">
+  <button id="tabNormal" class="active">🏠 NORMAL PAGE</button>
+  <button id="tabLua">🌙 LUA</button>
+</div>
 
 <div class="searchbox">
   <h2>🔍 * WEB SEARCH</h2>
@@ -157,6 +168,10 @@
 <div class="leaders">
   <h2>* HALL OF FAME</h2>
   <ol id="hof"><li>loading…</li></ol>
+</div>
+
+<div id="luaView" style="display:none">
+  <iframe id="luaFrame" title="Lua Lab" loading="lazy"></iframe>
 </div>
 
 <footer>scores sync to the cloud when online · made for fun · <span id="vtag" style="opacity:.35;cursor:default">v1.0</span></footer>
@@ -293,6 +308,44 @@
       });
     }
   });
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  // 🌙 Lua tab: swap the whole hub for Lua Lab, and back (Joslyn's design).
+  var tabN = document.getElementById("tabNormal");
+  var tabL = document.getElementById("tabLua");
+  var view = document.getElementById("luaView");
+  var frame = document.getElementById("luaFrame");
+  var hubParts = [
+    document.querySelector(".searchbox"),
+    document.getElementById("grid"),
+    document.querySelector(".leaders")
+  ];
+  var inLua = false;
+  function showLua() {
+    inLua = true;
+    hubParts.forEach(function (el) { if (el) el.style.display = "none"; });
+    view.style.display = "block";
+    if (!frame.getAttribute("src")) frame.setAttribute("src", "games/lua-lab.html");
+    tabN.textContent = "← BACK TO NORMAL PAGE";
+    tabL.textContent = "🌙 LUA";
+    tabN.classList.remove("active"); tabL.classList.add("active");
+    try { history.replaceState(null, "", "#lua"); } catch (e) {}
+  }
+  function showNormal() {
+    inLua = false;
+    hubParts.forEach(function (el) { if (el) el.style.display = ""; });
+    view.style.display = "none";
+    tabN.textContent = "🏠 NORMAL PAGE";
+    tabL.textContent = "🌙 LUA";
+    tabN.classList.add("active"); tabL.classList.remove("active");
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  }
+  tabL.addEventListener("click", showLua);
+  tabN.addEventListener("click", function () { if (inLua) showNormal(); });
+  if (location.hash === "#lua") showLua();
 })();
 </script>
 </body>

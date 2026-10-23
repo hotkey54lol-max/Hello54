@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Lua Lab 🌙 — Sandbox Arcade</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #000; color: #fff; font-family: "Press Start 2P", monospace;
+         min-height: 100vh; padding: 12px; }
+  .back { display: inline-block; color: #8ef; text-decoration: none; margin: 6px 2px; font-size: .6rem; }
+  h1 { font-size: 1.15rem; margin: 8px 0 6px; color: #fff; }
+  .sub { font-size: .55rem; line-height: 1.9; color: #bbb; margin-bottom: 10px; max-width: 900px; }
+  .sub b { color: #ffe600; }
+  #hud { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 8px 0 12px;
+         font-size: .6rem; color: #ffe600; }
+  #status { color: #8f8; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+  .col { flex: 1 1 340px; min-width: 300px; }
+  textarea#code { width: 100%; min-height: 340px; background: #05050a; color: #c8ffd0;
+    border: 3px solid #fff; padding: 10px; font-family: "Courier New", monospace;
+    font-size: 14px; line-height: 1.5; resize: vertical; outline: none; }
+  canvas#stage { width: 100%; max-width: 640px; aspect-ratio: 3 / 2; background: #000;
+    border: 3px solid #fff; image-rendering: pixelated; display: block; }
+  #console { margin-top: 10px; background: #05050a; border: 3px solid #fff; padding: 10px;
+    height: 150px; overflow-y: auto; font-family: "Courier New", monospace; font-size: 13px;
+    line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  #console .err { color: #ff6b6b; }
+  #console .sys { color: #ffe600; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; align-items: center; }
+  button, select { background: #000; border: 2px solid #fff; color: #fff; cursor: pointer;
+    font-family: "Press Start 2P", monospace; font-size: .6rem; padding: 10px 12px; }
+  button:active { transform: scale(.96); }
+  #runBtn { border-color: #8f8; color: #8f8; }
+  #stopBtn { border-color: #ff6b6b; color: #ff6b6b; }
+  #inputRow { display: none; gap: 8px; margin-top: 8px; }
+  #inputRow input { flex: 1; background: #000; border: 2px solid #8ef; color: #fff;
+    padding: 9px; font-family: "Courier New", monospace; font-size: 14px; }
+  .card { border: 3px solid #fff; padding: 12px; margin-top: 14px; max-width: 900px; }
+  .card h2 { font-size: .7rem; color: #ffe600; margin-bottom: 8px; }
+  .card p, .card li { font-size: .55rem; line-height: 2; color: #ccc; }
+  .card ul { margin-left: 16px; }
+  .card code { color: #8ef; font-family: "Courier New", monospace; font-size: .7rem; }
+  #board { font-size: .6rem; line-height: 2.1; color: #fff; }
+  :fullscreen h1, :fullscreen .back, :fullscreen .sub { display: none !important; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>* LUA LAB 🌙</h1>
+<p class="sub">* a game where you <b>code in lua</b>. the lua is <b>fully real</b> — but it lives in a
+sandbox: no files, no internet, no touching the arcade. all it can do is <b>print</b>, <b>draw</b>, and play.
+finish a run with <b>0 errors = +400 points</b>. errors void the run. how rich can clean code make you?</p>
+
+<div id="hud">
+  <span>🏆 points: <span id="points">0</span></span>
+  <span>✅ clean runs: <span id="runs">0</span></span>
+  <span id="status">* ready.</span>
+</div>
+
+<div class="wrap">
+  <div class="col">
+    <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+    <div class="row">
+      <button id="runBtn">▶ run</button>
+      <button id="stopBtn">⏹ stop</button>
+      <select id="examples">
+        <option value="">📚 examples…</option>
+        <option value="hello">👋 hello, lua</option>
+        <option value="ball">🏀 bouncing ball</option>
+        <option value="stars">✨ starfield</option>
+        <option value="guess">🔢 guess the number</option>
+        <option value="pong">🏓 mouse pong</option>
+      </select>
+      <button id="clearBtn">🗑 clear console</button>
+    </div>
+  </div>
+  <div class="col">
+    <canvas id="stage" width="480" height="320"></canvas>
+    <div id="console"></div>
+    <div id="inputRow">
+      <input id="inputBox" type="text" placeholder="type your answer, then send →" maxlength="100">
+      <button id="inputSend">send</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>* HOW IT PAYS</h2>
+  <p>* press ▶ run. if your script <b>finishes with 0 errors</b>, or runs a full
+  <b>2 seconds error-free</b> with on_tick, you bank <b>+400</b>. one bank per run.
+  any error before the bank = the run pays nothing. your points total is your leaderboard score.</p>
+</div>
+
+<div class="card">
+  <h2>* THE LUA LAB API (everything your code can touch)</h2>
+  <ul>
+    <li><code>print(...)</code> — write to the console</li>
+    <li><code>input()</code> — pause and ask the player for a line of text (returns a string)</li>
+    <li><code>draw.clear()</code> · <code>draw.color(r, g, b)</code> · <code>draw.rect(x, y, w, h)</code></li>
+    <li><code>draw.circle(x, y, r)</code> · <code>draw.line(x1, y1, x2, y2)</code> · <code>draw.text("hi", x, y)</code></li>
+    <li><code>draw.W</code> = 480 · <code>draw.H</code> = 320 — the canvas size</li>
+    <li><code>function on_tick(dt)</code> — runs ~30×/second while your script lives</li>
+    <li><code>function on_key(key)</code> — "left", "right", "up", "down", "space", "a", …</li>
+    <li><code>mouse.x</code> · <code>mouse.y</code> · <code>mouse.down</code> — read the mouse/touch</li>
+    <li>plus all of lua itself: tables, functions, coroutines, math, string…</li>
+    <li>NOT in the sandbox: os, io, files, require, the internet, the arcade. they were never built.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>* 🏆 LUA LAB LEADERBOARD (total points)</h2>
+  <div id="board">loading…</div>
+</div>
+
+<script src="../js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  var editor = document.getElementById("code");
+  var consoleEl = document.getElementById("console");
+  var statusEl = document.getElementById("status");
+  var pointsEl = document.getElementById("points");
+  var runsEl = document.getElementById("runs");
+  var inputRow = document.getElementById("inputRow");
+  var inputBox = document.getElementById("inputBox");
+  var stage = document.getElementById("stage");
+  var ctx = stage.getContext("2d");
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 480, 320);
+
+  var total = Number(localStorage.getItem("lualab_total") || 0) || 0;
+  var cleanRuns = Number(localStorage.getItem("lualab_runs") || 0) || 0;
+  var worker = null;
+  var run = null; // { errored, banked, live }
+
+  function hud() { pointsEl.textContent = total; runsEl.textContent = cleanRuns; }
+  function status(t) { statusEl.textContent = t; }
+  function log(text, cls) {
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = text;
+    consoleEl.appendChild(d);
+    while (consoleEl.children.length > 200) consoleEl.removeChild(consoleEl.firstChild);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  var EXAMPLES = {
+    hello: [
+      '-- 👋 HELLO, LUA',
+      'print("hello from the lua lab!")',
+      '',
+      'local names = { "oliver", "aria", "sophia", "albert" }',
+      'for i, name in ipairs(names) do',
+      '  print(i, name)',
+      'end',
+      '',
+      'local total = 0',
+      'for n = 1, 10 do total = total + n end',
+      'print("1+2+...+10 =", total)',
+      '',
+      'function fib(n) if n < 2 then return n end return fib(n-1) + fib(n-2) end',
+      'print("fib(15) =", fib(15))',
+      'print("clean run? press run and see +400.")',
+    ].join("\n"),
+    ball: [
+      '-- 🏀 BOUNCING BALL',
+      'local x, y = 60, 60',
+      'local vx, vy = 130, 95',
+      '',
+      'function on_tick(dt)',
+      '  x = x + vx * dt',
+      '  y = y + vy * dt',
+      '  if x < 16 or x > draw.W - 16 then vx = -vx end',
+      '  if y < 16 or y > draw.H - 16 then vy = -vy end',
+      '  draw.clear()',
+      '  draw.color(255, 90, 90)',
+      '  draw.circle(x, y, 16)',
+      '  draw.color(255, 255, 255)',
+      '  draw.text("catch me", 12, 20)',
+      'end',
+    ].join("\n"),
+    stars: [
+      '-- ✨ STARFIELD',
+      'local stars = {}',
+      'for i = 1, 110 do',
+      '  stars[i] = { x = math.random(0, draw.W), y = math.random(0, draw.H),',
+      '               s = math.random(1, 3), v = math.random(6, 40) }',
+      'end',
+      '',
+      'function on_tick(dt)',
+      '  draw.clear()',
+      '  for _, st in ipairs(stars) do',
+      '    st.y = st.y + st.v * dt',
+      '    if st.y > draw.H then st.y = 0 st.x = math.random(0, draw.W) end',
+      '    local c = 120 + st.s * 40',
+      '    draw.color(c, c, 255)',
+      '    draw.rect(st.x, st.y, st.s, st.s)',
+      '  end',
+      'end',
+    ].join("\n"),
+    guess: [
+      '-- 🔢 GUESS THE NUMBER',
+      'print("i am thinking of a number, 1 to 100.")',
+      'local secret = math.random(1, 100)',
+      'local tries = 0',
+      'while true do',
+      '  print("your guess?")',
+      '  local line = input()',
+      '  local g = tonumber(line)',
+      '  tries = tries + 1',
+      '  if g == nil then print("that is not a number!")',
+      '  elseif g < secret then print("too low…")',
+      '  elseif g > secret then print("too high…")',
+      '  else print("🎉 got it in " .. tries .. " tries!") break end',
+      'end',
+    ].join("\n"),
+    pong: [
+      '-- 🏓 MOUSE PONG — move the mouse, keep the ball alive',
+      'local bx, by = 240, 120',
+      'local vx, vy = 150, 190',
+      'local score = 0',
+      '',
+      'function on_tick(dt)',
+      '  bx = bx + vx * dt',
+      '  by = by + vy * dt',
+      '  if bx < 8 or bx > draw.W - 8 then vx = -vx end',
+      '  if by < 8 then vy = -vy end',
+      '  local px = mouse.x - 40',
+      '  if by > draw.H - 24 and by < draw.H - 8 and bx > px and bx < px + 80 and vy > 0 then',
+      '    vy = -vy score = score + 1 print("bounce! score:", score)',
+      '  end',
+      '  if by > draw.H then',
+      '    by, vy = 120, 190 print("missed! score resets") score = 0',
+      '  end',
+      '  draw.clear()',
+      '  draw.color(255, 255, 0)',
+      '  draw.circle(bx, by, 8)',
+      '  draw.color(120, 220, 255)',
+      '  draw.rect(px, draw.H - 16, 80, 8)',
+      '  draw.color(255, 255, 255)',
+      '  draw.text("score " .. score, 12, 20)',
+      'end',
+    ].join("\n"),
+  };
+
+  /* ---------- worker + run lifecycle ---------- */
+  var curColor = "rgb(255,255,255)";
+  function applyDraw(calls) {
+    for (var i = 0; i < calls.length; i++) {
+      var c = calls[i];
+      if (c[0] === "clear") { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 480, 320); }
+      else if (c[0] === "color") { curColor = "rgb(" + (c[1] | 0) + "," + (c[2] | 0) + "," + (c[3] | 0) + ")"; }
+      else if (c[0] === "rect") { ctx.fillStyle = curColor; ctx.fillRect(c[1], c[2], c[3], c[4]); }
+      else if (c[0] === "circle") { ctx.fillStyle = curColor; ctx.beginPath(); ctx.arc(c[1], c[2], c[3], 0, 6.3); ctx.fill(); }
+      else if (c[0] === "line") { ctx.strokeStyle = curColor; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c[1], c[2]); ctx.lineTo(c[3], c[4]); ctx.stroke(); }
+      else if (c[0] === "text") { ctx.fillStyle = curColor; ctx.font = "8px 'Press Start 2P', monospace"; ctx.fillText(String(c[1]), c[2], c[3]); }
+    }
+  }
+
+  function bank(why) {
+    if (!run || run.banked || run.errored) return;
+    run.banked = true;
+    total += 400; cleanRuns += 1;
+    try {
+      localStorage.setItem("lualab_total", String(total));
+      localStorage.setItem("lualab_runs", String(cleanRuns));
+    } catch (e) {}
+    if (window.Arcade) {
+      // never Arcade.playerName() here — it prompts when no name is stored,
+      // and the Lab must not interrupt coding; the hub owns naming.
+      var nm = "Player1";
+      try { nm = localStorage.getItem("arcade_name") || "Player1"; } catch (e) {}
+      Arcade.saveScore("lua-lab", nm, total);
+    }
+    hud();
+    log("* " + why + " → +400! total: " + total, "sys");
+    status("* +400 banked. still running — stop it or edit and re-run.");
+    setTimeout(refreshBoard, 1600);
+  }
+
+  function spawnWorker() {
+    var w = new Worker("../js/lua-worker.js");
+    w.onmessage = function (e) {
+      var m = e.data || {};
+      if (m.t === "print") log(m.text);
+      else if (m.t === "draw") applyDraw(m.calls);
+      else if (m.t === "error") {
+        if (run) { run.errored = true; run.live = false; }
+        log("💥 " + m.msg, "err");
+        status("* error — this run pays nothing.");
+        inputRow.style.display = "none";
+      } else if (m.t === "clean") {
+        bank("clean for 2 seconds");
+      } else if (m.t === "state") {
+        if (m.state === "finished") {
+          if (run && !run.errored) { bank("script finished clean"); if (run) run.live = false; }
+          if (run && !run.errored) status("* finished clean. run it again for another +400.");
+        } else if (m.state === "ticking") {
+          status("* running… survive 2s clean to bank +400.");
+        } else if (m.state === "waiting-input") {
+          status("* ⌨ the script is asking for input…");
+          inputRow.style.display = "flex";
+          try { inputBox.focus(); } catch (e2) {}
+        } else if (m.state === "running") {
+          inputRow.style.display = "none";
+        } else if (m.state === "idle") {
+          if (run) run.live = false;
+        }
+      }
+    };
+    w.onerror = function () { log("💥 the lab itself hiccuped — try run again.", "err"); };
+    return w;
+  }
+
+  function doRun() {
+    if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 480, 320);
+    curColor = "rgb(255,255,255)";
+    run = { errored: false, banked: false, live: true };
+    worker = spawnWorker();
+    status("* running…");
+    worker.postMessage({ t: "run", code: editor.value });
+  }
+  function doStop() {
+    if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
+    inputRow.style.display = "none";
+    if (run && run.live && !run.banked && !run.errored) log("* stopped — the run never banked. no points.", "sys");
+    if (run && run.banked) log("* stopped.", "sys");
+    if (run) run.live = false;
+    status("* stopped.");
+  }
+  function sendInput() {
+    if (!worker) return;
+    var v = inputBox.value;
+    inputBox.value = "";
+    log("› " + v, "sys");
+    inputRow.style.display = "none";
+    status("* running…");
+    worker.postMessage({ t: "input", text: v });
+  }
+
+  document.getElementById("runBtn").addEventListener("click", doRun);
+  document.getElementById("stopBtn").addEventListener("click", doStop);
+  document.getElementById("clearBtn").addEventListener("click", function () { consoleEl.innerHTML = ""; });
+  document.getElementById("inputSend").addEventListener("click", sendInput);
+  inputBox.addEventListener("keydown", function (e) { if (e.key === "Enter") sendInput(); });
+  document.getElementById("examples").addEventListener("change", function () {
+    var v = this.value;
+    if (v && EXAMPLES[v]) {
+      editor.value = EXAMPLES[v];
+      try { localStorage.setItem("lualab_code", editor.value); } catch (e) {}
+      log("* example loaded: " + v + " — press ▶ run.", "sys");
+    }
+    this.value = "";
+  });
+
+  /* editor: autosave + tab key */
+  var saveTimer = null;
+  editor.addEventListener("input", function () {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { try { localStorage.setItem("lualab_code", editor.value); } catch (e) {} }, 400);
+  });
+  editor.addEventListener("keydown", function (e) {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      var s = editor.selectionStart;
+      editor.value = editor.value.slice(0, s) + "  " + editor.value.slice(editor.selectionEnd);
+      editor.selectionStart = editor.selectionEnd = s + 2;
+    }
+  });
+
+  /* keys + mouse for scripts */
+  function normKey(e) {
+    if (e.key === " ") return "space";
+    if (e.key.indexOf("Arrow") === 0) return e.key.slice(5).toLowerCase();
+    return e.key.length === 1 ? e.key.toLowerCase() : e.key.toLowerCase();
+  }
+  document.addEventListener("keydown", function (e) {
+    if (!worker) return;
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+    worker.postMessage({ t: "key", key: normKey(e) });
+  });
+  function stagePos(e) {
+    var r = stage.getBoundingClientRect();
+    var cx = (e.touches ? e.touches[0].clientX : e.clientX);
+    var cy = (e.touches ? e.touches[0].clientY : e.clientY);
+    return { x: Math.round((cx - r.left) / r.width * 480), y: Math.round((cy - r.top) / r.height * 320) };
+  }
+  var mouseDown = false;
+  function pushMouse(e, down) {
+    if (!worker) return;
+    var p = stagePos(e);
+    mouseDown = down;
+    worker.postMessage({ t: "mouse", x: p.x, y: p.y, down: down });
+  }
+  stage.addEventListener("mousemove", function (e) { pushMouse(e, mouseDown); });
+  stage.addEventListener("mousedown", function (e) { pushMouse(e, true); });
+  stage.addEventListener("mouseup", function (e) { pushMouse(e, false); });
+  stage.addEventListener("touchstart", function (e) { pushMouse(e, true); }, { passive: true });
+  stage.addEventListener("touchmove", function (e) { pushMouse(e, true); }, { passive: true });
+  stage.addEventListener("touchend", function (e) { if (worker) worker.postMessage({ t: "mouse", x: 0, y: 0, down: false }); });
+
+  /* leaderboard */
+  function refreshBoard() {
+    var box = document.getElementById("board");
+    if (!window.Arcade) { box.textContent = "offline"; return; }
+    Arcade.getScores("lua-lab", 5).then(function (rows) {
+      if (!rows || !rows.length) { box.textContent = "no scores yet — be the first clean run."; return; }
+      box.innerHTML = "";
+      rows.forEach(function (r, i) {
+        var d = document.createElement("div");
+        d.textContent = (i + 1) + ". " + (r.player_name || "?") + " — " + r.score;
+        box.appendChild(d);
+      });
+    });
+  }
+
+  /* boot */
+  var saved = null;
+  try { saved = localStorage.getItem("lualab_code"); } catch (e) {}
+  editor.value = saved || EXAMPLES.hello;
+  hud();
+  refreshBoard();
+  log("* welcome to lua lab. your code is autosaved in this browser.", "sys");
+  log("* press ▶ run — 0 errors = +400.", "sys");
+})();
+</script>
+</body>
+</html>
