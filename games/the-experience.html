@@ -37,6 +37,7 @@
   .track .t { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.85rem; }
   .track .d { color:#9fc4e8; font-size:.72rem; }
   .track .rm { background:none; border:none; color:#c22f4e; font-size:1rem; cursor:pointer; padding:2px 6px; }
+  .track .dl { background:none; border:none; color:#8dff9a; font-size:1rem; cursor:pointer; padding:2px 6px; }
   .note { margin-top:18px; color:#5f7d9c; font-size:.7rem; text-align:center; max-width:560px; line-height:1.6; }
 </style>
 </head>
@@ -95,7 +96,7 @@
   </div>
 </div>
 
-<div class="note">* uploaded files play straight from your device — nothing is uploaded anywhere.<br>* the built-in track is the one Joslyn sent in, converted from his video to mp3.</div>
+<div class="note">* uploaded files play straight from your device — nothing is uploaded anywhere.<br>* the built-in track is the one Joslyn sent in, converted from his video to mp3.<br>* tap ⬇ on any track to download it — take the music with you, listen offline anywhere.</div>
 
 <audio id="au" preload="metadata"></audio>
 <script>
@@ -127,6 +128,10 @@ function renderPlaylist() {
     row.innerHTML = '<span>' + (i === idx && !au.paused ? '🎵' : '🎶') + '</span><span class="t"></span><span class="d">' + (t.dur ? fmt(t.dur) : '') + '</span>';
     row.querySelector('.t').textContent = t.title;
     row.addEventListener('click', () => load(i, true));
+    const dl = document.createElement('button');
+    dl.className = 'dl'; dl.textContent = '⬇'; dl.title = 'Download this track';
+    dl.addEventListener('click', e => { e.stopPropagation(); downloadTrack(t, dl); });
+    row.appendChild(dl);
     if (!t.builtin) {
       const rm = document.createElement('button');
       rm.className = 'rm'; rm.textContent = '✖'; rm.title = 'Remove';
@@ -144,6 +149,30 @@ async function ensureSrc(t) {
   const bytes = new Uint8Array(bin.length);
   for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
   t.src = URL.createObjectURL(new Blob([bytes], { type: t.mime || 'audio/mpeg' }));
+}
+
+function fileNameFor(t) {
+  const extByMime = { 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/flac': 'flac', 'audio/opus': 'opus' };
+  let ext = extByMime[t.mime] || '';
+  if (!ext && t.src && !t.src.startsWith('blob:')) {
+    const m = /\.([a-z0-9]+)(?:[?#]|$)/i.exec(t.src);
+    if (m) ext = m[1].toLowerCase();
+  }
+  return t.title.replace(/[\\/:*?"<>|]+/g, '').trim() + '.' + (ext || 'mp3');
+}
+
+async function downloadTrack(t, btn) {
+  try {
+    if (btn) btn.textContent = '…';
+    await ensureSrc(t); /* approved songs: fetch the audio first, same path playback uses */
+    const a = document.createElement('a');
+    a.href = t.src;
+    a.download = fileNameFor(t);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) { /* a failed fetch just means no download this tap */ }
+  if (btn) btn.textContent = '⬇';
 }
 
 async function load(i, autoplay) {
@@ -407,6 +436,9 @@ window.__exp = {
   },
   volStatus: () => volStatus.textContent,
   tracks: () => tracks.map(t => t.title),
+  dlCount: () => document.querySelectorAll('.track .dl').length,
+  dlName: i => fileNameFor(tracks[i]),
+  download: i => downloadTrack(tracks[i], null),
   count: () => tracks.length,
   idx: () => idx,
   playing: () => !au.paused,
