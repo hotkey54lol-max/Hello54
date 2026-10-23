@@ -174,7 +174,24 @@
   <iframe id="luaFrame" title="Lua Lab" loading="lazy"></iframe>
 </div>
 
-<footer>scores sync to the cloud when online · made for fun · <span id="vtag" style="opacity:.35;cursor:default">v1.0</span></footer>
+<footer>scores sync to the cloud when online · made for fun · <button id="offToggle" style="background:none;border:1px solid var(--ut-gray);color:var(--ut-gray);border-radius:5px;padding:1px 8px;font-family:inherit;font-size:9px;cursor:pointer">go offline (no-supabase mode)</button> · <span id="vtag" style="opacity:.35;cursor:default">v1.0</span></footer>
+<script>
+(function bindOffToggle() {
+  var b = document.getElementById('offToggle');
+  if (!b) return;
+  if (!window.Arcade || !Arcade.offline) { setTimeout(bindOffToggle, 200); return; }
+  function paint() {
+    if (Arcade.offline.is()) { b.textContent = 'offline mode: ON — tap to go back online'; b.style.color = '#ffd94d'; b.style.borderColor = '#ffd94d'; }
+    else { b.textContent = 'go offline (no-supabase mode)'; b.style.color = ''; b.style.borderColor = ''; }
+  }
+  b.addEventListener('click', function () {
+    if (Arcade.offline.is()) Arcade.offline.exit(); else Arcade.offline.enter();
+    setTimeout(paint, 60); setTimeout(paint, 800);
+  });
+  paint();
+  setInterval(paint, 3000);
+})();
+</script>
 
 <script src="js/arcade.js"></script>
 <script>

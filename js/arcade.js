@@ -16,6 +16,182 @@ window.Arcade = (function () {
     };
   }
 
+  /* ================= No-Supabase (offline) mode =================
+   * Joslyn's insurance policy (Oct 23): if Supabase is down, paused or
+   * out of usage, the arcade must keep working — games play, scores just
+   * don't save — and it must SAY so, loudly. Two ways in:
+   *   manual — the visitor flipped it on (hub footer). Stored per device.
+   *   forced — 3 Supabase calls in a row died (network error, 402 quota,
+   *            403 restricted, 429, or 5xx). A probe runs on load and
+   *            every 45s; the moment one succeeds we're back online.
+   * Implementation: a gate on window.fetch scoped to SUPABASE_URL only.
+   * Every caller in this file already treats a rejected fetch as a
+   * silent no-op, so blocking the call IS the whole feature — and while
+   * offline, polling burns zero quota because nothing leaves the page.
+   */
+  const _realFetch = window.fetch.bind(window);
+  const OFF_KEY = "arcade_offline";
+  let _offMode = "online"; // "online" | "manual" | "forced"
+  let _offFails = 0;
+  let _offProbeTimer = null;
+
+  function _offIsDead(status) {
+    if (status == null) return true; // fetch rejected outright
+    return status === 402 || status === 403 || status === 429 || status >= 500;
+  }
+  function _offNote(status) {
+    if (_offMode !== "online") return;
+    if (_offIsDead(status)) {
+      _offFails++;
+      if (_offFails >= 3) _setOffMode("forced");
+    } else {
+      _offFails = 0;
+    }
+  }
+
+  window.fetch = function (input, init) {
+    let url = "";
+    try { url = typeof input === "string" ? input : (input && input.url) || ""; } catch (e) {}
+    if (url.indexOf(SUPABASE_URL) !== 0) return _realFetch(input, init);
+    if (_offMode !== "online") {
+      return Promise.reject(new TypeError("arcade is in no-supabase mode"));
+    }
+    return _realFetch(input, init).then(
+      function (r) { _offNote(r.status); return r; },
+      function (e) { _offNote(null); throw e; }
+    );
+  };
+
+  async function _offProbe() {
+    try {
+      const r = await _realFetch(
+        SUPABASE_URL + "/rest/v1/site_settings?select=key&limit=1",
+        { headers: baseHeaders() }
+      );
+      return !_offIsDead(r.status);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function _offBar() {
+    let bar = document.getElementById("arcade-offline-bar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "arcade-offline-bar";
+      bar.setAttribute("style",
+        "position:fixed;top:0;left:0;right:0;z-index:100000;background:#1a0505;" +
+        "color:#ffb3b3;border-bottom:3px solid #c22f4e;padding:10px 8px;" +
+        "font-family:'Courier New',monospace;font-size:13px;line-height:1.5;" +
+        "text-align:center;");
+      document.body.appendChild(bar);
+    }
+    return bar;
+  }
+
+  function _offRenderBar() {
+    _fxSafe(function () {
+      if (typeof document === "undefined" || !document.body) return;
+      const old = document.getElementById("arcade-offline-bar");
+      if (_offMode === "online") {
+        if (old && old.dataset.flash !== "1") old.remove();
+        return;
+      }
+      const bar = _offBar();
+      delete bar.dataset.flash;
+      bar.style.background = "#1a0505";
+      bar.style.color = "#ffb3b3";
+      bar.style.borderBottomColor = "#c22f4e";
+      const msg = _offMode === "manual"
+        ? "* OFFLINE MODE — you turned the score server off. Games still play, but scores won't save."
+        : "* OFFLINE MODE — can't reach the score server (down or out of usage). Games still play, but scores won't save.";
+      bar.innerHTML = "";
+      bar.appendChild(document.createTextNode(msg + " "));
+      const btn = document.createElement("button");
+      btn.textContent = _offMode === "manual" ? "GO BACK ONLINE" : "↻ RETRY";
+      btn.setAttribute("style",
+        "background:#000;color:#ffd94d;border:2px solid #ffd94d;border-radius:6px;" +
+        "padding:3px 12px;font-family:inherit;font-size:12px;cursor:pointer;margin-left:6px;");
+      btn.addEventListener("click", async function () {
+        btn.disabled = true;
+        btn.textContent = "CHECKING…";
+        if (_offMode === "manual") {
+          try { localStorage.removeItem(OFF_KEY); } catch (e) {}
+          _offMode = "online";
+        }
+        const alive = await _offProbe();
+        if (alive) { _offFails = 0; _setOffMode("online"); _offFlashOnline(); }
+        else {
+          if (_offMode === "online") _setOffMode("forced");
+          else _offRenderBar();
+        }
+      });
+      bar.appendChild(btn);
+    });
+  }
+
+  function _offFlashOnline() {
+    _fxSafe(function () {
+      if (typeof document === "undefined" || !document.body) return;
+      const bar = _offBar();
+      bar.dataset.flash = "1";
+      bar.style.background = "#0a1f0a";
+      bar.style.color = "#b3ffb3";
+      bar.style.borderBottomColor = "#4caf50";
+      bar.textContent = "* BACK ONLINE — the score server answered. Scores save again ✓";
+      setTimeout(function () {
+        if (bar.dataset.flash === "1" && _offMode === "online") bar.remove();
+      }, 4000);
+    });
+  }
+
+  function _setOffMode(mode) {
+    if (_offMode === mode) { _offRenderBar(); return; }
+    _offMode = mode;
+    if (_offProbeTimer) { clearInterval(_offProbeTimer); _offProbeTimer = null; }
+    if (mode === "forced") {
+      _offProbeTimer = setInterval(async function () {
+        if (await _offProbe()) { _offFails = 0; _setOffMode("online"); _offFlashOnline(); }
+      }, 45000);
+    }
+    _offRenderBar();
+  }
+
+  function offEnterManual() {
+    try { localStorage.setItem(OFF_KEY, "1"); } catch (e) {}
+    _setOffMode("manual");
+  }
+  function offExit() {
+    try { localStorage.removeItem(OFF_KEY); } catch (e) {}
+    if (_offMode === "manual") _offMode = "online";
+    _offProbe().then(function (alive) {
+      if (alive) { _offFails = 0; _setOffMode("online"); _offRenderBar(); }
+      else _setOffMode("forced");
+    });
+  }
+
+  _fxSafe(function () {
+    let manual = false;
+    try { manual = localStorage.getItem(OFF_KEY) === "1"; } catch (e) {}
+    if (manual) _offMode = "manual";
+    const start = function () {
+      _offRenderBar();
+      if (!manual) {
+        _offProbe().then(function (alive) {
+          if (!alive && _offMode === "online") _setOffMode("forced");
+          else if (alive) _offFails = 0;
+        });
+      }
+    };
+    if (typeof document !== "undefined") {
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", start);
+      } else {
+        start();
+      }
+    }
+  });
+
   // POST a score. Silently ignore all failures.
   async function saveScore(gameId, playerName, score) {
     try {
@@ -1563,7 +1739,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-23.50";
+  const ARCADE_BUILD = "2026-10-23.51";
   let _updateHandled = false;
 
   function _siteBase() {
@@ -1659,5 +1835,11 @@ window.Arcade = (function () {
     settings: settingsApi,
     checkAdmin: checkAdminPassword,
     fullscreen: { toggle: _fsToggle },
+    offline: {
+      is: function () { return _offMode !== "online"; },
+      mode: function () { return _offMode; },
+      enter: offEnterManual,
+      exit: offExit,
+    },
   };
 })();
