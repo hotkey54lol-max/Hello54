@@ -112,7 +112,7 @@
 <div class="panel" id="introPanel">
   <h1>🚦 RED LIGHT, GREEN LEGS 🕷️</h1>
   <p>* An empty warehouse. A giant traffic light. Four spider-bots with googly eyes — each running its own tiny AI brain.</p>
-  <p>* Nobody taught them to walk. They learn from rewards alone: forward on <span style="color:#5f5">GREEN</span> is good, moving on <span style="color:#f66">RED</span> gets you SENT BACK to the start, finishing is jackpot.</p>
+  <p>* Nobody taught them to walk. Their bodies are real physics — eight legs genuinely holding each one up — so until a brain learns balance, expect wobbling, face-plants and dragging. They learn from rewards alone: forward on <span style="color:#5f5">GREEN</span> is good, moving on <span style="color:#f66">RED</span> gets you SENT BACK to the start. First one to the end <b>wins the race</b>.</p>
   <p>* Early rounds are pure chaos. Given enough rounds, they figure it out — well, most of them do. There's usually one hopeless case. You will adopt him.</p>
   <h2>* HOW DO YOU WANT TO START?</h2>
   <div class="big">
@@ -128,8 +128,8 @@
   <p>* The spiders grind rounds headlessly — no watching, maximum speed — until a <span style="color:#ffd94a">SUDDEN POINT</span>. Then it's your call.</p>
   <h2>* TRAIN UNTIL…</h2>
   <div class="mile" id="mileRow">
-    <button data-mile="first" class="mileb on">🏁 FIRST FINISHER</button>
-    <button data-mile="break" class="mileb">⚡ A BREAKTHROUGH</button>
+    <button data-mile="first" class="mileb">🏁 FIRST FINISHER</button>
+    <button data-mile="break" class="mileb on">⚡ A BREAKTHROUGH</button>
     <button data-mile="fifty" class="mileb">50 ROUNDS</button>
     <button data-mile="twohundred" class="mileb">200 ROUNDS</button>
   </div>
@@ -149,7 +149,7 @@
 <script>
 'use strict';
 /* ================= state ================= */
-const SAVE_KEY = 'rlgl_save_v1', SEEN_KEY = 'rlgl_seen_v1';
+const SAVE_KEY = 'rlgl_save_v2', SEEN_KEY = 'rlgl_seen_v1';
 let sim = RLGL.makeSim((Date.now() % 100000) + 7);
 let saveLoaded = false;
 try {
@@ -204,33 +204,44 @@ const sfx = {
 const canvas = document.getElementById('renderCanvas');
 const engine = new BABYLON.Engine(canvas, true, { stencil: false });
 const scene = new BABYLON.Scene(engine);
-scene.clearColor = new BABYLON.Color4(0.04, 0.04, 0.06, 1);
+scene.clearColor = new BABYLON.Color4(0.93, 0.94, 0.96, 1);
 scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-scene.fogDensity = 0.0026;
-scene.fogColor = new BABYLON.Color3(0.04, 0.04, 0.06);
+scene.fogDensity = 0.0016;
+scene.fogColor = new BABYLON.Color3(0.93, 0.94, 0.96);
 
 const camMain = new BABYLON.UniversalCamera('camMain', new BABYLON.Vector3(0, 5.4, -11), scene);
 camMain.setTarget(new BABYLON.Vector3(0, 0.7, 5));
 camMain.fov = 0.95;
-const camFree = new BABYLON.ArcRotateCamera('camFree', -Math.PI / 2, 1.02, 30, new BABYLON.Vector3(0, 1, 34), scene);
-camFree.lowerRadiusLimit = 4; camFree.upperRadiusLimit = 90;
+const camFree = new BABYLON.ArcRotateCamera('camFree', -Math.PI / 2, 1.02, 34, new BABYLON.Vector3(0, 1, 55), scene);
+camFree.lowerRadiusLimit = 4; camFree.upperRadiusLimit = 170;
 camFree.maxZ = 300;
 scene.activeCamera = camMain;
 
+/* Portrait phones squeeze the horizontal view hard — keep the horizontal
+   field constant and pull the director camera back so all 4 lanes fit. */
+let camDistMul = 1;
+function applyCamAspect() {
+  const w = engine.getRenderWidth(), h = Math.max(1, engine.getRenderHeight());
+  const portrait = (w / h) < 1.05;
+  camDistMul = portrait ? 1.55 : 1;
+  if (portrait) { camMain.fovMode = BABYLON.Camera.FOVMODE_HORIZONTAL_FIXED; camMain.fov = 1.2; }
+  else { camMain.fovMode = BABYLON.Camera.FOVMODE_VERTICAL_FIXED; camMain.fov = 0.95; }
+}
+
 const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0.2), scene);
-hemi.intensity = 0.75;
-hemi.diffuse = new BABYLON.Color3(0.85, 0.87, 0.95);
-hemi.groundColor = new BABYLON.Color3(0.22, 0.22, 0.28);
+hemi.intensity = 1.05;
+hemi.diffuse = new BABYLON.Color3(0.98, 0.99, 1.0);
+hemi.groundColor = new BABYLON.Color3(0.55, 0.56, 0.60);
 const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(0.35, -1, 0.3), scene);
 sun.position = new BABYLON.Vector3(-22, 32, -14);
-sun.intensity = 0.85;
-sun.setDirectionToTarget(new BABYLON.Vector3(0, 0, 46));
-Object.assign(sun, { orthoLeft: -75, orthoRight: 75, orthoTop: 75, orthoBottom: -75, shadowMinZ: 1, shadowMaxZ: 140 });
+sun.intensity = 0.95;
+sun.setDirectionToTarget(new BABYLON.Vector3(0, 0, 55));
+Object.assign(sun, { orthoLeft: -80, orthoRight: 80, orthoTop: 80, orthoBottom: -80, shadowMinZ: 1, shadowMaxZ: 190 });
 const shadows = new BABYLON.ShadowGenerator(1024, sun);
 shadows.useBlurExponentialShadowMap = true;
 shadows.blurKernel = 18;
-const trafficPt = new BABYLON.PointLight('tpt', new BABYLON.Vector3(0, 7.2, 99), scene);
-trafficPt.intensity = 1.6; trafficPt.distance = 150;
+const trafficPt = new BABYLON.PointLight('tpt', new BABYLON.Vector3(0, 8.6, 126), scene);
+trafficPt.intensity = 1.6; trafficPt.distance = 200;
 trafficPt.diffuse = new BABYLON.Color3(0.2, 1, 0.35);
 
 function stdMat(r, g, b, opts) {
@@ -248,58 +259,108 @@ function box(name, w, h, d, x, y, z, mat) {
   return b;
 }
 
-/* warehouse shell — deliberately EMPTY, per spec */
+/* warehouse shell — WHITE and much bigger (v2 brief), still deliberately EMPTY */
 (function buildWarehouse() {
-  const floorMat = stdMat(0.21, 0.21, 0.24);
-  const floor = BABYLON.MeshBuilder.CreateGround('floor', { width: 16.4, height: 118 }, scene);
-  floor.position.set(0, 0, 51); floor.material = floorMat; floor.receiveShadows = true;
-  const laneMat = stdMat(0.32, 0.32, 0.38);
-  for (const lx of [-6, -3, 0, 3, 6]) box('lane', 0.09, 0.012, 100, lx, 0.008, 50, laneMat);
-  box('startline', 13, 0.02, 0.55, 0, 0.012, 0, stdMat(0.9, 0.9, 0.9));
-  // finish checker strip (16 small boxes — no texture needed)
-  const chkB = stdMat(0.05, 0.05, 0.05), chkW = stdMat(0.9, 0.9, 0.9);
+  const floorMat = stdMat(0.84, 0.86, 0.88);
+  const floor = BABYLON.MeshBuilder.CreateGround('floor', { width: 48, height: 176 }, scene);
+  floor.position.set(0, 0, 66); floor.material = floorMat; floor.receiveShadows = true;
+  const laneMat = stdMat(0.60, 0.63, 0.66);
+  for (const lx of [-9, -4.5, 0, 4.5, 9]) box('lane', 0.1, 0.012, 120, lx, 0.008, 60, laneMat);
+  box('startline', 17, 0.02, 0.55, 0, 0.012, 0, stdMat(0.15, 0.15, 0.16));
+  // finish checker strip at z=120 (16 small boxes — no texture needed)
+  const chkB = stdMat(0.05, 0.05, 0.05), chkW = stdMat(0.95, 0.95, 0.95);
   for (let i = 0; i < 8; i++) for (let j = 0; j < 2; j++) {
-    box('chk', 13 / 8, 0.02, 0.85, -6.5 + (i + 0.5) * (13 / 8), 0.012, 99.15 + j * 0.85, (i + j) % 2 ? chkB : chkW);
+    box('chk', 17 / 8, 0.02, 0.85, -8.5 + (i + 0.5) * (17 / 8), 0.012, 119.15 + j * 0.85, (i + j) % 2 ? chkB : chkW);
   }
-  const wallMat = stdMat(0.13, 0.13, 0.18);
-  const seamMat = stdMat(0.17, 0.17, 0.24);
-  box('wallL', 0.4, 12, 118, -8.4, 6, 51, wallMat);
-  box('wallR', 0.4, 12, 118, 8.4, 6, 51, wallMat);
-  box('wallB', 17.2, 12, 0.4, 0, 6, -7.8, wallMat);
-  box('wallF', 17.2, 12, 0.4, 0, 6, 109.8, wallMat);
-  box('ceil', 17.2, 0.3, 118, 0, 12.1, 51, stdMat(0.07, 0.07, 0.1));
-  for (let z = -2; z <= 106; z += 13.5) {
-    box('seamL', 0.1, 12, 0.35, -8.15, 6, z, seamMat);
-    box('seamR', 0.1, 12, 0.35, 8.15, 6, z, seamMat);
+  const wallMat = stdMat(0.94, 0.95, 0.96);
+  const seamMat = stdMat(0.78, 0.80, 0.83);
+  box('wallL', 0.4, 13, 176, -22, 6.5, 66, wallMat);
+  box('wallR', 0.4, 13, 176, 22, 6.5, 66, wallMat);
+  box('wallB', 44.4, 13, 0.4, 0, 6.5, -14, wallMat);
+  box('wallF', 44.4, 13, 0.4, 0, 6.5, 146, wallMat);
+  box('ceil', 44.4, 0.3, 176, 0, 13.1, 66, stdMat(0.97, 0.97, 0.98));
+  for (let z = -8; z <= 142; z += 15) {
+    box('seamL', 0.7, 13, 0.5, -21.7, 6.5, z, seamMat);
+    box('seamR', 0.7, 13, 0.5, 21.7, 6.5, z, seamMat);
   }
-  const stripMat = stdMat(0.9, 0.95, 1, { emissive: new BABYLON.Color3(0.55, 0.62, 0.75) });
-  for (let z = 4; z <= 104; z += 16.6) box('strip', 2.4, 0.06, 0.55, 0, 11.9, z, stripMat);
+  const stripMat = stdMat(1, 1, 1, { emissive: new BABYLON.Color3(0.85, 0.88, 0.92) });
+  for (let z = 2; z <= 140; z += 17) box('strip', 3.2, 0.06, 0.6, 0, 12.9, z, stripMat);
 })();
 
 /* the giant traffic light */
 const lightMats = {};
 (function buildTrafficLight() {
   const dark = stdMat(0.05, 0.05, 0.07);
-  box('cord', 0.22, 3.4, 0.22, 0, 10.3, 104, dark);
-  box('housing', 1.25, 2.9, 0.75, 0, 7.1, 104, dark);
+  box('cord', 0.26, 3.8, 0.26, 0, 11.2, 127, dark);
+  box('housing', 1.5, 3.4, 0.8, 0, 8.6, 127, dark);
   function lamp(y, key, rgb) {
     const m = new BABYLON.StandardMaterial('lamp' + key, scene);
     m.diffuseColor = new BABYLON.Color3(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25);
     m.emissiveColor = new BABYLON.Color3(rgb[0], rgb[1], rgb[2]);
     m.emissiveIntensity = 0.12;
-    const d = BABYLON.MeshBuilder.CreateDisc('disc' + key, { radius: 0.46, tessellation: 28 }, scene);
-    d.position.set(0, y, 103.6); d.rotation.y = Math.PI; d.material = m;
+    const d = BABYLON.MeshBuilder.CreateDisc('disc' + key, { radius: 0.55, tessellation: 28 }, scene);
+    d.position.set(0, y, 126.55); d.rotation.y = Math.PI; d.material = m;
     lightMats[key] = m;
   }
-  lamp(7.85, 'red', [1, 0.13, 0.13]);
-  lamp(6.35, 'green', [0.15, 1, 0.3]);
+  lamp(9.35, 'red', [1, 0.13, 0.13]);
+  lamp(7.85, 'green', [0.15, 1, 0.3]);
 })();
+/* the countdown TV — a big black screen on the far wall. The 2-minute clock
+   lives HERE, inside the spiders' world, not on the HUD (Joslyn's rule).
+   Digits are chunky 7-segment LEDs built from boxes. */
+const tvDigits = [], tvColon = [];
+let tvShown = '';
+(function buildTV() {
+  box('tvframe', 16, 6.4, 0.35, 0, 9.4, 145.55, stdMat(0.02, 0.02, 0.02));
+  box('tvscreen', 15.3, 5.7, 0.1, 0, 9.4, 145.32, stdMat(0.004, 0.004, 0.006));
+  const z = 145.24, cy = 9.4;
+  function seg(w, h, x, y) {
+    const m = BABYLON.MeshBuilder.CreateBox('tvseg', { width: w, height: h, depth: 0.1 }, scene);
+    m.position.set(x, y, z); m.receiveShadows = false;
+    return m;
+  }
+  function makeDigit(cx) {
+    // order: a(top) b(topR) c(botR) d(bot) e(botL) f(topL) g(mid)
+    const d = [
+      seg(1.52, 0.34, cx, cy + 1.72), seg(0.34, 1.4, cx + 0.77, cy + 0.87),
+      seg(0.34, 1.4, cx + 0.77, cy - 0.87), seg(1.52, 0.34, cx, cy - 1.72),
+      seg(0.34, 1.4, cx - 0.77, cy - 0.87), seg(0.34, 1.4, cx - 0.77, cy + 0.87),
+      seg(1.52, 0.34, cx, cy),
+    ];
+    tvDigits.push(d);
+    return d;
+  }
+  makeDigit(-4.6); makeDigit(-0.75); makeDigit(2.0);
+  tvColon.push(seg(0.34, 0.34, -2.7, cy + 0.86), seg(0.34, 0.34, -2.7, cy - 0.86));
+})();
+const tvAmber = (() => { const m = new BABYLON.StandardMaterial('tvAmber', scene); m.emissiveColor = new BABYLON.Color3(1.0, 0.72, 0.22); m.emissiveIntensity = 2.4; m.diffuseColor = new BABYLON.Color3(0.1, 0.07, 0.02); return m; })();
+const tvRed = (() => { const m = new BABYLON.StandardMaterial('tvRed', scene); m.emissiveColor = new BABYLON.Color3(1, 0.15, 0.15); m.emissiveIntensity = 2.4; m.diffuseColor = new BABYLON.Color3(0.1, 0.02, 0.02); return m; })();
+const tvOff = (() => { const m = new BABYLON.StandardMaterial('tvOff', scene); m.diffuseColor = new BABYLON.Color3(0.05, 0.03, 0.02); m.emissiveColor = new BABYLON.Color3(0.05, 0.02, 0.01); return m; })();
+const TV_SEG = { 0: [1, 1, 1, 1, 1, 1, 0], 1: [0, 1, 1, 0, 0, 0, 0], 2: [1, 1, 0, 1, 1, 0, 1], 3: [1, 1, 1, 1, 0, 0, 1], 4: [0, 1, 1, 0, 0, 1, 1], 5: [1, 0, 1, 1, 0, 1, 1], 6: [1, 0, 1, 1, 1, 1, 1], 7: [1, 1, 1, 0, 0, 0, 0], 8: [1, 1, 1, 1, 1, 1, 1], 9: [1, 1, 1, 1, 0, 1, 1] };
+function tvSetDigit(d, n, mat) { TV_SEG[n].forEach((on, i) => { d[i].material = on ? mat : tvOff; }); }
+function updateTV() {
+  const remain = Math.max(0, RLGL.ROUND_TIME - sim.time);
+  const danger = remain <= 10.5;
+  const mat = danger ? tvRed : tvAmber;
+  const colonMat = (Math.floor(sim.time) % 2 === 0) ? mat : tvOff;
+  tvColon.forEach(m => { m.material = colonMat; });
+  const key = remain.toFixed(0) + (danger ? '!' : '');
+  if (key === tvShown) return;
+  tvShown = key;
+  const tot = Math.ceil(remain);
+  const m = Math.floor(tot / 60), s = tot % 60;
+  tvSetDigit(tvDigits[0], m, mat);
+  tvSetDigit(tvDigits[1], Math.floor(s / 10), mat);
+  tvSetDigit(tvDigits[2], s % 10, mat);
+  window.__tvText = m + ':' + String(s).padStart(2, '0');
+}
+
 function paintLight(state) {
   const red = state === 'red';
   lightMats.red.emissiveIntensity = red ? 2.6 : 0.12;
   lightMats.green.emissiveIntensity = red ? 0.12 : 2.6;
   trafficPt.diffuse = red ? new BABYLON.Color3(1, 0.18, 0.18) : new BABYLON.Color3(0.2, 1, 0.35);
-  hemi.diffuse = red ? new BABYLON.Color3(0.95, 0.72, 0.72) : new BABYLON.Color3(0.8, 0.95, 0.85);
+  hemi.diffuse = red ? new BABYLON.Color3(1.0, 0.86, 0.86) : new BABYLON.Color3(0.88, 1.0, 0.9);
 }
 
 /* spiders */
@@ -360,8 +421,8 @@ const spiderViews = sim.agents.map(buildSpider);
 
 function syncSpider(v, a, tNow, dtR) {
   const rt = a.rt; if (!rt) return;
-  const bob = Math.sin(rt.phase * 2) * 0.03 * Math.min(1, rt.speed) + (rt.finished ? Math.abs(Math.sin(tNow * 5)) * 0.09 : 0);
-  v.rig.position.set(rt.x, 0.85 + bob, rt.z);
+  const bob = rt.finished ? Math.abs(Math.sin(tNow * 5)) * 0.09 : 0;
+  v.rig.position.set(rt.x, rt.y + bob, rt.z); // body height + tilt come from the physics now
   v.rig.rotationQuaternion = BABYLON.Quaternion.RotationYawPitchRoll(rt.heading, rt.pitch, rt.roll);
   v.ring.position.x = rt.x; v.ring.position.z = rt.z;
   v.eyeSpin = Math.max(0, v.eyeSpin - dtR);
@@ -409,7 +470,7 @@ function drawSpark(i) {
   ctx.strokeStyle = cssCol(sim.agents[i].color); ctx.lineWidth = 1.6; ctx.beginPath();
   h.forEach((d, k) => {
     const x = (k / (h.length - 1)) * (cv.width - 2) + 1;
-    const y = cv.height - 2 - (Math.min(100, d) / 100) * (cv.height - 4);
+    const y = cv.height - 2 - (Math.min(RLGL.TRACK_LEN, d) / RLGL.TRACK_LEN) * (cv.height - 4);
     k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
   });
   ctx.stroke();
@@ -421,7 +482,7 @@ function updateCards() {
     const s = a.stats;
     $('st' + i).innerHTML =
       `DIST <b>${rt.z.toFixed(1)}m</b> · BEST <b>${s.bestDist.toFixed(0)}m</b><br>` +
-      `🏁 <b>${s.finishes}</b> · ⤺ <b>${rt.sentBacks}</b> this round · 🏆 <b>${s.wins}</b>` +
+      `🏁 <b>${s.finishes}</b> · ⤺ <b>${rt.sentBacks}</b> this round · 💥 <b>${s.falls}</b> · 🏆 <b>${s.wins}</b>` +
       (rt.finished ? `<br><span style="color:#5f5">FINISHED ${rt.finishTime.toFixed(1)}s!</span>` : '');
     $('card' + i).classList.toggle('sel', camMode === 'agent' && camAgent === i);
   });
@@ -457,7 +518,7 @@ function paintLightUI() {
   $('lightText').textContent = red ? 'RED — FREEZE!' : 'GREEN — GO!';
   $('lightText').style.color = red ? '#ff7a7a' : '#7aff8a';
   $('lightbox').style.borderColor = red ? '#ff5a5a' : '#5aff7a';
-  $('roundInfo').textContent = `ROUND ${sim.round} · ${Math.max(0, RLGL.ROUND_TIME - sim.time).toFixed(1)}s`;
+  $('roundInfo').textContent = `ROUND ${sim.round}`; // the countdown lives on the in-world TV now, not the HUD
 }
 
 /* ================= cameras ================= */
@@ -494,8 +555,8 @@ function updateCamera(dtR) {
     focusTimer -= dtR;
     if (focusTimer <= 0) { focusIdx = pickFocus(); focusTimer = 1.4; }
     const rt = sim.agents[focusIdx].rt; if (!rt) return;
-    dp = new BABYLON.Vector3(rt.x * 0.4, 6.4, Math.min(92, Math.max(-11, rt.z - 14)));
-    dt2 = new BABYLON.Vector3(rt.x * 0.55, 0.6, rt.z + 4.5);
+    dp = new BABYLON.Vector3(rt.x * 0.4, 7.4 + 3.0 * (camDistMul - 1), Math.min(112, Math.max(-14 - 7 * (camDistMul - 1), rt.z - 17 * camDistMul)));
+    dt2 = new BABYLON.Vector3(rt.x * 0.55, 0.6, rt.z + 5);
     k = 1 - Math.exp(-2.4 * dtR);
   }
   BABYLON.Vector3.LerpToRef(_camPos, dp, k, _camPos);
@@ -511,11 +572,12 @@ function handleEvents() {
     const i = sim.agents.findIndex(a => a.name === ev.agent);
     if (ev.type === 'sentback') { sfx.sentback(); if (i >= 0) spiderViews[i].eyeSpin = 0.7; tick(`⤺ ${ev.agent} SENT BACK!`); }
     else if (ev.type === 'finish') { sfx.finish(); tick(`🏁 ${ev.agent} FINISHED!`); }
-    else if (ev.type === 'trip') { sfx.trip(); tick(`💥 ${ev.agent} tripped!`); }
+    else if (ev.type === 'fall') { sfx.trip(); tick(`💥 ${ev.agent} face-planted!`); }
+    else if (ev.type === 'recover') { tick(`🧍 ${ev.agent} is back up!`); }
   }
 }
 function startWatchRound() {
-  RLGL.beginRound(sim, false); // watch = best brains on show; learning lives in training
+  RLGL.beginRound(sim, true, 0.10); // watch = gentle mutation: they keep learning while you spectate, without wrecking their best moves
   roundActive = true; simAcc = 0; lastLight = 'green';
   paintLight('green'); paintLightUI();
   showBanner(`ROUND ${sim.round}<div class="small">green means GO · red means BACK TO START</div>`, 1800);
@@ -525,11 +587,13 @@ function endWatchRound(quiet) {
   roundActive = false; resultsTimer = 3.4;
   const fins = res.results.filter(r => r.finished);
   const improved = res.results.filter(r => r.adopted).map(r => r.name);
-  let html = `🏁 ROUND ${res.round} — ${res.winner} WINS`;
+  const rebooted = res.results.filter(r => r.rebooted).map(r => r.name);
+  let html = res.winner ? `🏆 ${res.winner} WINS THE RACE!` : `⏰ TIME UP — EVERYBODY LOSES!`;
   html += `<div class="small">` + (fins.length
     ? fins.map(r => `${r.name} ⏱ ${r.time.toFixed(1)}s`).join(' · ')
-    : `no finishers — best ${Math.max(...res.results.map(r => r.dist)).toFixed(0)}m`) + `</div>`;
+    : `nobody beat the clock — best ${Math.max(...res.results.map(r => r.dist)).toFixed(0)}m`) + `</div>`;
   if (improved.length) html += `<div class="small">🧠 brain improved: ${improved.join(', ')}</div>`;
+  if (rebooted.length) html += `<div class="small">🔄 factory reset (new brain): ${rebooted.join(', ')}</div>`;
   if (!quiet) showBanner(html, 3200);
   sim.agents.forEach((a, i) => drawSpark(i));
   updateHOF(); save();
@@ -552,13 +616,14 @@ function stepWatch(dtReal) {
       paintLight(lastLight);
       if (lastLight === 'red') sfx.red(); else sfx.green();
     }
-    if (sim.time >= RLGL.ROUND_TIME || sim.agents.every(a => a.rt.finished)) { endWatchRound(false); break; }
+    // race rule: the round ends shortly after the FIRST finisher (or at the clock)
+    if (sim.time >= RLGL.ROUND_TIME || (sim.firstFinishAt && sim.time - sim.firstFinishAt >= 1.4)) { endWatchRound(false); break; }
   }
   paintLightUI();
 }
 
 /* ================= training mode ================= */
-let training = false, mileType = 'first', trainCount = 0;
+let training = false, mileType = 'break', trainCount = 0;
 let sessFinish = null, sessBreak = null, sessPrevBest = [];
 const trainLogLines = [];
 function trainLog(msg) {
@@ -593,6 +658,8 @@ function trainChunk() {
       if (r.dist > sessPrevBest[i]) sessPrevBest[i] = r.dist;
     });
     const fin = res.results.find(r => r.finished);
+    const reb = res.results.find(r => r.rebooted);
+    if (reb) trainLog(`🔄 R${sim.round} — ${reb.name} was hopeless: factory reset, new brain.`);
     if (fin) trainLog(`🏁 R${sim.round} — ${fin.name} finished in ${fin.time.toFixed(1)}s!`);
     else if (sessBreak && sessBreak.round === sim.round) trainLog(`⚡ R${sim.round} — ${sessBreak.name} smashed their best: ${sessBreak.dist.toFixed(0)}m!`);
     else if (sim.round % 25 === 0) trainLog(`…R${sim.round} — best so far: ${Math.max(...sim.agents.map(a => a.stats.bestDist)).toFixed(0)}m`);
@@ -697,6 +764,7 @@ sim.agents.forEach((a, i) => drawSpark(i));
 if (seen) { $('introPanel').classList.add('hidden'); paused = false; }
 else paused = true;
 let cardClock = 0;
+applyCamAspect();
 engine.runRenderLoop(() => {
   const rawMs = engine.getDeltaTime();
   const dtR = Math.min(0.05, rawMs / 1000);
@@ -704,12 +772,13 @@ engine.runRenderLoop(() => {
   const tNow = performance.now() / 1000;
   if (mode === 'watch' && !paused) stepWatch(dtReal);
   sim.agents.forEach((a, i) => syncSpider(spiderViews[i], a, tNow, dtR));
+  if (mode === 'watch') updateTV();
   updateCamera(dtR);
   cardClock += dtR;
   if (cardClock > 0.15) { cardClock = 0; if (mode === 'watch') updateCards(); }
   scene.render();
 });
-window.addEventListener('resize', () => engine.resize());
+window.addEventListener('resize', () => { engine.resize(); applyCamAspect(); });
 </script>
 </body>
 </html>
