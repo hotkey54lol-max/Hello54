@@ -141,6 +141,12 @@
     </div>
 
     <div class="card">
+      <h2>* ARCADE GUIDE (AI)</h2>
+      <button class="cyan" id="aiToggle">🤖 guide: …</button>
+      <p class="sub" style="margin:10px 0 0">the 🤖 ask-the-arcade button on every page. off = hidden for everyone, everywhere</p>
+    </div>
+
+    <div class="card">
       <h2>* PERMANENT</h2>
       <p class="sub" style="text-align:left;margin:0 0 10px">* background &amp; title survive refresh. every visitor sees them.</p>
       <input type="file" id="bgFile" accept="image/*">
@@ -305,6 +311,8 @@
     refreshChatToggle();
     setInterval(refreshChatToggle, 5000);
     refreshStoryToggle();
+    refreshAiToggle();
+    setInterval(refreshAiToggle, 5000);
     setInterval(refreshStoryToggle, 5000);
     refreshBgToggle();
     setInterval(refreshBgToggle, 5000);
@@ -401,6 +409,20 @@
       Arcade.storyteller.setEnabled(!on).then(function (ok) {
         toast(ok ? ("📖 storyteller " + (!on ? "enabled" : "disabled")) : "failed — offline?");
         refreshStoryToggle();
+      });
+    });
+  });
+  function refreshAiToggle() {
+    Arcade.ai.enabled().then(function (on) {
+      var b = document.getElementById("aiToggle");
+      b.textContent = on ? "🤖 guide: ON — tap to disable" : "🤖 guide: OFF — tap to enable";
+    });
+  }
+  document.getElementById("aiToggle").addEventListener("click", function () {
+    Arcade.ai.enabled().then(function (on) {
+      Arcade.ai.setEnabled(!on).then(function (ok) {
+        toast(ok ? ("🤖 guide " + (!on ? "enabled" : "disabled")) : "failed — offline?");
+        refreshAiToggle();
       });
     });
   });
