@@ -1060,7 +1060,8 @@ window.Arcade = (function () {
         _aiHistory.pop();
         if (_aiVisitorKey()) {
           try { localStorage.removeItem("arcade_groq_key"); } catch (e) {}
-          _aiShowKeyUI("* that key got rejected by groq, so i cleared it. the house key is tapped out too — paste a fresh groq key to keep chatting:");
+          _aiSyncTag();
+          _aiRow("* that key got rejected by groq, so i cleared it — you're back on the house key. ask again!", "sys");
         } else {
           _aiShowKeyUI("* the house groq key is tapped out (rate limit or quota). got your own? paste a groq api key — it stays in YOUR browser and talks straight to groq:");
         }
@@ -1416,7 +1417,7 @@ window.Arcade = (function () {
    * to the same new value, or every open page will nag/reload forever.
    * Pages can opt out with window.ARCADE_NO_UPDATE=true.
    */
-  const ARCADE_BUILD = "2026-10-22.44";
+  const ARCADE_BUILD = "2026-10-22.45";
   let _updateHandled = false;
 
   function _siteBase() {
