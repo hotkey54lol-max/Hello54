@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🎬 Theater — Joslyn's Arcade</title>
+<link rel="icon" href="data:,">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { min-height:100%; background:#000; color:#fff; font-family:'Courier New', monospace; }
+  body { display:flex; flex-direction:column; align-items:center; padding:18px 14px 40px; }
+  .back { align-self:flex-start; color:#ffd94d; text-decoration:none; border:2px solid #ffd94d; border-radius:6px; padding:4px 10px; font-weight:700; font-size:.8rem; }
+  h1 { font-size:1.5rem; letter-spacing:.22em; margin:16px 0 2px; text-align:center; }
+  .tag { color:#9fc4e8; font-size:.82rem; margin-bottom:18px; text-align:center; }
+  .row { display:flex; gap:8px; width:min(720px, 94vw); }
+  #link { flex:1; background:#000; color:#fff; border:2px solid #3f6ea3; border-radius:8px; padding:11px 12px; font-family:inherit; font-size:.9rem; min-width:0; }
+  #link:focus { border-color:#ffd94d; outline:none; }
+  #go { background:#000; color:#ffd94d; border:2px solid #ffd94d; border-radius:8px; padding:11px 18px; font-size:.95rem; cursor:pointer; font-family:inherit; font-weight:700; }
+  #status { margin-top:10px; font-size:.8rem; color:#bfe3ff; min-height:1.2em; text-align:center; max-width:94vw; }
+  #stage { margin-top:16px; width:min(720px, 94vw); aspect-ratio:16/9; background:#050a10; border:2px solid #2c4a66; border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  #stage iframe { width:100%; height:100%; border:0; display:block; }
+  #empty { color:#5f7d9c; font-size:.85rem; text-align:center; padding:20px; line-height:1.7; }
+  .bar { margin-top:12px; display:flex; gap:8px; }
+  .bar button { background:#000; color:#fff; border:2px solid #fff; border-radius:8px; padding:8px 14px; font-size:.85rem; cursor:pointer; font-family:inherit; }
+  .bar button:hover { border-color:#ffd94d; color:#ffd94d; }
+  #recent { margin-top:18px; width:min(720px, 94vw); display:none; }
+  #recent .h { font-size:.78rem; color:#9fc4e8; letter-spacing:.14em; margin-bottom:8px; }
+  .ritem { display:block; width:100%; text-align:left; background:#050a10; color:#fff; border:1px solid #2c4a66; border-radius:8px; padding:9px 12px; margin-top:6px; cursor:pointer; font-family:inherit; font-size:.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ritem:hover { border-color:#ffd94d; }
+  .note { margin-top:20px; color:#5f7d9c; font-size:.7rem; text-align:center; max-width:640px; line-height:1.6; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← HUB</a>
+<h1>🎬 THE THEATER</h1>
+<div class="tag">* a quiet room with a big screen. paste a youtube link, take a seat.</div>
+
+<div class="row">
+  <input id="link" type="text" placeholder="paste a YouTube link (or just a video ID)…" autocomplete="off" spellcheck="false">
+  <button id="go">▶ PLAY</button>
+</div>
+<div id="status"></div>
+
+<div id="stage">
+  <div id="empty">🍿 nothing on the screen yet<br>paste a link above and press play</div>
+  <iframe id="player" title="video player" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" style="display:none;"></iframe>
+</div>
+<div class="bar">
+  <button id="fsBtn">⛶ Fullscreen</button>
+  <button id="clearBtn">✖ Clear screen</button>
+</div>
+
+<div id="recent"><div class="h">* RECENTLY SCREENED</div><div id="rlist"></div></div>
+
+<div class="note">* the video streams straight from youtube's own servers into the frame — this page just holds the screen.<br>* if the screen stays black or shows a block message, the network said no. nothing breaks — the room just stays quiet.</div>
+
+<script>
+'use strict';
+const linkEl = document.getElementById('link');
+const statusEl = document.getElementById('status');
+const stage = document.getElementById('stage');
+const emptyEl = document.getElementById('empty');
+const player = document.getElementById('player');
+const recentBox = document.getElementById('recent');
+const rlist = document.getElementById('rlist');
+const LS_KEY = 'theater_recent';
+
+function parseId(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  const pats = [
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /\/(?:shorts|embed|live|v)\/([A-Za-z0-9_-]{11})/,
+  ];
+  for (const p of pats) { const m = p.exec(s); if (m) return m[1]; }
+  return null;
+}
+
+function getRecent() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch (e) { return []; }
+}
+function pushRecent(id, label) {
+  let r = getRecent().filter(x => x.id !== id);
+  r.unshift({ id: id, label: label || id });
+  r = r.slice(0, 6);
+  try { localStorage.setItem(LS_KEY, JSON.stringify(r)); } catch (e) {}
+  renderRecent();
+}
+function renderRecent() {
+  const r = getRecent();
+  recentBox.style.display = r.length ? '' : 'none';
+  rlist.innerHTML = '';
+  for (const item of r) {
+    const b = document.createElement('button');
+    b.className = 'ritem';
+    b.textContent = '🎞 ' + item.label;
+    b.addEventListener('click', () => play(item.id));
+    rlist.appendChild(b);
+  }
+}
+
+function play(id) {
+  player.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0';
+  player.style.display = '';
+  emptyEl.style.display = 'none';
+  statusEl.textContent = '🍿 now screening — if it stays black, the network blocked the stream itself.';
+  pushRecent(id, 'youtube.com/watch?v=' + id);
+}
+
+function go() {
+  const id = parseId(linkEl.value);
+  if (!id) {
+    statusEl.textContent = '⚠ that doesn\'t look like a YouTube link or video ID — try copying the full link from the video page.';
+    return;
+  }
+  play(id);
+}
+
+document.getElementById('go').addEventListener('click', go);
+linkEl.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+linkEl.addEventListener('paste', () => setTimeout(go, 60));
+document.getElementById('fsBtn').addEventListener('click', () => {
+  if (stage.requestFullscreen) stage.requestFullscreen().catch(() => {});
+});
+document.getElementById('clearBtn').addEventListener('click', () => {
+  player.removeAttribute('src');
+  player.style.display = 'none';
+  emptyEl.style.display = '';
+  statusEl.textContent = '';
+  linkEl.value = '';
+});
+renderRecent();
+window.__theater = { parseId: parseId, play: play, src: () => player.getAttribute('src') || '' };
+</script>
+</body>
+</html>
