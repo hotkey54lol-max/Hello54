@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Red Light, Green Legs — Joslyn's Arcade</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#0b0b10; font-family:'Press Start 2P', monospace; color:#eee; }
+  #renderCanvas { width:100%; height:100%; display:block; touch-action:none; outline:none; }
+  .hud { position:fixed; z-index:10; }
+  #topbar { top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start; padding:10px 12px; pointer-events:none; }
+  #topbar > * { pointer-events:auto; }
+  .titlebox { background:rgba(10,10,16,.78); border:3px solid #fff; padding:8px 10px; font-size:11px; line-height:1.7; }
+  .titlebox a { color:#ffd94a; text-decoration:none; }
+  .titlebox .sub { font-size:8px; color:#9fd; }
+  #lightbox { text-align:center; background:rgba(10,10,16,.78); border:3px solid #fff; padding:8px 14px; min-width:210px; }
+  #lightLamp { font-size:26px; line-height:1.1; }
+  #lightText { font-size:13px; margin-top:4px; }
+  #roundInfo { font-size:8px; color:#bbb; margin-top:6px; line-height:1.7; }
+  #ticker { font-size:8px; color:#ffd94a; margin-top:5px; min-height:12px; }
+  .btnrow { display:flex; gap:6px; flex-wrap:wrap; }
+  button { font-family:inherit; font-size:9px; background:#1c1c26; color:#eee; border:3px solid #fff; padding:8px 9px; cursor:pointer; line-height:1.4; }
+  button:hover { background:#33334a; }
+  button.on { background:#ffd94a; color:#111; border-color:#ffd94a; }
+  button.warn { border-color:#ff5a5a; color:#ff8a8a; }
+  #sidebtns { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+  #cards { left:10px; bottom:10px; display:flex; flex-direction:column; gap:7px; max-width:250px; }
+  .card { background:rgba(10,10,16,.82); border:3px solid #666; padding:7px 9px; cursor:pointer; font-size:8px; line-height:1.65; }
+  .card.sel { border-color:#ffd94a; }
+  .card .nm { font-size:10px; }
+  .card .bar { height:9px; background:#26262f; border:2px solid #555; margin:4px 0; position:relative; }
+  .card .fill { position:absolute; left:0; top:0; bottom:0; }
+  .card canvas { display:block; margin-top:4px; background:#101018; }
+  .card .st { color:#bbb; }
+  .card .st b { color:#fff; font-weight:normal; }
+  #controls { bottom:10px; left:50%; transform:translateX(-50%); background:rgba(10,10,16,.82); border:3px solid #fff; padding:8px 10px; display:flex; flex-direction:column; gap:7px; align-items:center; }
+  #controls .lbl { font-size:7px; color:#999; }
+  #banner { top:22%; left:50%; transform:translateX(-50%); text-align:center; font-size:19px; line-height:1.9; text-shadow:3px 3px 0 #000; pointer-events:none; opacity:0; transition:opacity .25s; max-width:92vw; }
+  #banner .small { font-size:10px; color:#ffd94a; }
+  .panel { position:fixed; z-index:30; top:50%; left:50%; transform:translate(-50%,-50%); width:min(680px,94vw); max-height:92vh; overflow:auto; background:rgba(8,8,14,.96); border:4px solid #fff; padding:20px 22px; font-size:10px; line-height:2; }
+  .panel h1 { font-size:16px; line-height:1.7; text-align:center; margin-bottom:8px; }
+  .panel h2 { font-size:11px; margin:12px 0 4px; color:#ffd94a; }
+  .panel p { color:#ccc; }
+  .panel .big { display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  .panel button { font-size:11px; padding:12px 14px; }
+  .hidden { display:none !important; }
+  #trainStats { display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; margin-top:6px; }
+  #trainLog { margin-top:10px; font-size:8px; color:#9fd; line-height:1.9; min-height:56px; }
+  #sudden { text-align:center; font-size:12px; color:#ffd94a; line-height:2; margin-top:10px; }
+  .mile { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  #hof { right:10px; bottom:10px; background:rgba(10,10,16,.82); border:3px solid #666; padding:8px 10px; font-size:8px; line-height:1.8; color:#bbb; text-align:right; }
+  #hof b { color:#ffd94a; font-weight:normal; }
+  @media (max-width: 760px) {
+    #cards { max-width:172px; }
+    .card canvas { display:none; }
+    #hof { display:none; }
+    #lightbox { min-width:150px; }
+    .titlebox .sub { display:none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="renderCanvas"></canvas>
+
+<div class="hud" id="topbar">
+  <div class="titlebox">
+    🚦 RED LIGHT,<br>GREEN LEGS 🕷️<br>
+    <span class="sub">* 4 spider-bots. 0 instructions.<br>* they learn. you watch.</span><br>
+    <a href="../index.html">← ARCADE</a>
+  </div>
+  <div id="lightbox">
+    <div id="lightLamp">🟢</div>
+    <div id="lightText">GREEN — GO!</div>
+    <div id="roundInfo">ROUND 1 · 60.0s</div>
+    <div id="ticker"></div>
+  </div>
+  <div id="sidebtns">
+    <button id="btnSound">🔊 SOUND ON</button>
+    <button id="btnReset" class="warn">🧠 RESET BRAINS</button>
+  </div>
+</div>
+
+<div class="hud" id="cards"></div>
+
+<div class="hud" id="controls">
+  <div class="btnrow">
+    <button id="modeWatch" class="on">👀 WATCH</button>
+    <button id="modeTrain">🏋️ TRAIN</button>
+    <button id="btnPause">⏸ PAUSE</button>
+  </div>
+  <div class="btnrow" id="speedRow">
+    <span class="lbl">SPEED</span>
+    <button data-speed="1" class="spd on">1×</button>
+    <button data-speed="2" class="spd">2×</button>
+    <button data-speed="4" class="spd">4×</button>
+    <button data-speed="8" class="spd">8×</button>
+  </div>
+  <div class="btnrow">
+    <span class="lbl">CAMERA</span>
+    <button id="camDirector" class="camb on">🎬 DIRECTOR</button>
+    <button id="camFree" class="camb">🕹️ FREE</button>
+    <span class="lbl">click a spider's card for its cam</span>
+  </div>
+</div>
+
+<div class="hud" id="hof"></div>
+<div class="hud" id="banner"></div>
+
+<!-- INTRO -->
+<div class="panel" id="introPanel">
+  <h1>🚦 RED LIGHT, GREEN LEGS 🕷️</h1>
+  <p>* An empty warehouse. A giant traffic light. Four spider-bots with googly eyes — each running its own tiny AI brain.</p>
+  <p>* Nobody taught them to walk. They learn from rewards alone: forward on <span style="color:#5f5">GREEN</span> is good, moving on <span style="color:#f66">RED</span> gets you SENT BACK to the start, finishing is jackpot.</p>
+  <p>* Early rounds are pure chaos. Given enough rounds, they figure it out — well, most of them do. There's usually one hopeless case. You will adopt him.</p>
+  <h2>* HOW DO YOU WANT TO START?</h2>
+  <div class="big">
+    <button id="introWatch">👀 WATCH THEM LEARN</button>
+    <button id="introTrain">🏋️ TRAIN THEM FIRST</button>
+  </div>
+  <p style="text-align:center; margin-top:10px;">* You can switch any time. Watching is never forced.<br>* Their brains save on this device — they keep learning between visits.</p>
+</div>
+
+<!-- TRAINING -->
+<div class="panel hidden" id="trainPanel">
+  <h1>🏋️ TRAINING MODE</h1>
+  <p>* The spiders grind rounds headlessly — no watching, maximum speed — until a <span style="color:#ffd94a">SUDDEN POINT</span>. Then it's your call.</p>
+  <h2>* TRAIN UNTIL…</h2>
+  <div class="mile" id="mileRow">
+    <button data-mile="first" class="mileb on">🏁 FIRST FINISHER</button>
+    <button data-mile="break" class="mileb">⚡ A BREAKTHROUGH</button>
+    <button data-mile="fifty" class="mileb">50 ROUNDS</button>
+    <button data-mile="twohundred" class="mileb">200 ROUNDS</button>
+  </div>
+  <div id="trainStats"></div>
+  <div id="trainLog"></div>
+  <div id="sudden" class="hidden"></div>
+  <div class="big">
+    <button id="trainGo">▶ START TRAINING</button>
+    <button id="trainStop" class="hidden">⏹ STOP</button>
+    <button id="trainWatch">👀 WATCH NOW</button>
+  </div>
+</div>
+
+<script src="../lib/babylon.min.js"></script>
+<script src="../rlgl/sim.js"></script>
+<script src="../js/arcade.js"></script>
+<script>
+'use strict';
+/* ================= state ================= */
+const SAVE_KEY = 'rlgl_save_v1', SEEN_KEY = 'rlgl_seen_v1';
+let sim = RLGL.makeSim((Date.now() % 100000) + 7);
+let saveLoaded = false;
+try {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (raw) saveLoaded = RLGL.deserialize(sim, JSON.parse(raw));
+} catch (e) { /* fresh start */ }
+
+let mode = 'watch';           // 'watch' | 'train'
+let paused = false;
+let speedMul = 1;
+let roundActive = false;
+let resultsTimer = 0;
+let camMode = 'director';     // 'director' | 'free' | 'agent'
+let camAgent = 0;
+let focusIdx = 0, focusTimer = 0;
+let soundOn = true;
+let audioCtx = null;
+
+function save() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(RLGL.serialize(sim))); } catch (e) {}
+}
+window.addEventListener('pagehide', save);
+
+/* ================= audio ================= */
+function ac() {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function tone(freq, dur, type, vol, slideTo, delay) {
+  if (!soundOn) return;
+  const ctx = ac(); if (!ctx) return;
+  const t0 = ctx.currentTime + (delay || 0);
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
+  g.gain.setValueAtTime(vol || 0.06, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+const sfx = {
+  green() { tone(660, 0.09, 'square', 0.05); tone(880, 0.12, 'square', 0.05, 0, 0.09); },
+  red() { tone(150, 0.28, 'sawtooth', 0.07); },
+  sentback() { tone(520, 0.38, 'square', 0.07, 65); },
+  finish() { tone(523, 0.12, 'square', 0.06); tone(659, 0.12, 'square', 0.06, 0, 0.1); tone(784, 0.22, 'square', 0.06, 0, 0.2); },
+  trip() { tone(95, 0.16, 'sine', 0.12, 45); },
+};
+
+/* ================= babylon scene ================= */
+const canvas = document.getElementById('renderCanvas');
+const engine = new BABYLON.Engine(canvas, true, { stencil: false });
+const scene = new BABYLON.Scene(engine);
+scene.clearColor = new BABYLON.Color4(0.04, 0.04, 0.06, 1);
+scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+scene.fogDensity = 0.0026;
+scene.fogColor = new BABYLON.Color3(0.04, 0.04, 0.06);
+
+const camMain = new BABYLON.UniversalCamera('camMain', new BABYLON.Vector3(0, 5.4, -11), scene);
+camMain.setTarget(new BABYLON.Vector3(0, 0.7, 5));
+camMain.fov = 0.95;
+const camFree = new BABYLON.ArcRotateCamera('camFree', -Math.PI / 2, 1.02, 30, new BABYLON.Vector3(0, 1, 34), scene);
+camFree.lowerRadiusLimit = 4; camFree.upperRadiusLimit = 90;
+camFree.maxZ = 300;
+scene.activeCamera = camMain;
+
+const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0.2), scene);
+hemi.intensity = 0.75;
+hemi.diffuse = new BABYLON.Color3(0.85, 0.87, 0.95);
+hemi.groundColor = new BABYLON.Color3(0.22, 0.22, 0.28);
+const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(0.35, -1, 0.3), scene);
+sun.position = new BABYLON.Vector3(-22, 32, -14);
+sun.intensity = 0.85;
+sun.setDirectionToTarget(new BABYLON.Vector3(0, 0, 46));
+Object.assign(sun, { orthoLeft: -75, orthoRight: 75, orthoTop: 75, orthoBottom: -75, shadowMinZ: 1, shadowMaxZ: 140 });
+const shadows = new BABYLON.ShadowGenerator(1024, sun);
+shadows.useBlurExponentialShadowMap = true;
+shadows.blurKernel = 18;
+const trafficPt = new BABYLON.PointLight('tpt', new BABYLON.Vector3(0, 7.2, 99), scene);
+trafficPt.intensity = 1.6; trafficPt.distance = 150;
+trafficPt.diffuse = new BABYLON.Color3(0.2, 1, 0.35);
+
+function stdMat(r, g, b, opts) {
+  const m = new BABYLON.StandardMaterial('m' + Math.random(), scene);
+  m.diffuseColor = new BABYLON.Color3(r, g, b);
+  m.specularColor = new BABYLON.Color3(0.14, 0.14, 0.14);
+  if (opts && opts.emissive) m.emissiveColor = opts.emissive;
+  if (opts && opts.alpha !== undefined) { m.alpha = opts.alpha; m.transparencyMode = 2; }
+  return m;
+}
+function box(name, w, h, d, x, y, z, mat) {
+  const b = BABYLON.MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
+  b.position.set(x, y, z); b.material = mat;
+  b.receiveShadows = true;
+  return b;
+}
+
+/* warehouse shell — deliberately EMPTY, per spec */
+(function buildWarehouse() {
+  const floorMat = stdMat(0.21, 0.21, 0.24);
+  const floor = BABYLON.MeshBuilder.CreateGround('floor', { width: 16.4, height: 118 }, scene);
+  floor.position.set(0, 0, 51); floor.material = floorMat; floor.receiveShadows = true;
+  const laneMat = stdMat(0.32, 0.32, 0.38);
+  for (const lx of [-6, -3, 0, 3, 6]) box('lane', 0.09, 0.012, 100, lx, 0.008, 50, laneMat);
+  box('startline', 13, 0.02, 0.55, 0, 0.012, 0, stdMat(0.9, 0.9, 0.9));
+  // finish checker strip (16 small boxes — no texture needed)
+  const chkB = stdMat(0.05, 0.05, 0.05), chkW = stdMat(0.9, 0.9, 0.9);
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 2; j++) {
+    box('chk', 13 / 8, 0.02, 0.85, -6.5 + (i + 0.5) * (13 / 8), 0.012, 99.15 + j * 0.85, (i + j) % 2 ? chkB : chkW);
+  }
+  const wallMat = stdMat(0.13, 0.13, 0.18);
+  const seamMat = stdMat(0.17, 0.17, 0.24);
+  box('wallL', 0.4, 12, 118, -8.4, 6, 51, wallMat);
+  box('wallR', 0.4, 12, 118, 8.4, 6, 51, wallMat);
+  box('wallB', 17.2, 12, 0.4, 0, 6, -7.8, wallMat);
+  box('wallF', 17.2, 12, 0.4, 0, 6, 109.8, wallMat);
+  box('ceil', 17.2, 0.3, 118, 0, 12.1, 51, stdMat(0.07, 0.07, 0.1));
+  for (let z = -2; z <= 106; z += 13.5) {
+    box('seamL', 0.1, 12, 0.35, -8.15, 6, z, seamMat);
+    box('seamR', 0.1, 12, 0.35, 8.15, 6, z, seamMat);
+  }
+  const stripMat = stdMat(0.9, 0.95, 1, { emissive: new BABYLON.Color3(0.55, 0.62, 0.75) });
+  for (let z = 4; z <= 104; z += 16.6) box('strip', 2.4, 0.06, 0.55, 0, 11.9, z, stripMat);
+})();
+
+/* the giant traffic light */
+const lightMats = {};
+(function buildTrafficLight() {
+  const dark = stdMat(0.05, 0.05, 0.07);
+  box('cord', 0.22, 3.4, 0.22, 0, 10.3, 104, dark);
+  box('housing', 1.25, 2.9, 0.75, 0, 7.1, 104, dark);
+  function lamp(y, key, rgb) {
+    const m = new BABYLON.StandardMaterial('lamp' + key, scene);
+    m.diffuseColor = new BABYLON.Color3(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25);
+    m.emissiveColor = new BABYLON.Color3(rgb[0], rgb[1], rgb[2]);
+    m.emissiveIntensity = 0.12;
+    const d = BABYLON.MeshBuilder.CreateDisc('disc' + key, { radius: 0.46, tessellation: 28 }, scene);
+    d.position.set(0, y, 103.6); d.rotation.y = Math.PI; d.material = m;
+    lightMats[key] = m;
+  }
+  lamp(7.85, 'red', [1, 0.13, 0.13]);
+  lamp(6.35, 'green', [0.15, 1, 0.3]);
+})();
+function paintLight(state) {
+  const red = state === 'red';
+  lightMats.red.emissiveIntensity = red ? 2.6 : 0.12;
+  lightMats.green.emissiveIntensity = red ? 0.12 : 2.6;
+  trafficPt.diffuse = red ? new BABYLON.Color3(1, 0.18, 0.18) : new BABYLON.Color3(0.2, 1, 0.35);
+  hemi.diffuse = red ? new BABYLON.Color3(0.95, 0.72, 0.72) : new BABYLON.Color3(0.8, 0.95, 0.85);
+}
+
+/* spiders */
+const _up = new BABYLON.Vector3(0, 1, 0);
+const _dir = new BABYLON.Vector3(), _mid = new BABYLON.Vector3(), _q = new BABYLON.Quaternion();
+function setLimb(mesh, ax, ay, az, bx, by, bz) {
+  _dir.set(bx - ax, by - ay, bz - az);
+  const len = Math.max(0.05, _dir.length());
+  _mid.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
+  mesh.position.copyFrom(_mid);
+  mesh.scaling.y = len;
+  _dir.normalize();
+  BABYLON.Quaternion.FromUnitVectorsToRef(_up, _dir, _q);
+  mesh.rotationQuaternion = _q.clone();
+}
+function buildSpider(a) {
+  const v = { eyeSpin: 0, pupils: [], whites: [] };
+  const rig = new BABYLON.TransformNode('rig' + a.name, scene);
+  v.rig = rig;
+  const col = new BABYLON.Color3(a.color[0], a.color[1], a.color[2]);
+  const bodyMat = new BABYLON.StandardMaterial('bm' + a.name, scene);
+  bodyMat.diffuseColor = col; bodyMat.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+  const body = BABYLON.MeshBuilder.CreateSphere('body' + a.name, { diameter: 1.26, segments: 14 }, scene);
+  body.scaling.set(1.05, 0.78, 1.32); body.material = bodyMat;
+  body.parent = rig; shadows.addShadowCaster(body);
+  v.body = body;
+  // googly eyes on stalks
+  const stalkMat = stdMat(0.1, 0.1, 0.12);
+  const whiteMat = stdMat(0.95, 0.95, 0.95);
+  const pupilMat = stdMat(0.02, 0.02, 0.02);
+  for (const s of [-1, 1]) {
+    const stalk = BABYLON.MeshBuilder.CreateCylinder('stalk', { height: 0.26, diameter: 0.05 }, scene);
+    stalk.position.set(s * 0.27, 0.55, 0.42); stalk.rotation.x = 0.25; stalk.material = stalkMat; stalk.parent = rig;
+    const white = BABYLON.MeshBuilder.CreateSphere('eye', { diameter: 0.34, segments: 10 }, scene);
+    white.position.set(s * 0.27, 0.7, 0.47); white.material = whiteMat; white.parent = rig;
+    const pupil = BABYLON.MeshBuilder.CreateSphere('pupil', { diameter: 0.16, segments: 8 }, scene);
+    pupil.material = pupilMat; pupil.parent = rig;
+    v.whites.push(white); v.pupils.push(pupil);
+  }
+  // legs (world-space limbs, repositioned every frame)
+  const legMat = stdMat(0.13, 0.13, 0.16);
+  v.upper = []; v.lower = [];
+  for (let i = 0; i < 8; i++) {
+    const up = BABYLON.MeshBuilder.CreateCylinder('up' + i, { height: 1, diameterTop: 0.055, diameterBottom: 0.085 }, scene);
+    up.material = legMat; shadows.addShadowCaster(up); v.upper.push(up);
+    const lo = BABYLON.MeshBuilder.CreateCylinder('lo' + i, { height: 1, diameterTop: 0.04, diameterBottom: 0.06 }, scene);
+    lo.material = legMat; shadows.addShadowCaster(lo); v.lower.push(lo);
+  }
+  // tracking ring
+  const ringMat = new BABYLON.StandardMaterial('ring' + a.name, scene);
+  ringMat.diffuseColor = col; ringMat.emissiveColor = col.scale(0.4); ringMat.alpha = 0.55;
+  const ring = BABYLON.MeshBuilder.CreateDisc('ring', { radius: 1.05, tessellation: 26 }, scene);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.02; ring.material = ringMat;
+  v.ring = ring;
+  return v;
+}
+const spiderViews = sim.agents.map(buildSpider);
+
+function syncSpider(v, a, tNow, dtR) {
+  const rt = a.rt; if (!rt) return;
+  const bob = Math.sin(rt.phase * 2) * 0.03 * Math.min(1, rt.speed) + (rt.finished ? Math.abs(Math.sin(tNow * 5)) * 0.09 : 0);
+  v.rig.position.set(rt.x, 0.85 + bob, rt.z);
+  v.rig.rotationQuaternion = BABYLON.Quaternion.RotationYawPitchRoll(rt.heading, rt.pitch, rt.roll);
+  v.ring.position.x = rt.x; v.ring.position.z = rt.z;
+  v.eyeSpin = Math.max(0, v.eyeSpin - dtR);
+  for (let e = 0; e < 2; e++) {
+    const w = v.whites[e], p = v.pupils[e];
+    let ox = Math.sin(tNow * 16 + e * 2.1) * 0.012 * (1 + rt.speed);
+    let oy = Math.cos(tNow * 13 + e * 1.7) * 0.01 * (1 + rt.speed) + (rt.finished ? 0.045 : 0);
+    let oz = 0.145;
+    if (v.eyeSpin > 0) {
+      const ang = (0.7 - v.eyeSpin) * 26 + e * 0.7;
+      ox = Math.sin(ang) * 0.075; oy = Math.cos(ang) * 0.075; oz = 0.11;
+    }
+    p.position.set(w.position.x + ox, w.position.y + oy, w.position.z + oz);
+  }
+  for (let leg = 0; leg < 8; leg++) {
+    const i3 = leg * 3;
+    setLimb(v.upper[leg], rt.hips[i3], rt.hips[i3 + 1], rt.hips[i3 + 2], rt.knees[i3], rt.knees[i3 + 1], rt.knees[i3 + 2]);
+    setLimb(v.lower[leg], rt.knees[i3], rt.knees[i3 + 1], rt.knees[i3 + 2], rt.feet[i3], rt.feet[i3 + 1], rt.feet[i3 + 2]);
+  }
+}
+
+/* ================= HUD ================= */
+const $ = id => document.getElementById(id);
+const cssCol = c => `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`;
+const cardsEl = $('cards');
+sim.agents.forEach((a, i) => {
+  const d = document.createElement('div');
+  d.className = 'card'; d.id = 'card' + i;
+  d.innerHTML = `<div class="nm"><span style="color:${cssCol(a.color)}">●</span> ${a.name} <span style="float:right;color:#888">📷</span></div>
+    <div class="bar"><div class="fill" id="fill${i}" style="background:${cssCol(a.color)};width:0%"></div></div>
+    <div class="st" id="st${i}">at the start line…</div>
+    <canvas width="218" height="24" id="spark${i}"></canvas>`;
+  d.title = 'Ride along with ' + a.name;
+  d.onclick = () => setCam('agent', i);
+  cardsEl.appendChild(d);
+});
+function drawSpark(i) {
+  const cv = $('spark' + i); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const h = sim.agents[i].stats.distHistory;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = 'rgba(255,255,255,.14)';
+  ctx.beginPath(); ctx.moveTo(0, 2.5); ctx.lineTo(cv.width, 2.5); ctx.stroke();
+  if (h.length < 2) return;
+  ctx.strokeStyle = cssCol(sim.agents[i].color); ctx.lineWidth = 1.6; ctx.beginPath();
+  h.forEach((d, k) => {
+    const x = (k / (h.length - 1)) * (cv.width - 2) + 1;
+    const y = cv.height - 2 - (Math.min(100, d) / 100) * (cv.height - 4);
+    k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.stroke();
+}
+function updateCards() {
+  sim.agents.forEach((a, i) => {
+    const rt = a.rt; if (!rt) return;
+    $('fill' + i).style.width = Math.min(100, (rt.z / RLGL.TRACK_LEN) * 100) + '%';
+    const s = a.stats;
+    $('st' + i).innerHTML =
+      `DIST <b>${rt.z.toFixed(1)}m</b> · BEST <b>${s.bestDist.toFixed(0)}m</b><br>` +
+      `🏁 <b>${s.finishes}</b> · ⤺ <b>${rt.sentBacks}</b> this round · 🏆 <b>${s.wins}</b>` +
+      (rt.finished ? `<br><span style="color:#5f5">FINISHED ${rt.finishTime.toFixed(1)}s!</span>` : '');
+    $('card' + i).classList.toggle('sel', camMode === 'agent' && camAgent === i);
+  });
+}
+function updateHOF() {
+  let fastest = null, mostWins = null, totRounds = 0, totFin = 0;
+  for (const a of sim.agents) {
+    totRounds += a.stats.rounds; totFin += a.stats.finishes;
+    if (a.stats.bestTime && (!fastest || a.stats.bestTime < fastest.stats.bestTime)) fastest = a;
+    if (!mostWins || a.stats.wins > mostWins.stats.wins) mostWins = a;
+  }
+  $('hof').innerHTML = `🏆 HALL OF FAME<br>` +
+    (fastest ? `FASTEST FINISH <b>${fastest.stats.bestTime.toFixed(1)}s — ${fastest.name}</b><br>` : `NO FINISHERS YET<br>`) +
+    `MOST WINS <b>${mostWins.name} (${mostWins.stats.wins})</b><br>` +
+    `ROUNDS TRAINED <b>${totRounds.toLocaleString()}</b> · FINISHES <b>${totFin}</b>`;
+}
+let bannerTimer = null;
+function showBanner(html, ms) {
+  const b = $('banner');
+  b.innerHTML = html; b.style.opacity = 1;
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { b.style.opacity = 0; }, ms || 2600);
+}
+let tickerTimer = null;
+function tick(msg) {
+  $('ticker').textContent = msg;
+  clearTimeout(tickerTimer);
+  tickerTimer = setTimeout(() => { $('ticker').textContent = ''; }, 4200);
+}
+function paintLightUI() {
+  const red = sim.light.state === 'red';
+  $('lightLamp').textContent = red ? '🔴' : '🟢';
+  $('lightText').textContent = red ? 'RED — FREEZE!' : 'GREEN — GO!';
+  $('lightText').style.color = red ? '#ff7a7a' : '#7aff8a';
+  $('lightbox').style.borderColor = red ? '#ff5a5a' : '#5aff7a';
+  $('roundInfo').textContent = `ROUND ${sim.round} · ${Math.max(0, RLGL.ROUND_TIME - sim.time).toFixed(1)}s`;
+}
+
+/* ================= cameras ================= */
+const _camPos = new BABYLON.Vector3(0, 5.4, -11), _camTgt = new BABYLON.Vector3(0, 0.7, 5);
+function setCam(m, idx) {
+  camMode = m;
+  if (idx !== undefined) camAgent = idx;
+  $('camDirector').classList.toggle('on', m === 'director');
+  $('camFree').classList.toggle('on', m === 'free');
+  if (m === 'free') { scene.activeCamera = camFree; camFree.attachControl(canvas, true); }
+  else { camFree.detachControl(); scene.activeCamera = camMain; }
+  updateCards();
+}
+function pickFocus() {
+  let idx = 0, best = -1;
+  if (sim.light.state === 'red' && sim.light.t < 1.4) {
+    sim.agents.forEach((a, i) => { if (!a.rt.finished && a.rt.speed > best) { best = a.rt.speed; idx = i; } });
+  } else {
+    sim.agents.forEach((a, i) => { if (!a.rt.finished && a.rt.z > best) { best = a.rt.z; idx = i; } });
+    if (best < 0) sim.agents.forEach((a, i) => { if (a.rt.z > best) { best = a.rt.z; idx = i; } });
+  }
+  return idx;
+}
+function updateCamera(dtR) {
+  if (camMode === 'free') return;
+  let k, dp, dt2;
+  if (camMode === 'agent') {
+    const rt = sim.agents[camAgent].rt; if (!rt) return;
+    const fx = Math.sin(rt.heading), fz = Math.cos(rt.heading);
+    dp = new BABYLON.Vector3(rt.x - fx * 5.4, 2.5, rt.z - fz * 5.4);
+    dt2 = new BABYLON.Vector3(rt.x + fx * 4.5, 0.5, rt.z + fz * 4.5);
+    k = 1 - Math.exp(-5 * dtR);
+  } else {
+    focusTimer -= dtR;
+    if (focusTimer <= 0) { focusIdx = pickFocus(); focusTimer = 1.4; }
+    const rt = sim.agents[focusIdx].rt; if (!rt) return;
+    dp = new BABYLON.Vector3(rt.x * 0.4, 6.4, Math.min(92, Math.max(-11, rt.z - 14)));
+    dt2 = new BABYLON.Vector3(rt.x * 0.55, 0.6, rt.z + 4.5);
+    k = 1 - Math.exp(-2.4 * dtR);
+  }
+  BABYLON.Vector3.LerpToRef(_camPos, dp, k, _camPos);
+  BABYLON.Vector3.LerpToRef(_camTgt, dt2, k, _camTgt);
+  camMain.position.copyFrom(_camPos);
+  camMain.setTarget(_camTgt);
+}
+
+/* ================= watch mode ================= */
+let lastLight = 'green', simAcc = 0;
+function handleEvents() {
+  for (const ev of sim.events) {
+    const i = sim.agents.findIndex(a => a.name === ev.agent);
+    if (ev.type === 'sentback') { sfx.sentback(); if (i >= 0) spiderViews[i].eyeSpin = 0.7; tick(`⤺ ${ev.agent} SENT BACK!`); }
+    else if (ev.type === 'finish') { sfx.finish(); tick(`🏁 ${ev.agent} FINISHED!`); }
+    else if (ev.type === 'trip') { sfx.trip(); tick(`💥 ${ev.agent} tripped!`); }
+  }
+}
+function startWatchRound() {
+  RLGL.beginRound(sim, false); // watch = best brains on show; learning lives in training
+  roundActive = true; simAcc = 0; lastLight = 'green';
+  paintLight('green'); paintLightUI();
+  showBanner(`ROUND ${sim.round}<div class="small">green means GO · red means BACK TO START</div>`, 1800);
+}
+function endWatchRound(quiet) {
+  const res = RLGL.endRound(sim);
+  roundActive = false; resultsTimer = 3.4;
+  const fins = res.results.filter(r => r.finished);
+  const improved = res.results.filter(r => r.adopted).map(r => r.name);
+  let html = `🏁 ROUND ${res.round} — ${res.winner} WINS`;
+  html += `<div class="small">` + (fins.length
+    ? fins.map(r => `${r.name} ⏱ ${r.time.toFixed(1)}s`).join(' · ')
+    : `no finishers — best ${Math.max(...res.results.map(r => r.dist)).toFixed(0)}m`) + `</div>`;
+  if (improved.length) html += `<div class="small">🧠 brain improved: ${improved.join(', ')}</div>`;
+  if (!quiet) showBanner(html, 3200);
+  sim.agents.forEach((a, i) => drawSpark(i));
+  updateHOF(); save();
+}
+function stepWatch(dtReal) {
+  if (resultsTimer > 0) {
+    resultsTimer -= dtReal;
+    if (resultsTimer <= 0 && mode === 'watch' && !paused) startWatchRound();
+    return;
+  }
+  if (!roundActive) { startWatchRound(); return; }
+  simAcc += dtReal * speedMul;
+  let guard = 0;
+  while (simAcc >= RLGL.DT && guard++ < 90) {
+    RLGL.stepSim(sim, RLGL.DT);
+    simAcc -= RLGL.DT;
+    handleEvents();
+    if (sim.light.state !== lastLight) {
+      lastLight = sim.light.state;
+      paintLight(lastLight);
+      if (lastLight === 'red') sfx.red(); else sfx.green();
+    }
+    if (sim.time >= RLGL.ROUND_TIME || sim.agents.every(a => a.rt.finished)) { endWatchRound(false); break; }
+  }
+  paintLightUI();
+}
+
+/* ================= training mode ================= */
+let training = false, mileType = 'first', trainCount = 0;
+let sessFinish = null, sessBreak = null, sessPrevBest = [];
+const trainLogLines = [];
+function trainLog(msg) {
+  trainLogLines.push(msg);
+  while (trainLogLines.length > 5) trainLogLines.shift();
+  $('trainLog').innerHTML = trainLogLines.join('<br>');
+}
+function refreshTrainStats() {
+  $('trainStats').innerHTML = sim.agents.map(a =>
+    `<div><span style="color:${cssCol(a.color)}">●</span> <b>${a.name}</b> — BEST ${a.stats.bestDist.toFixed(0)}m · 🏁 ${a.stats.finishes} · ROUNDS ${a.stats.rounds}</div>`).join('');
+}
+function suddenPoint(text) {
+  training = false;
+  $('trainGo').classList.remove('hidden'); $('trainStop').classList.add('hidden');
+  const s = $('sudden');
+  s.classList.remove('hidden');
+  s.innerHTML = `⚡ SUDDEN POINT ⚡<br>${text}`;
+  $('trainWatch').classList.add('on');
+  sfx.finish(); save();
+  sim.agents.forEach((a, i) => drawSpark(i));
+  updateHOF();
+}
+function trainChunk() {
+  if (!training) return;
+  const CH = 20;
+  for (let k = 0; k < CH; k++) {
+    const res = RLGL.runRound(sim);
+    trainCount++;
+    res.results.forEach((r, i) => {
+      if (r.finished && !sessFinish) sessFinish = { name: r.name, time: r.time, round: sim.round };
+      if (!sessBreak && sessPrevBest[i] >= 10 && r.dist >= sessPrevBest[i] + 15) sessBreak = { name: r.name, dist: r.dist, round: sim.round };
+      if (r.dist > sessPrevBest[i]) sessPrevBest[i] = r.dist;
+    });
+    const fin = res.results.find(r => r.finished);
+    if (fin) trainLog(`🏁 R${sim.round} — ${fin.name} finished in ${fin.time.toFixed(1)}s!`);
+    else if (sessBreak && sessBreak.round === sim.round) trainLog(`⚡ R${sim.round} — ${sessBreak.name} smashed their best: ${sessBreak.dist.toFixed(0)}m!`);
+    else if (sim.round % 25 === 0) trainLog(`…R${sim.round} — best so far: ${Math.max(...sim.agents.map(a => a.stats.bestDist)).toFixed(0)}m`);
+    // milestone checks
+    if (mileType === 'first' && sessFinish) return suddenPoint(`${sessFinish.name} just FINISHED — ${sessFinish.time.toFixed(1)}s, round ${sessFinish.round}. These spiders can play now.`);
+    if (mileType === 'break' && sessBreak) return suddenPoint(`${sessBreak.name} just leapt to ${sessBreak.dist.toFixed(0)}m in round ${sessBreak.round}. Something clicked in that little brain.`);
+    if (mileType === 'fifty' && trainCount >= 50) return suddenPoint(`50 rounds ground out. Compare the cards — somebody learned something.`);
+    if (mileType === 'twohundred' && trainCount >= 200) return suddenPoint(`200 rounds of school. These are not the spiders you started with.`);
+  }
+  refreshTrainStats();
+  setTimeout(trainChunk, 0);
+}
+function startTraining() {
+  sessFinish = null; sessBreak = null; trainCount = 0;
+  sessPrevBest = sim.agents.map(a => a.stats.bestDist);
+  trainLogLines.length = 0; trainLog(`school is in session — training until: ${mileType}`);
+  $('sudden').classList.add('hidden'); $('trainWatch').classList.remove('on');
+  $('trainGo').classList.add('hidden'); $('trainStop').classList.remove('hidden');
+  training = true;
+  setTimeout(trainChunk, 30);
+}
+function stopTraining() {
+  training = false;
+  $('trainGo').classList.remove('hidden'); $('trainStop').classList.add('hidden');
+  save();
+}
+
+/* ================= modes & wiring ================= */
+function enterWatch() {
+  if (training) stopTraining();
+  mode = 'watch';
+  $('trainPanel').classList.add('hidden');
+  $('modeWatch').classList.add('on'); $('modeTrain').classList.remove('on');
+  $('speedRow').style.opacity = 1;
+}
+function enterTrain() {
+  mode = 'train';
+  if (roundActive) {
+    if (sim.time < 2) { roundActive = false; }
+    else endWatchRound(true);
+  }
+  resultsTimer = 0;
+  $('trainPanel').classList.remove('hidden');
+  $('modeTrain').classList.add('on'); $('modeWatch').classList.remove('on');
+  $('speedRow').style.opacity = 0.35;
+  refreshTrainStats();
+}
+$('modeWatch').onclick = () => { ac(); enterWatch(); };
+$('modeTrain').onclick = () => { ac(); enterTrain(); };
+$('trainWatch').onclick = () => { ac(); enterWatch(); };
+$('trainGo').onclick = () => { ac(); startTraining(); };
+$('trainStop').onclick = () => stopTraining();
+$('btnPause').onclick = () => {
+  paused = !paused;
+  $('btnPause').textContent = paused ? '▶ RESUME' : '⏸ PAUSE';
+  $('btnPause').classList.toggle('on', paused);
+};
+document.querySelectorAll('.spd').forEach(b => b.onclick = () => {
+  speedMul = parseInt(b.dataset.speed, 10);
+  document.querySelectorAll('.spd').forEach(x => x.classList.toggle('on', x === b));
+});
+document.querySelectorAll('.mileb').forEach(b => b.onclick = () => {
+  mileType = b.dataset.mile;
+  document.querySelectorAll('.mileb').forEach(x => x.classList.toggle('on', x === b));
+});
+$('camDirector').onclick = () => setCam('director');
+$('camFree').onclick = () => setCam('free');
+$('btnSound').onclick = () => {
+  soundOn = !soundOn;
+  $('btnSound').textContent = soundOn ? '🔊 SOUND ON' : '🔇 MUTED';
+  if (soundOn) ac();
+};
+$('btnReset').onclick = () => {
+  if (confirm('Wipe all four brains back to round-1 chaos?')) {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    location.reload();
+  }
+};
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); $('btnPause').click(); }
+  if (e.key >= '1' && e.key <= '4') setCam('agent', parseInt(e.key, 10) - 1);
+  if (e.key === 'd' || e.key === 'D') setCam('director');
+  if (e.key === 'f' || e.key === 'F') setCam('free');
+});
+
+/* intro */
+let seen = false;
+try { seen = !!localStorage.getItem(SEEN_KEY); } catch (e) {}
+function dismissIntro(train) {
+  try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) {}
+  $('introPanel').classList.add('hidden');
+  paused = false;
+  if (train) enterTrain(); else enterWatch();
+}
+$('introWatch').onclick = () => { ac(); dismissIntro(false); };
+$('introTrain').onclick = () => { ac(); dismissIntro(true); };
+
+/* ================= main loop ================= */
+RLGL.beginRound(sim); roundActive = true;
+paintLight('green'); paintLightUI(); updateHOF(); updateCards();
+sim.agents.forEach((a, i) => drawSpark(i));
+if (seen) { $('introPanel').classList.add('hidden'); paused = false; }
+else paused = true;
+let cardClock = 0;
+engine.runRenderLoop(() => {
+  const rawMs = engine.getDeltaTime();
+  const dtR = Math.min(0.05, rawMs / 1000);
+  const dtReal = Math.min(0.25, rawMs / 1000);
+  const tNow = performance.now() / 1000;
+  if (mode === 'watch' && !paused) stepWatch(dtReal);
+  sim.agents.forEach((a, i) => syncSpider(spiderViews[i], a, tNow, dtR));
+  updateCamera(dtR);
+  cardClock += dtR;
+  if (cardClock > 0.15) { cardClock = 0; if (mode === 'watch') updateCards(); }
+  scene.render();
+});
+window.addEventListener('resize', () => engine.resize());
+</script>
+</body>
+</html>
