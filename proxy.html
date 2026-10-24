@@ -14,47 +14,82 @@
   header h1 { font-size:clamp(1rem,4.5vw,1.5rem); letter-spacing:2px; }
   header p { margin-top:12px; font-size:9px; color:var(--ut-gray); }
   a.back { color:var(--ut-yellow); text-decoration:none; font-size:10px; }
-  .bar { display:flex; gap:8px; max-width:1000px; width:100%; margin:16px auto 10px; }
+  .modes { display:flex; gap:8px; justify-content:center; margin:14px auto 4px; flex-wrap:wrap; }
+  .modes button { background:#000; border:3px solid var(--ut-white); color:var(--ut-white); padding:8px 14px; font-family:inherit; font-size:10px; cursor:pointer; }
+  .modes button.active { border-color:var(--ut-yellow); color:var(--ut-yellow); }
+  .bar { display:flex; gap:8px; max-width:1000px; width:100%; margin:12px auto 10px; }
   .bar input { flex:1; background:#111; border:3px solid var(--ut-white); color:#fff; padding:10px; font-family:inherit; font-size:11px; min-width:0; }
   .bar button { background:var(--ut-yellow); color:#000; border:0; padding:10px 18px; font-family:inherit; font-size:11px; cursor:pointer; }
   .quick { text-align:center; margin:4px 0 12px; font-size:9px; }
   .quick button { background:#000; border:2px solid var(--ut-gray); color:var(--ut-white); padding:6px 10px; margin:3px; font-family:inherit; font-size:9px; cursor:pointer; }
   .quick button:hover { border-color:var(--ut-yellow); color:var(--ut-yellow); }
-  .framewrap { flex:1; max-width:1000px; width:100%; margin:0 auto; border:3px solid var(--ut-white); background:#fff; min-height:60vh; display:flex; }
+  .framewrap { flex:1; max-width:1000px; width:100%; margin:0 auto; border:3px solid var(--ut-white); background:#fff; min-height:62vh; display:flex; }
   iframe { flex:1; width:100%; border:0; background:#fff; }
   .note { text-align:center; color:var(--ut-gray); font-size:8px; margin:12px auto 4px; max-width:800px; }
+  .note a { color:var(--ut-yellow); }
+  .hidden { display:none !important; }
 </style>
 </head>
 <body>
 <header>
   <a class="back" href="index.html">← BACK TO ARCADE</a>
-  <h1>* 🌐 MINI PROXY</h1>
-  <p>* Browse simple sites from inside the arcade. Pages are fetched by the arcade's Netlify function — light reading works great; heavy sites (video, logins, big apps) mostly won't.</p>
+  <h1>* 🌐 PROXY</h1>
+  <p id="modeBlurb">* FULL mode runs a real proxy engine (Ultraviolet) on the arcade's Bonto app — most sites work, logins and all. It naps when idle: if you see a "Starting…" page, give it ~30 seconds to wake.</p>
 </header>
 
-<form class="bar" id="go">
-  <input id="addr" type="text" placeholder="* type an address… e.g. en.wikipedia.org" aria-label="Website address" autocomplete="off">
-  <button type="submit">GO →</button>
-</form>
-
-<div class="quick">
-  * QUICK TRIPS:
-  <button data-u="https://en.wikipedia.org/wiki/Arcade_game">📖 WIKIPEDIA</button>
-  <button data-u="https://example.com">🧪 EXAMPLE.COM</button>
-  <button data-u="https://lite.duckduckgo.com/lite/">🦆 DUCKDUCKGO LITE</button>
-  <button data-u="https://www.gutenberg.org">📚 PROJECT GUTENBERG</button>
+<div class="modes">
+  <button id="modeFull" class="active">🚀 FULL PROXY</button>
+  <button id="modeMini">📖 MINI PROXY</button>
 </div>
 
-<div class="framewrap">
-  <iframe id="view" title="Proxied page" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+<!-- FULL MODE -->
+<div id="fullPane" style="display:contents">
+  <p class="note">* If the frame misbehaves, <a href="https://joslyns-proxy.bonto.run/" target="_blank" rel="noopener">open the full proxy in its own tab ↗</a> — same engine, no frame.</p>
+  <div class="framewrap">
+    <iframe id="fullView" title="Full proxy (Ultraviolet)" src="https://joslyns-proxy.bonto.run/" allow="fullscreen" allowfullscreen></iframe>
+  </div>
 </div>
 
-<p class="note">* HOW IT WORKS: the arcade's server fetches the page and rewrites its links to stay in the proxy. No accounts, no logins — sites that need them won't work here. Pages over ~5 MB are refused. Be nice with it. 💛</p>
+<!-- MINI MODE -->
+<div id="miniPane" class="hidden" style="display:contents">
+  <form class="bar" id="go">
+    <input id="addr" type="text" placeholder="* type an address… e.g. en.wikipedia.org" aria-label="Website address" autocomplete="off">
+    <button type="submit">GO →</button>
+  </form>
+  <div class="quick">
+    * QUICK TRIPS:
+    <button data-u="https://en.wikipedia.org/wiki/Arcade_game">📖 WIKIPEDIA</button>
+    <button data-u="https://example.com">🧪 EXAMPLE.COM</button>
+    <button data-u="https://lite.duckduckgo.com/lite/">🦆 DUCKDUCKGO LITE</button>
+    <button data-u="https://www.gutenberg.org">📚 PROJECT GUTENBERG</button>
+  </div>
+  <div class="framewrap">
+    <iframe id="view" title="Proxied page (mini)" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+  </div>
+  <p class="note">* MINI mode: the arcade's Netlify function fetches simple pages directly — light reading only, no logins, ~5 MB cap. Handy while the full proxy is waking up.</p>
+</div>
 
 <script src="js/arcade.js"></script>
 <script>
 (function () {
   "use strict";
+  var blurb = document.getElementById("modeBlurb");
+  var bFull = document.getElementById("modeFull");
+  var bMini = document.getElementById("modeMini");
+  var pFull = document.getElementById("fullPane");
+  var pMini = document.getElementById("miniPane");
+  function setMode(full) {
+    bFull.classList.toggle("active", full);
+    bMini.classList.toggle("active", !full);
+    pFull.classList.toggle("hidden", !full);
+    pMini.classList.toggle("hidden", full);
+    blurb.textContent = full
+      ? "* FULL mode runs a real proxy engine (Ultraviolet) on the arcade's Bonto app — most sites work, logins and all. It naps when idle: if you see a \"Starting…\" page, give it ~30 seconds to wake."
+      : "* MINI mode fetches simple sites through the arcade's own Netlify function — light reading works great; heavy sites (video, logins, big apps) mostly won't.";
+  }
+  bFull.addEventListener("click", function () { setMode(true); });
+  bMini.addEventListener("click", function () { setMode(false); });
+
   var FN = (location.hostname.indexOf("netlify.app") !== -1)
     ? "/.netlify/functions/proxy"
     : "https://gasterindeltarune.netlify.app/.netlify/functions/proxy";
@@ -75,7 +110,7 @@
     b.addEventListener("click", function () { go(b.getAttribute("data-u")); });
   });
   var start = new URLSearchParams(location.search).get("url");
-  if (start) go(start);
+  if (start) { setMode(false); go(start); }
 })();
 </script>
 </body>
