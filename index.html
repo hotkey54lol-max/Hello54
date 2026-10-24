@@ -152,6 +152,7 @@
 <div class="tabs">
   <button id="tabNormal" class="active">🏠 NORMAL PAGE</button>
   <button id="tabLua">🌙 LUA</button>
+  <button id="tabProxy">🌐 PROXY</button>
 </div>
 
 <div class="searchbox">
@@ -362,6 +363,8 @@
   }
   tabL.addEventListener("click", showLua);
   tabN.addEventListener("click", function () { if (inLua) showNormal(); });
+  var tabP = document.getElementById("tabProxy");
+  if (tabP) tabP.addEventListener("click", function () { location.href = "proxy.html"; });
   if (location.hash === "#lua") showLua();
 })();
 </script>
