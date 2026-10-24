@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌐 Proxy — Sandbox Arcade 🕹️</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root { --ut-white:#fff; --ut-yellow:#ffff00; --ut-gray:#808080; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#000; color:var(--ut-white); font-family:"Press Start 2P",monospace; font-size:11px; line-height:1.8; min-height:100vh; padding:16px; display:flex; flex-direction:column; }
+  header { text-align:center; margin:20px 0 6px; }
+  header h1 { font-size:clamp(1rem,4.5vw,1.5rem); letter-spacing:2px; }
+  header p { margin-top:12px; font-size:9px; color:var(--ut-gray); }
+  a.back { color:var(--ut-yellow); text-decoration:none; font-size:10px; }
+  .bar { display:flex; gap:8px; max-width:1000px; width:100%; margin:16px auto 10px; }
+  .bar input { flex:1; background:#111; border:3px solid var(--ut-white); color:#fff; padding:10px; font-family:inherit; font-size:11px; min-width:0; }
+  .bar button { background:var(--ut-yellow); color:#000; border:0; padding:10px 18px; font-family:inherit; font-size:11px; cursor:pointer; }
+  .quick { text-align:center; margin:4px 0 12px; font-size:9px; }
+  .quick button { background:#000; border:2px solid var(--ut-gray); color:var(--ut-white); padding:6px 10px; margin:3px; font-family:inherit; font-size:9px; cursor:pointer; }
+  .quick button:hover { border-color:var(--ut-yellow); color:var(--ut-yellow); }
+  .framewrap { flex:1; max-width:1000px; width:100%; margin:0 auto; border:3px solid var(--ut-white); background:#fff; min-height:60vh; display:flex; }
+  iframe { flex:1; width:100%; border:0; background:#fff; }
+  .note { text-align:center; color:var(--ut-gray); font-size:8px; margin:12px auto 4px; max-width:800px; }
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="index.html">← BACK TO ARCADE</a>
+  <h1>* 🌐 MINI PROXY</h1>
+  <p>* Browse simple sites from inside the arcade. Pages are fetched by the arcade's Netlify function — light reading works great; heavy sites (video, logins, big apps) mostly won't.</p>
+</header>
+
+<form class="bar" id="go">
+  <input id="addr" type="text" placeholder="* type an address… e.g. en.wikipedia.org" aria-label="Website address" autocomplete="off">
+  <button type="submit">GO →</button>
+</form>
+
+<div class="quick">
+  * QUICK TRIPS:
+  <button data-u="https://en.wikipedia.org/wiki/Arcade_game">📖 WIKIPEDIA</button>
+  <button data-u="https://example.com">🧪 EXAMPLE.COM</button>
+  <button data-u="https://lite.duckduckgo.com/lite/">🦆 DUCKDUCKGO LITE</button>
+  <button data-u="https://www.gutenberg.org">📚 PROJECT GUTENBERG</button>
+</div>
+
+<div class="framewrap">
+  <iframe id="view" title="Proxied page" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+</div>
+
+<p class="note">* HOW IT WORKS: the arcade's server fetches the page and rewrites its links to stay in the proxy. No accounts, no logins — sites that need them won't work here. Pages over ~5 MB are refused. Be nice with it. 💛</p>
+
+<script src="js/arcade.js"></script>
+<script>
+(function () {
+  "use strict";
+  var FN = (location.hostname.indexOf("netlify.app") !== -1)
+    ? "/.netlify/functions/proxy"
+    : "https://gasterindeltarune.netlify.app/.netlify/functions/proxy";
+  var view = document.getElementById("view");
+  var addr = document.getElementById("addr");
+  function go(raw) {
+    var u = (raw || "").trim();
+    if (!u) return;
+    if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+    addr.value = u;
+    view.src = FN + "?url=" + encodeURIComponent(u) + "&home=" + encodeURIComponent(location.origin);
+  }
+  document.getElementById("go").addEventListener("submit", function (e) {
+    e.preventDefault();
+    go(addr.value);
+  });
+  document.querySelectorAll(".quick button").forEach(function (b) {
+    b.addEventListener("click", function () { go(b.getAttribute("data-u")); });
+  });
+  var start = new URLSearchParams(location.search).get("url");
+  if (start) go(start);
+})();
+</script>
+</body>
+</html>
