@@ -4,8 +4,40 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* Tasteful film grade: gentle vignette + animated grain. Runs in linear HDR
+   before OutputPass (which does tonemap + sRGB). Kept subtle on purpose. */
+const NexusGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0 },
+    uVignette: { value: 0.32 },
+    uGrain: { value: 0.045 },
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform float uTime, uVignette, uGrain;
+    varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uTime * 61.7) * 43758.5453); }
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec2 d = vUv - 0.5;
+      float vig = 1.0 - uVignette * smoothstep(0.18, 0.72, dot(d, d) * 2.2);
+      c.rgb *= vig;
+      float g = hash(vUv * vec2(1920.0, 1080.0)) - 0.5;
+      c.rgb += g * uGrain * (0.35 + 0.65 * (1.0 - clamp(dot(c.rgb, vec3(0.333)), 0.0, 1.0)));
+      gl_FragColor = c;
+    }
+  `,
+};
 
 export const SIM_DT = 1 / 60;
 
@@ -28,9 +60,19 @@ export class Engine {
 
     this.composer = new EffectComposer(this.renderer);
     this.renderPass = new RenderPass(this.scene, this.camera);
+    /* ground-truth ambient occlusion (the Lumen stand-in's contact-shadow
+       half): grounds every prop and tree in soft occlusion. Expensive, so
+       the governor sheds it first and the settings panel can force it off. */
+    this.ao = new GTAOPass(this.scene, this.camera, window.innerWidth, window.innerHeight);
+    this.ao.blendIntensity = 0.9;
+    this.userAO = true;
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.55, 0.85);
+    this.film = new ShaderPass(NexusGradeShader);
+    this.userFilm = true; // settings-panel toggle can flip this later (main.js)
     this.composer.addPass(this.renderPass);
+    this.composer.addPass(this.ao);
     this.composer.addPass(this.bloom);
+    this.composer.addPass(this.film);
     this.composer.addPass(new OutputPass());
     this.usePost = true;
 
@@ -69,12 +111,15 @@ export class Engine {
       this.govFactor = Math.max(0.5, +(this.govFactor - 0.15).toFixed(2));
       this._govGood = 0;
       this.setPixelScale(this.userScale || 1);
-      if (this.govFactor <= 0.65) this.bloom.enabled = false;
+      if (this.govFactor <= 0.85) this.ao.enabled = false;
+      if (this.govFactor <= 0.65) { this.bloom.enabled = false; this.film.enabled = false; }
       if (this.onGovernor) this.onGovernor(this.govFactor, 'down');
     } else if (realFps > 50 && this.govFactor < 1) {
       if (++this._govGood >= 2) {
         this.govFactor = Math.min(1, +(this.govFactor + 0.1).toFixed(2));
+        if (this.govFactor > 0.85 && this.userAO !== false) this.ao.enabled = true;
         if (this.govFactor > 0.65 && this.userBloom !== false) this.bloom.enabled = true;
+        if (this.govFactor > 0.65 && this.userFilm !== false) this.film.enabled = true;
         this.setPixelScale(this.userScale || 1);
         if (this.onGovernor) this.onGovernor(this.govFactor, 'up');
         this._govGood = 0;
@@ -92,6 +137,11 @@ export class Engine {
       const t0 = performance.now();
 
       if (!this.paused) {
+        /* render interpolation (build .33): sim systems snapshot their
+           previous+current states around the substep batch; render systems
+           then interpolate with alpha = acc/step so 60Hz sim looks smooth
+           at any display rate. beginFrame resets per-frame step tracking. */
+        for (const s of this.systems) if (s.beginFrame) s.beginFrame();
         this.acc += rawDt;
         let steps = 0;
         const simT0 = performance.now();
@@ -104,11 +154,15 @@ export class Engine {
         if (steps === 5) this.acc = 0; // spiral-of-death guard
         this.frame.simMs = performance.now() - simT0;
         const alpha = this.acc / SIM_DT;
+        this.lastAlpha = alpha;
         for (const s of this.systems) if (s.render) s.render(alpha, rawDt);
       }
 
       this.renderer.info.reset();
-      if (this.usePost) this.composer.render();
+      if (this.usePost) {
+        this.film.uniforms.uTime.value = this.simTime;
+        this.composer.render();
+      }
       else this.renderer.render(this.scene, this.camera);
 
       const ms = performance.now() - t0;

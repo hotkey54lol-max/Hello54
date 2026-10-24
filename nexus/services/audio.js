@@ -70,6 +70,11 @@ export class AudioService {
   jump() { this.blip(280, 520, 0.14, 0.12); }
   spawnPop() { this.blip(500, 900, 0.09, 0.10); }
   boom() { this.noiseBurst(0.7, 0.5, 900); this.blip(120, 34, 0.6, 0.4, 'triangle'); }
+  thunder() {
+    if (!this.ctx || this.muted) return;
+    this.noiseBurst(1.5, 0.5, 150);
+    setTimeout(() => this.noiseBurst(1.0, 0.28, 105), 190);
+  }
 
   update(dt, s) {
     if (!this.ctx) return;
@@ -81,8 +86,9 @@ export class AudioService {
     if (this._prevVy <= 0.5 && s.vy > 3) this.jump();
     if (this._prevVy < -6 && s.grounded) this.noiseBurst(0.12, 0.16, 300); // landing thud
     this._prevVy = s.vy;
-    if (this._windFilter) this._windFilter.frequency.value = 430 + Math.sin(performance.now() / 3400) * 130;
-    const rainTarget = s.raining ? 0.11 : 0;
+    if (this._windFilter) this._windFilter.frequency.value = 430 + Math.sin(performance.now() / 3400) * 130 + (s.wind || 0) * 260;
+    if (this.windGain) this.windGain.gain.value = 0.035 + (s.wind || 0.15) * 0.085;
+    const rainTarget = (s.wet || 0) * 0.13;
     if (this.rainGain) this.rainGain.gain.value += (rainTarget - this.rainGain.gain.value) * Math.min(1, dt * 3);
   }
 }
