@@ -1810,6 +1810,65 @@ window.Arcade = (function () {
     }
   });
 
+  /* ---------- loading veil (hub v2) ----------
+     Branded loading screen (Joslyn's "Stay Determined" art) shown while
+     a page settles: the hub ships it inline (no flash); game pages get
+     it injected here. Fades on window load, with a ~0.55s minimum so
+     it reads as a moment rather than a strobe, and ALWAYS lifts by
+     1.8s so a hung CDN can never trap anyone behind it. A tap after
+     0.3s dismisses it early. Lua Lab (hub iframe) and Demolition Day
+     (Nexus has its own loading) are skipped.
+     Opt out per page: window.ARCADE_NO_LOADING = true. */
+  _fxSafe(function () {
+    if (typeof document === "undefined" || typeof window === "undefined") return;
+    if (window.ARCADE_NO_LOADING) return;
+    var file = (location.pathname || "").split("/").pop() || "";
+    if (file === "lua-lab.html" || file === "demolition-day.html") return;
+    var t0 = Date.now();
+    var veil = null;
+    var hidden = false;
+    function hide() {
+      if (hidden || !veil) return;
+      hidden = true;
+      veil.classList.add("av-hide");
+      setTimeout(function () { if (veil && veil.parentNode) veil.parentNode.removeChild(veil); }, 420);
+    }
+    function wire() {
+      veil.addEventListener("click", function () { if (Date.now() - t0 > 300) hide(); });
+      var ready = function () {
+        setTimeout(hide, Math.max(0, 550 - (Date.now() - t0)));
+      };
+      if (document.readyState === "complete") ready();
+      else window.addEventListener("load", ready);
+      setTimeout(hide, 1800);
+    }
+    function build() {
+      veil = document.getElementById("arcadeVeil");
+      if (!veil) {
+        var st = document.createElement("style");
+        st.textContent =
+          "#arcadeVeil{position:fixed;inset:0;z-index:100002;background-color:#000;background-position:center;" +
+          "background-size:cover;background-repeat:no-repeat;transition:opacity .35s ease;}" +
+          "#arcadeVeil.av-hide{opacity:0;pointer-events:none;}" +
+          "#arcadeVeil .av-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 62%,rgba(0,0,0,.38));}" +
+          "#arcadeVeil .av-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.14);overflow:hidden;}" +
+          "#arcadeVeil .av-bar i{position:absolute;top:0;bottom:0;width:38%;background:#ffff00;animation:avSlide 1.1s ease-in-out infinite;}" +
+          "@keyframes avSlide{0%{left:-38%}100%{left:100%}}" +
+          "@media (prefers-reduced-motion: reduce){#arcadeVeil .av-bar i{animation:none;left:0;width:100%;opacity:.5}}";
+        document.head.appendChild(st);
+        veil = document.createElement("div");
+        veil.id = "arcadeVeil";
+        veil.setAttribute("aria-hidden", "true");
+        veil.style.backgroundImage = 'url("' + _siteBase() + 'img/loading.jpg")';
+        veil.innerHTML = '<div class="av-shade"></div><div class="av-bar"><i></i></div>';
+        document.body.insertBefore(veil, document.body.firstChild);
+      }
+      wire();
+    }
+    if (document.body) build();
+    else document.addEventListener("DOMContentLoaded", build);
+  });
+
   /* ---------- shared game frame (hub v2, wave 2) ----------
      A slim floating chrome bar injected on game pages: back-to-hub,
      the game title, the player's name chip, and a fullscreen button —
