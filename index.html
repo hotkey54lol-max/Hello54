@@ -218,7 +218,7 @@
   }
   /* loading veil — inline so it paints before anything else; arcade.js lifts it */
   #arcadeVeil {
-    position: fixed; inset: 0; z-index: 100002; background: #000 url("img/loading.jpg") center / cover no-repeat;
+    position: fixed; inset: 0; z-index: 100002; background: #000 url("img/loading.jpg") center / contain no-repeat;
     transition: opacity .35s ease;
   }
   #arcadeVeil.av-hide { opacity: 0; pointer-events: none; }

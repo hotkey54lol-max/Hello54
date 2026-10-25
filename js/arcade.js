@@ -1848,7 +1848,7 @@ window.Arcade = (function () {
         var st = document.createElement("style");
         st.textContent =
           "#arcadeVeil{position:fixed;inset:0;z-index:100002;background-color:#000;background-position:center;" +
-          "background-size:cover;background-repeat:no-repeat;transition:opacity .35s ease;}" +
+          "background-size:contain;background-repeat:no-repeat;transition:opacity .35s ease;}" +
           "#arcadeVeil.av-hide{opacity:0;pointer-events:none;}" +
           "#arcadeVeil .av-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 62%,rgba(0,0,0,.38));}" +
           "#arcadeVeil .av-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.14);overflow:hidden;}" +
