@@ -1813,9 +1813,9 @@ window.Arcade = (function () {
   /* ---------- loading veil (hub v2) ----------
      Branded loading screen (Joslyn's "Stay Determined" art) shown while
      a page settles: the hub ships it inline (no flash); game pages get
-     it injected here. Fades on window load, with a ~0.55s minimum so
-     it reads as a moment rather than a strobe, and ALWAYS lifts by
-     1.8s so a hung CDN can never trap anyone behind it. A tap after
+     it injected here. Fades on window load, with a ~1.4s minimum —
+     Joslyn asked for a longer moment with the art — and ALWAYS lifts
+     by 3s so a hung CDN can never trap anyone behind it. A tap after
      0.3s dismisses it early. Lua Lab (hub iframe) and Demolition Day
      (Nexus has its own loading) are skipped.
      Opt out per page: window.ARCADE_NO_LOADING = true. */
@@ -1831,16 +1831,16 @@ window.Arcade = (function () {
       if (hidden || !veil) return;
       hidden = true;
       veil.classList.add("av-hide");
-      setTimeout(function () { if (veil && veil.parentNode) veil.parentNode.removeChild(veil); }, 420);
+      setTimeout(function () { if (veil && veil.parentNode) veil.parentNode.removeChild(veil); }, 580);
     }
     function wire() {
       veil.addEventListener("click", function () { if (Date.now() - t0 > 300) hide(); });
       var ready = function () {
-        setTimeout(hide, Math.max(0, 550 - (Date.now() - t0)));
+        setTimeout(hide, Math.max(0, 1400 - (Date.now() - t0)));
       };
       if (document.readyState === "complete") ready();
       else window.addEventListener("load", ready);
-      setTimeout(hide, 1800);
+      setTimeout(hide, 3000);
     }
     function build() {
       veil = document.getElementById("arcadeVeil");
@@ -1848,7 +1848,7 @@ window.Arcade = (function () {
         var st = document.createElement("style");
         st.textContent =
           "#arcadeVeil{position:fixed;inset:0;z-index:100002;background-color:#000;background-position:center;" +
-          "background-size:contain;background-repeat:no-repeat;transition:opacity .35s ease;}" +
+          "background-size:contain;background-repeat:no-repeat;transition:opacity .5s ease;}" +
           "#arcadeVeil.av-hide{opacity:0;pointer-events:none;}" +
           "#arcadeVeil .av-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 62%,rgba(0,0,0,.38));}" +
           "#arcadeVeil .av-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.14);overflow:hidden;}" +
