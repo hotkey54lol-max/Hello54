@@ -1404,7 +1404,8 @@ window.Arcade = (function () {
    * day starts, reverted when it ends, tracked by a state marker in
    * site_settings (plandate_state) that remembers prior values. Dates
    * match in the VISITOR's local time. Rules: 'last_mon_may',
-   * 'fourth_thu_nov'; anything else matches on month/day.
+   * 'fourth_thu_nov', 'fri_13' (any Friday the 13th); anything else
+   * matches on month/day.
    */
   const PD_URL = SUPABASE_URL + "/rest/v1/scheduled_events";
   const PD_STATE_KEY = "plandate_state";
@@ -1450,6 +1451,7 @@ window.Arcade = (function () {
     const m = d.getMonth() + 1, day = d.getDate();
     if (ev.rule === "last_mon_may") return m === 5 && d.getDay() === 1 && day + 7 > 31;
     if (ev.rule === "fourth_thu_nov") return m === 11 && d.getDay() === 4 && Math.ceil(day / 7) === 4;
+    if (ev.rule === "fri_13") return day === 13 && d.getDay() === 5;
     return Number(ev.month) === m && Number(ev.day) === day;
   }
 
