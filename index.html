@@ -231,6 +231,8 @@
 </head>
 <body>
 <div id="arcadeVeil" aria-hidden="true"><div class="av-shade"></div><div class="av-bar"><i></i></div></div>
+<script>/* December: swap the loading art to the Christmas version from first paint (arcade.js verifies the file exists and falls back if not) */
+if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.backgroundImage = 'url("img/loading-xmas.jpg")'; }</script>
 <header>
   <h1>* SANDBOX ARCADE</h1>
   <p>* 25 games. The air is filled with determination.</p>

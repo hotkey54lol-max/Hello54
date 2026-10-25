@@ -1824,6 +1824,19 @@ window.Arcade = (function () {
     if (window.ARCADE_NO_LOADING) return;
     var file = (location.pathname || "").split("/").pop() || "";
     if (file === "lua-lab.html" || file === "demolition-day.html") return;
+    /* Seasonal art: December (visitor-local) swaps in the Christmas
+       loading art; if that file is missing it falls back to the
+       year-round art. Preview anytime with ?veil=xmas in the URL. */
+    var VEIL_DEFAULT = "img/loading.jpg";
+    var VEIL_XMAS = "img/loading-xmas.jpg";
+    var wantXmas = new Date().getMonth() === 11 || /[?&]veil=xmas/.test(location.search || "");
+    function veilUrl(cb) {
+      if (!wantXmas) { cb(_siteBase() + VEIL_DEFAULT); return; }
+      var probe = new Image();
+      probe.onload = function () { cb(_siteBase() + VEIL_XMAS); };
+      probe.onerror = function () { cb(_siteBase() + VEIL_DEFAULT); };
+      probe.src = _siteBase() + VEIL_XMAS;
+    }
     var t0 = Date.now();
     var veil = null;
     var hidden = false;
@@ -1844,8 +1857,15 @@ window.Arcade = (function () {
     }
     function build() {
       veil = document.getElementById("arcadeVeil");
-      if (!veil) {
-        var st = document.createElement("style");
+      if (veil) {
+        // Hub ships its veil inline; in December, swap in the Christmas
+        // art (the hub's inline script already tried) — unless the file
+        // is missing, in which case fall back to the year-round art.
+        if (wantXmas) veilUrl(function (u) { veil.style.backgroundImage = 'url("' + u + '")'; });
+        wire();
+        return;
+      }
+      var st = document.createElement("style");
         st.textContent =
           "#arcadeVeil{position:fixed;inset:0;z-index:100002;background-color:#000;background-position:center;" +
           "background-size:contain;background-repeat:no-repeat;transition:opacity .5s ease;}" +
@@ -1859,10 +1879,10 @@ window.Arcade = (function () {
         veil = document.createElement("div");
         veil.id = "arcadeVeil";
         veil.setAttribute("aria-hidden", "true");
-        veil.style.backgroundImage = 'url("' + _siteBase() + 'img/loading.jpg")';
+        veil.style.backgroundImage = 'url("' + _siteBase() + VEIL_DEFAULT + '")';
+        if (wantXmas) veilUrl(function (u) { veil.style.backgroundImage = 'url("' + u + '")'; });
         veil.innerHTML = '<div class="av-shade"></div><div class="av-bar"><i></i></div>';
         document.body.insertBefore(veil, document.body.firstChild);
-      }
       wire();
     }
     if (document.body) build();
