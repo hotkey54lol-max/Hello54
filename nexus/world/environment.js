@@ -46,13 +46,21 @@ const WEATHER_STATES = {
   storm:  { wet: 1,    cloud: 1,    wind: 1 },
 };
 const GREY_TOP = new THREE.Color(0x5f7185), GREY_HOR = new THREE.Color(0x93a7ba), FLASH_C = new THREE.Color(0xe8f1ff);
+/* pooled temps for the per-step sky math: update()/followShadows() run every
+   frame, so they reuse these instead of allocating throwaway vectors/colors.
+   keyLerp's single caller consumes top/horizon/sun (by copy) before the
+   next call, so sharing them is safe. */
+const _sunDir = new THREE.Vector3(), _moonDir = new THREE.Vector3(), _shadowDir = new THREE.Vector3();
+const _kTop = new THREE.Color(), _kHorizon = new THREE.Color(), _kSun = new THREE.Color(), _kTmp = new THREE.Color();
 
 function keyLerp(h) {
   let a = SKY_KEYS[0], b = SKY_KEYS[SKY_KEYS.length - 1];
   for (let i = 0; i < SKY_KEYS.length - 1; i++) if (h >= SKY_KEYS[i][0] && h <= SKY_KEYS[i + 1][0]) { a = SKY_KEYS[i]; b = SKY_KEYS[i + 1]; break; }
   const t = (h - a[0]) / Math.max(0.0001, b[0] - a[0]);
-  const C = i => new THREE.Color(a[i]).lerp(new THREE.Color(b[i]), t);
-  return { top: C(1), horizon: C(2), sun: C(3), sunI: a[4] + (b[4] - a[4]) * t, hemiI: a[5] + (b[5] - a[5]) * t };
+  _kTop.set(a[1]).lerp(_kTmp.set(b[1]), t);
+  _kHorizon.set(a[2]).lerp(_kTmp.set(b[2]), t);
+  _kSun.set(a[3]).lerp(_kTmp.set(b[3]), t);
+  return { top: _kTop, horizon: _kHorizon, sun: _kSun, sunI: a[4] + (b[4] - a[4]) * t, hemiI: a[5] + (b[5] - a[5]) * t };
 }
 
 export class Environment {
@@ -522,7 +530,7 @@ export class Environment {
     const sunMul = 1 - 0.78 * cloud;
     this.scene.environmentIntensity = (0.05 + Math.min(0.3, k.sunI * 0.15)) * (1 - 0.3 * cloud) + w.flash * 0.25;
     const ang = ((h - 6) / 12) * Math.PI; // sunrise 6h, sunset 18h
-    const sunDir = new THREE.Vector3(Math.cos(ang) * 0.55, Math.sin(ang), 0.38).normalize();
+    const sunDir = _sunDir.set(Math.cos(ang) * 0.55, Math.sin(ang), 0.38).normalize();
     this.skyUniforms.topColor.value.copy(k.top);
     this.skyUniforms.horizonColor.value.copy(k.horizon);
     this.hemi.intensity = k.hemiI * (1 - 0.3 * cloud) + w.flash * 1.7;
@@ -537,7 +545,7 @@ export class Environment {
       // night: the key light becomes the moon — pale, dim, still casts shadows,
       // and the sky shader draws its disc from the same direction
       const mAng = ((h + 6) / 12) * Math.PI;
-      const moonDir = new THREE.Vector3(Math.cos(mAng) * 0.42, Math.max(0.18, Math.sin(mAng)), 0.3).normalize();
+      const moonDir = _moonDir.set(Math.cos(mAng) * 0.42, Math.max(0.18, Math.sin(mAng)), 0.3).normalize();
       this.skyUniforms.sunDir.value.copy(moonDir);
       this.skyUniforms.sunColor.value.set(0xdce8ff);
       this.skyUniforms.sunI.value = 0.8;
@@ -579,6 +587,6 @@ export class Environment {
   followShadows(target) {
     this.focusX = target.x; this.focusZ = target.z;
     this.sun.target.position.copy(target);
-    this.sun.position.copy(target).add(new THREE.Vector3().copy(this.skyUniforms.sunDir.value).multiplyScalar(150));
+    this.sun.position.copy(target).add(_shadowDir.copy(this.skyUniforms.sunDir.value).multiplyScalar(150));
   }
 }

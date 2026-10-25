@@ -29,6 +29,7 @@ export class Particles {
     this.points = new THREE.Points(geo, this.mat);
     this.points.frustumCulled = false;
     this.mode = 'dust';
+    this._colorMode = null;   // last mode the vertex colors were written for
     this.lowFx = false;
     scene.add(this.points);
     this.t = 0;
@@ -64,11 +65,19 @@ export class Particles {
       z = ((z % BOX.z) + BOX.z * 1.5) % BOX.z - BOX.z / 2;
       const groundish = flies ? Math.min(y, 4.5) : y;
       pos.setXYZ(i, focus.x + x, focus.y - 2 + groundish + bob, focus.z + z);
-      const c = flies ? C_FLY : (this.leaf[i] ? C_LEAF : C_DUST);
-      col.setXYZ(i, c.r, c.g, c.b);
     }
     pos.needsUpdate = true;
-    col.needsUpdate = true;
+    /* vertex colors depend only on the mode (dust vs fireflies) and each
+       mote's fixed leaf flag — rewrite and re-upload them only when the
+       mode flips, not every frame */
+    if (this._colorMode !== this.mode) {
+      this._colorMode = this.mode;
+      for (let i = 0; i < N; i++) {
+        const c = flies ? C_FLY : (this.leaf[i] ? C_LEAF : C_DUST);
+        col.setXYZ(i, c.r, c.g, c.b);
+      }
+      col.needsUpdate = true;
+    }
     if (flies) {
       this.mat.size = 0.21;
       this.mat.opacity = (0.35 + 0.6 * night) * (1 - wet * 0.85);

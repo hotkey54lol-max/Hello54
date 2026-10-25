@@ -247,13 +247,24 @@ export async function boot() {
     jumpBtn.addEventListener('touchend', e => { e.preventDefault(); input.keys['Space'] = false; }, { passive: false });
   }
 
+  /* perf HUD: compact chip in the top bar; the full dev line lives in the
+     Settings panel (#nxStats). Writes are skipped when the text is unchanged
+     so the DOM never churns on a steady frame rate. */
   const hud = document.getElementById('nxHud');
+  const statsEl = document.getElementById('nxStats');
+  let lastHud = '', lastStats = '';
   setInterval(() => {
-    if (!hud) return;
     const f = engine.frame;
-    hud.textContent = 'FPS ' + f.fps + ' · ' + f.ms.toFixed(1) + 'ms · sim ' + f.simMs.toFixed(1) + 'ms · draws ' + f.calls + ' · tris ' + (f.tris / 1000).toFixed(0) + 'k · bodies ' + physics.bodyCount + ' · props ' + physics.props.length + ' · gov ' + Math.round(engine.govFactor * 100) + '%' +
-      ' · MP ' + (net.online ? 'on' : 'off') + ' peers ' + net.peerCount + ' rx ' + net.rxCount + (net.lastErr ? ' ERR ' + net.lastErr : '');
-  }, 200);
+    if (hud) {
+      const compact = f.fps + ' FPS · ' + physics.props.length + ' props · ' + Math.round(engine.govFactor * 100) + '% quality' + (net.online ? ' · MP ' + net.peerCount : '');
+      if (compact !== lastHud) { hud.textContent = compact; lastHud = compact; }
+    }
+    if (statsEl) {
+      const full = 'FPS ' + f.fps + ' · ' + f.ms.toFixed(1) + 'ms · sim ' + f.simMs.toFixed(1) + 'ms · draws ' + f.calls + ' · tris ' + (f.tris / 1000).toFixed(0) + 'k · bodies ' + physics.bodyCount + ' · props ' + physics.props.length + ' · gov ' + Math.round(engine.govFactor * 100) + '%' +
+        ' · MP ' + (net.online ? 'on' : 'off') + ' peers ' + net.peerCount + ' rx ' + net.rxCount + (net.lastErr ? ' ERR ' + net.lastErr : '');
+      if (full !== lastStats) { statsEl.textContent = full; lastStats = full; }
+    }
+  }, 250);
 
   window.__nx = {
     ready: true,

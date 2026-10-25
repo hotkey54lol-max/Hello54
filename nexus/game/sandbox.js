@@ -401,8 +401,9 @@ export class Sandbox {
       this.rain.rotation.z = wind * 0.16;
     }
     this._updateSplashes(dt);
-    // bomb fuses + explosion fx
-    for (const b of [...this.bombs]) {
+    // bomb fuses + explosion fx (snapshot copy only while bombs are live —
+    // _detonate splices the array, so iterating it live would skip entries)
+    if (this.bombs.length) for (const b of [...this.bombs]) {
       b.t -= dt;
       b.mesh.material.emissiveIntensity = 0.4 + Math.max(0, 1.7 - b.t) * (Math.sin(performance.now() / 55) * 0.5 + 0.9);
       if (b.t <= 0) this._detonate(b);

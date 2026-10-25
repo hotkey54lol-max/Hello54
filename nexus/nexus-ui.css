@@ -1,0 +1,218 @@
+/* Project Nexus — shared UI theme ("Nexus Glass")
+   One stylesheet for both Nexus pages (Sandbox + Demolition Day).
+   Fresh look: floating glass panels, cyan→violet gradient accents,
+   a tabbed control deck instead of the old always-open button dock.
+   Contracts the game code relies on (do not break):
+   - #nxSettings / #nxJump / #ddTool / #ddFinish / #ddQuit start hidden via
+     inline style="display:none" in the markup; the mains toggle them.
+   - #ddHud / #ddPanel start hidden via the display:none rules below.
+   - body.ui-hidden (H key) and body.cine (Sequencer) hide the chrome. */
+
+:root {
+  --nx-bg: #070812;
+  --nx-glass: rgba(13, 16, 32, .72);
+  --nx-glass-strong: rgba(10, 12, 26, .92);
+  --nx-line: rgba(120, 150, 255, .22);
+  --nx-line-hot: rgba(34, 211, 238, .75);
+  --nx-text: #eef2ff;
+  --nx-muted: #9aa7c7;
+  --nx-cyan: #22d3ee;
+  --nx-violet: #a78bfa;
+  --nx-coral: #fb7185;
+  --nx-gold: #ffd94d;
+  --nx-grad: linear-gradient(92deg, var(--nx-cyan), var(--nx-violet));
+  --nx-radius: 16px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; background: var(--nx-bg); font-family: 'Segoe UI', system-ui, sans-serif; color: var(--nx-text); }
+#nxCanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+/* ---------- top bar: floating glass pill ---------- */
+.bar {
+  position: fixed; left: 10px; right: 10px; top: 10px; z-index: 10;
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  background: var(--nx-glass); border: 1px solid var(--nx-line); border-radius: var(--nx-radius);
+  backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  pointer-events: none;
+}
+.bar > * { pointer-events: auto; }
+.back {
+  color: var(--nx-text); text-decoration: none; font-weight: 700; font-size: .78rem;
+  padding: 5px 11px; border-radius: 999px; border: 1px solid var(--nx-line);
+  background: rgba(255, 255, 255, .04); white-space: nowrap;
+}
+.back:hover { border-color: var(--nx-line-hot); color: var(--nx-cyan); }
+h1 {
+  font-size: 1rem; letter-spacing: .14em; white-space: nowrap;
+  background: var(--nx-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.badge {
+  background: linear-gradient(92deg, #f43f5e, var(--nx-coral)); color: #fff;
+  font-size: .58rem; font-weight: 800; letter-spacing: .1em;
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+#nxHud {
+  margin-left: auto; display: flex; align-items: center; gap: 7px;
+  font-size: .68rem; color: #c9e7ff; white-space: nowrap; overflow: hidden;
+  background: rgba(0, 0, 0, .35); border: 1px solid var(--nx-line);
+  padding: 5px 10px; border-radius: 999px;
+}
+#nxHud::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--nx-cyan); box-shadow: 0 0 8px var(--nx-cyan);
+  animation: nxPulse 2.2s ease-in-out infinite;
+}
+@keyframes nxPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* ---------- toast ---------- */
+#nxToast {
+  position: fixed; top: 74px; left: 50%; transform: translateX(-50%); z-index: 11;
+  background: var(--nx-glass-strong); border: 1px solid var(--nx-line-hot); color: #dff6ff;
+  padding: 8px 16px; border-radius: 999px; font-size: .8rem;
+  opacity: 0; transition: opacity .4s; pointer-events: none;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5); max-width: 92vw; text-align: center;
+}
+
+/* ---------- control deck: tabbed glass panel ---------- */
+.deck {
+  position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 10;
+  width: min(760px, 96vw);
+  background: var(--nx-glass); border: 1px solid var(--nx-line); border-radius: 18px;
+  backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .5);
+  padding: 8px;
+}
+.deck-panels { margin-bottom: 8px; }
+.deck-panel { display: none; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
+.deck-panel.open { display: flex; }
+.deck button {
+  background: rgba(255, 255, 255, .05); color: var(--nx-text);
+  border: 1px solid var(--nx-line); border-radius: 999px;
+  padding: 8px 13px; font-size: .78rem; cursor: pointer; font-family: inherit;
+  transition: border-color .15s, color .15s, background .15s, transform .1s;
+}
+.deck button:hover { border-color: var(--nx-line-hot); color: var(--nx-cyan); }
+.deck button:active { transform: scale(.96); }
+.deck label { font-size: .7rem; color: var(--nx-muted); display: flex; align-items: center; gap: 7px; }
+.deck input[type=range] { width: 118px; accent-color: var(--nx-cyan); }
+.deck-tabs { display: flex; gap: 6px; }
+.deck-tab {
+  flex: 1; font-weight: 700; letter-spacing: .04em;
+  background: transparent !important; border: 1px solid transparent !important; color: var(--nx-muted) !important;
+}
+.deck-tab.active {
+  background: var(--nx-grad) !important; color: #0b0f1e !important; border-color: transparent !important;
+}
+.deck-tab.alt { flex: 0 0 auto; }
+
+/* ---------- settings panel ---------- */
+#nxSettings {
+  position: fixed; right: 10px; bottom: 118px; z-index: 12; width: 272px; max-width: 92vw;
+  background: var(--nx-glass-strong); border: 1px solid var(--nx-line); border-radius: var(--nx-radius);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .55);
+  padding: 14px 16px; font-size: .8rem; line-height: 2.05;
+}
+#nxSettings .nx-set-title {
+  font-weight: 800; letter-spacing: .1em; font-size: .82rem;
+  background: var(--nx-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#nxSettings select {
+  float: right; margin-left: 14px; background: #141b31; color: var(--nx-text);
+  border: 1px solid var(--nx-line); border-radius: 8px; padding: 3px 6px; font-family: inherit;
+}
+#nxSettings input[type=checkbox] { float: right; margin: 8px 0 0 14px; accent-color: var(--nx-cyan); width: 16px; height: 16px; }
+#nxSettings .nx-note { color: var(--nx-muted); font-size: .68rem; line-height: 1.5; margin-top: 6px; }
+#nxStats {
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--nx-line);
+  color: var(--nx-muted); font-size: .64rem; line-height: 1.6;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; word-break: break-word;
+}
+
+/* ---------- hint chip ---------- */
+.hint {
+  position: fixed; left: 10px; bottom: 118px; z-index: 9; max-width: 302px;
+  font-size: .66rem; line-height: 1.55; color: var(--nx-muted);
+  background: var(--nx-glass); border: 1px solid var(--nx-line); border-radius: 12px;
+  padding: 8px 11px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+
+/* ---------- touch jump ---------- */
+#nxJump {
+  position: fixed; right: 16px; bottom: 128px; z-index: 10;
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--nx-glass-strong); color: var(--nx-cyan);
+  border: 2px solid var(--nx-line-hot); font-size: 1.4rem; cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .5);
+}
+
+/* ---------- chrome visibility (H key / cinematic) ---------- */
+body.ui-hidden .bar, body.ui-hidden .deck, body.ui-hidden .hint,
+body.ui-hidden #nxToast, body.ui-hidden #nxSettings, body.ui-hidden #nxJump { display: none !important; }
+#nxBarT, #nxBarB { position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 39; transition: height .8s ease; pointer-events: none; }
+#nxBarT { top: 0; } #nxBarB { bottom: 0; }
+body.cine #nxBarT, body.cine #nxBarB { height: 7vh; }
+
+/* ---------- loading overlay ---------- */
+#nxLoading {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center;
+  background:
+    radial-gradient(60% 45% at 50% 30%, rgba(34, 211, 238, .14), transparent 70%),
+    radial-gradient(50% 40% at 78% 78%, rgba(167, 139, 250, .13), transparent 70%),
+    var(--nx-bg);
+}
+#nxLoading .t {
+  font-size: clamp(1.2rem, 5vw, 1.7rem); font-weight: 800; letter-spacing: .18em; text-align: center;
+  background: var(--nx-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#nxLoading .nx-loadbar {
+  width: min(300px, 70vw); height: 6px; border-radius: 999px;
+  background: rgba(255, 255, 255, .08); overflow: hidden;
+}
+#nxLoading .nx-loadbar::after {
+  content: ''; display: block; height: 100%; width: 40%; border-radius: 999px;
+  background: var(--nx-grad); animation: nxLoad 1.15s ease-in-out infinite;
+}
+@keyframes nxLoad { 0% { transform: translateX(-110%); } 100% { transform: translateX(280%); } }
+#nxStatus { color: var(--nx-muted); font-size: .85rem; }
+
+/* ---------- Demolition Day extras ---------- */
+#ddHud {
+  position: fixed; top: 76px; left: 10px; z-index: 10; display: none;
+  background: var(--nx-glass-strong); border: 1px solid var(--nx-gold); color: #ffe9a8;
+  border-radius: 999px; padding: 7px 14px; font-size: .84rem; font-weight: 700;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+#ddPanel {
+  position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 20; display: none;
+  background: var(--nx-glass-strong); border: 1px solid var(--nx-line-hot); border-radius: 18px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .6);
+  padding: 22px 28px; text-align: center; min-width: 264px; max-width: 92vw;
+}
+#ddPanel .row { display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+#ddPanel button {
+  background: rgba(255, 255, 255, .05); color: var(--nx-text); border: 1px solid var(--nx-line);
+  border-radius: 999px; padding: 9px 15px; cursor: pointer; font-family: inherit; font-size: .8rem;
+}
+#ddPanel button:hover { border-color: var(--nx-line-hot); color: var(--nx-cyan); }
+#ddBoard {
+  position: fixed; right: 10px; top: 76px; z-index: 9; max-width: 236px;
+  background: var(--nx-glass); border: 1px solid var(--nx-line); border-radius: 12px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  padding: 9px 13px; font-size: .72rem; color: #c9e7ff; line-height: 1.65;
+}
+.dd-stars { color: var(--nx-gold); margin-left: 5px; }
+
+/* ---------- small screens ---------- */
+@media (max-width: 700px) {
+  .hint { display: none; }
+  h1 { font-size: .82rem; }
+  #nxHud { display: none; }
+  #ddBoard { display: none; }
+  #nxSettings { bottom: 108px; }
+}

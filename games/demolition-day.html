@@ -5,41 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>💥 Demolition Day — Project Nexus</title>
 <link rel="icon" href="data:,">
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  html, body { height:100%; overflow:hidden; background:#0b0f14; font-family:'Segoe UI', system-ui, sans-serif; color:#eaf4ff; }
-  #nxCanvas { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
-  .bar { position:fixed; left:0; right:0; top:0; display:flex; align-items:center; gap:10px; padding:8px 12px; background:linear-gradient(180deg, rgba(5,10,18,.88), rgba(5,10,18,.55) 70%, transparent); z-index:10; pointer-events:none; }
-  .bar > * { pointer-events:auto; }
-  .back { color:#ffd94d; text-decoration:none; border:2px solid #ffd94d; border-radius:6px; padding:4px 10px; font-weight:700; font-size:.8rem; background:#0009; }
-  h1 { font-size:1.02rem; letter-spacing:.14em; color:#ffd94d; text-shadow:0 2px 10px #000; white-space:nowrap; }
-  .badge { background:#c22f4e; color:#fff; font-size:.6rem; font-weight:800; letter-spacing:.08em; padding:3px 7px; border-radius:4px; white-space:nowrap; }
-  #nxHud { margin-left:auto; font-size:.68rem; color:#bfe3ff; background:#000a; padding:5px 9px; border-radius:6px; border:1px solid #2c4a66; white-space:nowrap; overflow:hidden; }
-  #nxToast { position:fixed; top:52px; left:50%; transform:translateX(-50%); background:#10222eee; border:1px solid #ffd94d; color:#ffe9a8; padding:7px 14px; border-radius:8px; font-size:.8rem; opacity:0; transition:opacity .4s; z-index:11; pointer-events:none; }
-  .dock { position:fixed; left:50%; bottom:10px; transform:translateX(-50%); display:flex; flex-wrap:wrap; justify-content:center; gap:6px; z-index:10; max-width:96vw; }
-  .dock button { background:#101d2bee; color:#eaf4ff; border:1px solid #3f6ea3; border-radius:8px; padding:8px 11px; font-size:.78rem; cursor:pointer; font-family:inherit; }
-  .dock button:hover { border-color:#ffd94d; color:#ffd94d; }
-  .dock .grp { display:flex; gap:6px; align-items:center; background:#0a141fee; border:1px solid #274058; border-radius:10px; padding:5px 7px; }
-  .dock label { font-size:.68rem; color:#9fc4e8; }
-  .dock input[type=range] { width:110px; accent-color:#ffd94d; }
-  .hint { position:fixed; left:10px; bottom:10px; font-size:.68rem; color:#9fc4e8cc; z-index:9; max-width:300px; line-height:1.5; text-shadow:0 1px 4px #000; }
-  body.ui-hidden .bar, body.ui-hidden .dock, body.ui-hidden .hint, body.ui-hidden #nxToast, body.ui-hidden #nxSettings, body.ui-hidden #nxJump { display:none !important; }
-  #ddHud { position:fixed; top:52px; left:12px; z-index:10; background:#000a; border:1px solid #ffd94d; color:#ffe9a8; border-radius:8px; padding:6px 12px; font-size:.85rem; font-weight:700; display:none; }
-  #ddPanel { position:fixed; left:50%; top:38%; transform:translate(-50%,-50%); z-index:20; background:#0a1622f5; border:2px solid #ffd94d; border-radius:12px; padding:20px 26px; text-align:center; min-width:260px; display:none; }
-  #ddPanel .row { display:flex; gap:8px; justify-content:center; margin-top:14px; }
-  #ddPanel button { background:#101d2b; color:#eaf4ff; border:1px solid #3f6ea3; border-radius:8px; padding:8px 14px; cursor:pointer; font-family:inherit; }
-  #ddPanel button:hover { border-color:#ffd94d; color:#ffd94d; }
-  #ddBoard { position:fixed; right:12px; top:52px; z-index:9; background:#0009; border:1px solid #2c4a66; border-radius:8px; padding:8px 12px; font-size:.72rem; color:#bfe3ff; line-height:1.6; max-width:230px; }
-  @media (max-width:700px) { #ddBoard { display:none; } }
-  /* cinematic letterbox (Sequencer mode, C key) */
-  #nxBarT, #nxBarB { position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 39; transition: height .8s ease; pointer-events: none; }
-  #nxBarT { top: 0; } #nxBarB { bottom: 0; }
-  body.cine #nxBarT, body.cine #nxBarB { height: 7vh; }
-  #nxLoading { position:fixed; inset:0; background:#0b0f14; z-index:50; display:flex; flex-direction:column; gap:14px; align-items:center; justify-content:center; }
-  #nxLoading .t { font-size:1.3rem; letter-spacing:.2em; color:#ffd94d; }
-  #nxStatus { color:#9fc4e8; font-size:.85rem; }
-  @media (max-width:700px) { .hint { display:none; } h1 { font-size:.85rem; } #nxHud { display:none; } }
-</style>
+<link rel="stylesheet" href="../nexus/nexus-ui.css">
 </head>
 <body>
 <canvas id="nxCanvas"></canvas>
@@ -48,60 +14,77 @@
   <a class="back" href="../index.html">← HUB</a>
   <h1>💥 DEMOLITION DAY</h1>
   <span class="badge">PROJECT NEXUS</span>
-  <div id="nxHud">FPS —</div>
+  <div id="nxHud">…</div>
 </div>
 <div id="nxToast"></div>
 <div id="ddHud"></div>
 <div id="ddPanel"><div id="ddPanelBody"></div><div class="row"><button id="ddRetry">↻ Retry</button><button id="ddNext">Next ➜</button><button id="ddMenu">Challenges</button></div></div>
 <div id="ddBoard"></div>
 
-<div class="dock">
-  <div class="grp">
-    <button data-challenge="tower">🏗 Tower Topple<span class="dd-stars"></span></button>
-    <button data-challenge="dominoes">🁢 Domino Day<span class="dd-stars"></span></button>
-    <button data-challenge="blast">💥 Blast Off<span class="dd-stars"></span></button>
+<div class="deck">
+  <div class="deck-panels">
+    <div class="deck-panel open" data-panel="challenges">
+      <button data-challenge="tower">🏗 Tower Topple<span class="dd-stars"></span></button>
+      <button data-challenge="dominoes">🁢 Domino Day<span class="dd-stars"></span></button>
+      <button data-challenge="blast">💥 Blast Off<span class="dd-stars"></span></button>
+      <button id="ddTool" style="display:none"></button>
+      <button id="ddFinish" style="display:none">✔ Finish</button>
+      <button id="ddQuit" style="display:none">✖ Quit</button>
+    </div>
+    <div class="deck-panel" data-panel="world">
+      <label for="nxTime">☀️ Time
+        <input type="range" id="nxTime" min="0" max="24" step="0.1" value="10.5">
+      </label>
+      <button id="nxCycle">🕐 Cycle: off</button>
+      <button id="nxRain">🌦 Weather: Auto</button>
+      <button id="nxStorm">⛈ Summon storm</button>
+      <button id="nxSound">🔊 Sound: on</button>
+    </div>
   </div>
-  <div class="grp">
-    <button id="ddTool" style="display:none"></button>
-    <button id="ddFinish" style="display:none">✔ Finish</button>
-    <button id="ddQuit" style="display:none">✖ Quit</button>
-  </div>
-  <div class="grp">
-    <label for="nxTime">☀️ Time</label>
-    <input type="range" id="nxTime" min="0" max="24" step="0.1" value="10.5">
-    <button id="nxCycle">🕐 Cycle: off</button>
-    <button id="nxRain">🌦 Weather: Auto</button>
-    <button id="nxStorm">⛈ Summon storm</button>
-    <button id="nxSound">🔊 Sound: on</button>
-    <button id="nxSettingsBtn">⚙ Settings</button>
+  <div class="deck-tabs">
+    <button class="deck-tab active" data-deck="challenges">🎯 Challenges</button>
+    <button class="deck-tab" data-deck="world">🌍 World</button>
+    <button id="nxSettingsBtn" class="deck-tab alt">⚙ Settings</button>
   </div>
 </div>
 <div id="nxBarT"></div><div id="nxBarB"></div>
 
-<div id="nxSettings" style="display:none; position:fixed; right:12px; bottom:76px; z-index:12; background:#0a1622f2; border:1px solid #3f6ea3; border-radius:10px; padding:12px 14px; font-size:.78rem; line-height:2;">
-  <div style="color:#ffd94d; font-weight:700; letter-spacing:.08em;">⚙ NEXUS SETTINGS</div>
+<div id="nxSettings" style="display:none">
+  <div class="nx-set-title">⚙ NEXUS SETTINGS</div>
   <label>Render scale
-    <select id="nxScale" style="float:right; margin-left:14px; background:#12283e; color:#eaf4ff; border:1px solid #3f6ea3; border-radius:5px; padding:2px 5px;">
+    <select id="nxScale">
       <option value="1">100% (full)</option>
       <option value="0.75">75%</option>
       <option value="0.5">50%</option>
     </select>
   </label><br>
-  <label>Shadows <input type="checkbox" id="nxShadows" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
-  <label>Bloom glow <input type="checkbox" id="nxBloom" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
-  <label>Ambient occlusion <input type="checkbox" id="nxAO" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
-  <label>Film grade <input type="checkbox" id="nxFilm" checked style="float:right; margin-left:14px; accent-color:#ffd94d;"></label><br>
-  <div style="color:#9fc4e8; font-size:.68rem; line-height:1.45;">The auto-governor also eases quality live<br>if the frame rate dips — it never touches gameplay.</div>
+  <label>Shadows <input type="checkbox" id="nxShadows" checked></label><br>
+  <label>Bloom glow <input type="checkbox" id="nxBloom" checked></label><br>
+  <label>Ambient occlusion <input type="checkbox" id="nxAO" checked></label><br>
+  <label>Film grade <input type="checkbox" id="nxFilm" checked></label><br>
+  <div class="nx-note">The auto-governor also eases quality live if the frame rate dips — it never touches gameplay.</div>
+  <div id="nxStats"></div>
 </div>
 
-<button id="nxJump" style="display:none; position:fixed; right:16px; bottom:120px; z-index:10; width:64px; height:64px; border-radius:50%; background:#101d2bcc; color:#ffd94d; border:2px solid #ffd94d; font-size:1.4rem;">⬆</button>
+<button id="nxJump" style="display:none">⬆</button>
 <div class="hint">WASD move · drag mouse to orbit · wheel zoom · SHIFT sprint · SPACE jump<br>Pick a challenge below — it builds in front of you. Stand on flat ground for towers.<br>Touch: left thumb moves, right thumb looks.</div>
 
 <div id="nxLoading">
   <div class="t">💥 DEMOLITION DAY</div>
+  <div class="nx-loadbar"></div>
   <div id="nxStatus">Booting Project Nexus…</div>
 </div>
 
+<script>
+/* control-deck tabs (plain page chrome; the game module wires the buttons) */
+document.querySelectorAll('.deck-tab[data-deck]').forEach(function (t) {
+  t.addEventListener('click', function () {
+    var name = t.getAttribute('data-deck');
+    document.querySelectorAll('.deck-tab[data-deck]').forEach(function (x) { x.classList.toggle('active', x === t); });
+    document.querySelectorAll('.deck-panel').forEach(function (p) { p.classList.toggle('open', p.getAttribute('data-panel') === name); });
+  });
+});
+</script>
 <script src="../js/arcade.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script type="importmap">
