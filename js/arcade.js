@@ -1810,6 +1810,82 @@ window.Arcade = (function () {
     }
   });
 
+  /* ---------- shared game frame (hub v2, wave 2) ----------
+     A slim floating chrome bar injected on game pages: back-to-hub,
+     the game title, the player's name chip, and a fullscreen button —
+     one consistent frame for every game, in the arcade's colors.
+     Also records the visit in arcade_recent (the store the hub's
+     Recently Played strip reads), so direct links count too.
+     Skips: non-game pages, Demolition Day (Nexus Glass has its own
+     chrome), and Lua Lab (it runs inside the hub iframe — a hub link
+     there would nest the hub inside itself).
+     Opt out per page: window.ARCADE_NO_FRAME = true. */
+  _fxSafe(function () {
+    if (typeof document === "undefined" || typeof window === "undefined") return;
+    if (window.ARCADE_NO_FRAME) return;
+    var path = location.pathname || "";
+    var file = path.split("/").pop() || "";
+    if (path.indexOf("/games/") === -1) return;
+    if (file === "demolition-day.html" || file === "lua-lab.html") return;
+    var gameId = file.replace(/\.html$/, "");
+    var start = function () {
+      if (!document.body || document.getElementById("arcadeFrame")) return;
+      try {
+        var rec = [];
+        try { rec = JSON.parse(localStorage.getItem("arcade_recent") || "[]") || []; } catch (e) { rec = []; }
+        rec = rec.filter(function (r) { return r && r.id !== gameId; });
+        rec.unshift({ id: gameId, t: Date.now() });
+        localStorage.setItem("arcade_recent", JSON.stringify(rec.slice(0, 8)));
+      } catch (e) { /* storage unavailable — the frame still renders */ }
+
+      var style = document.createElement("style");
+      style.textContent =
+        "#arcadeFrame{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99990;" +
+        "display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.85);border:2px solid #fff;" +
+        "padding:6px 10px;font-family:'Press Start 2P',monospace;font-size:9px;color:#fff;line-height:1.6;" +
+        "transition:opacity .4s ease;white-space:nowrap;max-width:94vw;}" +
+        "#arcadeFrame.dim{opacity:.22;}" +
+        "#arcadeFrame a{color:#fff;text-decoration:none;}" +
+        "#arcadeFrame a:hover{color:#ffff00;}" +
+        "#arcadeFrame .af-title{color:#808080;overflow:hidden;text-overflow:ellipsis;}" +
+        "#arcadeFrame .af-name{color:#ffff00;}" +
+        "#arcadeFrame button{background:none;border:none;color:#fff;font:inherit;cursor:pointer;padding:0 2px;}" +
+        "#arcadeFrame button:hover{color:#ffff00;}" +
+        "@media (max-width:560px){#arcadeFrame .af-title{display:none;}}";
+      document.head.appendChild(style);
+
+      var esc = function (s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+      var name = "";
+      try { name = localStorage.getItem("arcade_name") || ""; } catch (e) {}
+      var title = (document.title || "").replace(/\s*[—|·].*$/, "").trim();
+      var bar = document.createElement("div");
+      bar.id = "arcadeFrame";
+      bar.innerHTML =
+        '<a href="' + _siteBase() + 'index.html" title="Back to the arcade hub">← ARCADE</a>' +
+        (title ? '<span class="af-title">' + esc(title) + "</span>" : "") +
+        (name ? '<span class="af-name">★ ' + esc(name.slice(0, 20)) + "</span>" : "") +
+        '<button type="button" id="arcadeFrameFs" title="Toggle fullscreen">⛶</button>';
+      document.body.appendChild(bar);
+      var fsBtn = document.getElementById("arcadeFrameFs");
+      if (fsBtn) fsBtn.addEventListener("click", function () { _fsToggle(); });
+      var idleTimer = null;
+      var wake = function () {
+        bar.classList.remove("dim");
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(function () { bar.classList.add("dim"); }, 3000);
+      };
+      document.addEventListener("mousemove", function (e) { if (e.clientY < 70) wake(); });
+      document.addEventListener("touchstart", wake, { passive: true });
+      bar.addEventListener("mouseenter", wake);
+      wake();
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", start);
+    } else {
+      start();
+    }
+  });
+
   return {
     build: ARCADE_BUILD,
     SUPABASE_URL: SUPABASE_URL,
