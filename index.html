@@ -25,12 +25,26 @@
     min-height: 100vh;
     padding: 16px;
   }
+  /* faint drifting starfield, pure CSS (brand-black, kept subtle) */
+  body::before {
+    content: ""; position: fixed; inset: -60px 0 0 0; z-index: -1; pointer-events: none;
+    background-image:
+      radial-gradient(1px 1px at 22px 34px, rgba(255,255,255,.55) 50%, transparent 51%),
+      radial-gradient(1px 1px at 130px 90px, rgba(255,255,255,.35) 50%, transparent 51%),
+      radial-gradient(2px 2px at 240px 150px, rgba(255,255,255,.28) 50%, transparent 51%),
+      radial-gradient(1px 1px at 320px 60px, rgba(255,255,255,.45) 50%, transparent 51%),
+      radial-gradient(1px 1px at 70px 190px, rgba(255,255,0,.30) 50%, transparent 51%);
+    background-size: 360px 240px;
+    animation: starDrift 90s linear infinite;
+  }
+  @keyframes starDrift { from { transform: translateY(0); } to { transform: translateY(240px); } }
   header { text-align: center; margin: 28px 0 10px; }
   header h1 {
     font-size: clamp(1.1rem, 5vw, 1.7rem);
     letter-spacing: 2px;
     color: var(--ut-white);
     line-height: 1.8;
+    text-shadow: 0 0 22px rgba(255,255,0,.35), 0 0 3px rgba(255,255,255,.6);
   }
   header p { color: var(--ut-white); margin-top: 16px; font-size: 10px; }
   .name-row { text-align: center; margin: 18px 0 6px; font-size: 10px; }
@@ -60,6 +74,40 @@
     font-family: inherit; font-size: 11px; padding: 10px 16px; cursor: pointer; border-radius: 0;
   }
   .searchbox button:hover { border-color: var(--ut-yellow); color: var(--ut-yellow); }
+  /* ---------- recent + filter bar (hub v2) ---------- */
+  #recentWrap { max-width: 900px; margin: 20px auto 0; }
+  #recentWrap h3 { font-size: 10px; letter-spacing: 1px; margin-bottom: 10px; color: var(--ut-white); }
+  #recentRow { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+  .mini {
+    flex: 0 0 auto; width: 118px; text-decoration: none; color: var(--ut-white);
+    border: 2px solid var(--ut-dark); background: #000; padding: 6px; text-align: center;
+  }
+  .mini:hover { border-color: var(--ut-yellow); }
+  .mini img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; margin-bottom: 6px; background: #111; }
+  .mini span { font-size: 8px; line-height: 1.6; display: block; }
+  .filterbar { max-width: 900px; margin: 18px auto 0; }
+  .filterrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+  #gameFilter {
+    flex: 1 1 220px; background: #000; border: 2px solid var(--ut-white); color: var(--ut-white);
+    font-family: inherit; font-size: 11px; padding: 10px 12px; border-radius: 0;
+  }
+  #gameFilter:focus { border-color: var(--ut-yellow); outline: none; }
+  #sortSel, #randomBtn {
+    background: #000; border: 2px solid var(--ut-white); color: var(--ut-white);
+    font-family: inherit; font-size: 10px; padding: 10px 12px; cursor: pointer; border-radius: 0;
+  }
+  #randomBtn:hover, #sortSel:hover { border-color: var(--ut-yellow); color: var(--ut-yellow); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip {
+    background: #000; border: 2px solid var(--ut-gray); color: var(--ut-white);
+    font-family: inherit; font-size: 9px; padding: 8px 10px; cursor: pointer; border-radius: 0;
+  }
+  .chip:hover { border-color: var(--ut-white); }
+  .chip.active { background: var(--ut-yellow); border-color: var(--ut-yellow); color: #000; }
+  #noResults {
+    max-width: 900px; margin: 24px auto 0; text-align: center; color: var(--ut-gray);
+    font-size: 10px; border: 2px dashed var(--ut-dark); padding: 22px 12px;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -76,10 +124,16 @@
     text-decoration: none;
     color: var(--ut-white);
     display: block;
+    position: relative;
+    overflow: hidden;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
   }
   .card:hover, .card:active {
     border-color: var(--ut-yellow);
+    transform: translateY(-3px);
+    box-shadow: 6px 6px 0 rgba(255,255,0,.22);
   }
+  .card:focus-visible { outline: 2px solid var(--ut-yellow); outline-offset: 2px; }
   .card:hover .title { color: var(--ut-yellow); }
   .card .emoji { font-size: 2.2rem; display: block; margin-bottom: 10px; }
   .card .title { font-size: 11px; line-height: 1.8; }
@@ -88,9 +142,12 @@
     content: "♥ "; color: var(--ut-red);
   }
   .card .best { margin-top: 10px; font-size: 9px; color: var(--ut-gray); min-height: 1.1em; line-height: 1.8; }
+  .card .best.champ { color: var(--ut-yellow); }
   .card.featured { grid-column: 1 / -1; border-color: var(--ut-yellow); padding: 22px 8px 18px; }
+  .grid.sorted .card.featured { grid-column: auto; }
   .card.featured .emoji { font-size: 3rem; }
   .card.featured .title { font-size: 13px; }
+  .grid.sorted .card.featured .title { font-size: 11px; }
   .card .badge {
     display: inline-block; background: var(--ut-yellow); color: #000;
     font-size: 9px; letter-spacing: 1px; padding: 5px 10px; margin-bottom: 12px;
@@ -108,8 +165,18 @@
   .card .thumb {
     width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block;
     margin-bottom: 12px; border: 2px solid var(--ut-dark); background: #111;
+    transition: transform .25s ease;
   }
+  .card:hover .thumb { transform: scale(1.045); }
   .card.featured .thumb { aspect-ratio: 21 / 9; }
+  .grid.sorted .card.featured .thumb { aspect-ratio: 16 / 10; }
+  .card .star {
+    position: absolute; top: 4px; right: 6px; z-index: 2;
+    font-size: 16px; line-height: 1; color: rgba(255,255,255,.38);
+    cursor: pointer; padding: 6px; text-shadow: 0 1px 4px #000;
+  }
+  .card .star:hover { color: var(--ut-white); }
+  .card .star.on { color: var(--ut-yellow); }
   .hofthumb {
     width: 40px; height: 25px; object-fit: cover; vertical-align: middle;
     margin-right: 8px; border: 1px solid var(--ut-dark); background: #111;
@@ -133,13 +200,22 @@
   .leaders li:last-child { border-bottom: none; }
   .leaders .who { color: var(--ut-yellow); }
   .leaders .pts { color: var(--ut-yellow); }
+  .leaders .rank { display: inline-block; min-width: 34px; }
   footer { text-align: center; color: var(--ut-gray); font-size: 9px; padding-bottom: 24px; line-height: 1.8; }
-  .tabs { max-width: 900px; margin: 14px auto 0; display: flex; gap: 8px; padding: 0 12px; }
+  .tabs {
+    max-width: 900px; margin: 14px auto 0; display: flex; gap: 8px; padding: 8px 12px;
+    position: sticky; top: 0; z-index: 60; background: #000;
+  }
   .tabs button { flex: 1; background: #000; border: 3px solid var(--ut-white); color: var(--ut-white);
     font-family: "Press Start 2P", monospace; font-size: 10px; padding: 12px 6px; cursor: pointer; }
   .tabs button.active { background: var(--ut-white); color: #000; }
   #luaView { max-width: 1100px; margin: 14px auto 30px; padding: 0 12px; }
   #luaFrame { width: 100%; height: calc(100vh - 190px); min-height: 600px; border: 3px solid var(--ut-white); background: #000; display: block; }
+  @media (prefers-reduced-motion: reduce) {
+    body::before { animation: none; }
+    .card, .card .thumb { transition: none; }
+    .card:hover { transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -164,7 +240,35 @@
   </form>
 </div>
 
+<div id="recentWrap" style="display:none">
+  <h3>🕘 * RECENTLY PLAYED</h3>
+  <div id="recentRow"></div>
+</div>
+
+<div class="filterbar">
+  <div class="filterrow">
+    <input type="text" id="gameFilter" placeholder="* find a game…  ( / )" aria-label="Filter games by name" autocomplete="off">
+    <select id="sortSel" aria-label="Sort games">
+      <option value="default">↕ DEFAULT ORDER</option>
+      <option value="az">↕ NAME A–Z</option>
+      <option value="top">↕ TOP SCORE</option>
+    </select>
+    <button id="randomBtn" title="Jump to a random game">🎲 SURPRISE ME</button>
+  </div>
+  <div class="chips" id="chips">
+    <button class="chip active" data-cat="all">ALL</button>
+    <button class="chip" data-cat="favs">⭐ FAVS</button>
+    <button class="chip" data-cat="classics">🕹 CLASSICS</button>
+    <button class="chip" data-cat="puzzle">🧩 PUZZLE</button>
+    <button class="chip" data-cat="action">💥 ACTION</button>
+    <button class="chip" data-cat="story">📖 STORY</button>
+    <button class="chip" data-cat="chill">🎧 CHILL</button>
+    <button class="chip" data-cat="online">🌐 ONLINE</button>
+  </div>
+</div>
+
 <div class="grid" id="grid"></div>
+<div id="noResults" style="display:none">* no games match that — but the air is still filled with determination.</div>
 
 <div class="leaders">
   <h2>* HALL OF FAME</h2>
@@ -199,50 +303,82 @@
 (function () {
   "use strict";
   const GAMES = [
-    { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin", featured: true, sub: "* FEAR TOXIN: ESCAPE — a haunted mansion. Find the keys. Get out." },
-    { id: "sandbox-of-nexus", emoji: "🏝", title: "Sandbox Of Nexus", sub: "* PROJECT NEXUS — the new engine's playground. Real physics. Bend time. Make weather." },
-    { id: "demolition-day", emoji: "💥", title: "Demolition Day", sub: "* PROJECT NEXUS — timed demolition challenges. Towers, dominoes, bombs. Earn stars, top the boards." },
-    { id: "red-light-green-legs", emoji: "🚦", title: "Red Light, Green Legs", sub: "* 4 spider-bots. 0 instructions. Oliver, Aria, Sophia and Albert teach themselves to walk, run and freeze on red — you just watch." },
-    { id: "the-experience", emoji: "🎧", title: "The Experience", sub: "* NOT A GAME — a listening room. Upload your own music and listen, or press play on the built-in track." },
-    { id: "snake",       emoji: "🐍", title: "Snake" },
-    { id: "2048",        emoji: "🔢", title: "2048" },
-    { id: "minesweeper", emoji: "💣", title: "Minesweeper" },
-    { id: "tetris",      emoji: "🧱", title: "Tetris" },
-    { id: "pong",        emoji: "🏓", title: "Pong" },
-    { id: "breakout",    emoji: "🧱", title: "Breakout" },
-    { id: "memory",      emoji: "🃏", title: "Memory" },
-    { id: "tictactoe",   emoji: "⭕", title: "Tic-Tac-Toe" },
-    { id: "flappy",      emoji: "🐤", title: "Flappy" },
-    { id: "asteroids",   emoji: "🚀", title: "Asteroids" },
+    { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin", cat: "story", featured: true, sub: "* FEAR TOXIN: ESCAPE — a haunted mansion. Find the keys. Get out." },
+    { id: "sandbox-of-nexus", emoji: "🏝", title: "Sandbox Of Nexus", cat: "action", sub: "* PROJECT NEXUS — the new engine's playground. Real physics. Bend time. Make weather." },
+    { id: "demolition-day", emoji: "💥", title: "Demolition Day", cat: "action", sub: "* PROJECT NEXUS — timed demolition challenges. Towers, dominoes, bombs. Earn stars, top the boards." },
+    { id: "red-light-green-legs", emoji: "🚦", title: "Red Light, Green Legs", cat: "chill", sub: "* 4 spider-bots. 0 instructions. Oliver, Aria, Sophia and Albert teach themselves to walk, run and freeze on red — you just watch." },
+    { id: "the-experience", emoji: "🎧", title: "The Experience", cat: "chill", sub: "* NOT A GAME — a listening room. Upload your own music and listen, or press play on the built-in track." },
+    { id: "snake",       emoji: "🐍", title: "Snake", cat: "classics" },
+    { id: "2048",        emoji: "🔢", title: "2048", cat: "puzzle" },
+    { id: "minesweeper", emoji: "💣", title: "Minesweeper", cat: "puzzle" },
+    { id: "tetris",      emoji: "🧱", title: "Tetris", cat: "classics" },
+    { id: "pong",        emoji: "🏓", title: "Pong", cat: "classics" },
+    { id: "breakout",    emoji: "🧱", title: "Breakout", cat: "classics" },
+    { id: "memory",      emoji: "🃏", title: "Memory", cat: "puzzle" },
+    { id: "tictactoe",   emoji: "⭕", title: "Tic-Tac-Toe", cat: "classics" },
+    { id: "flappy",      emoji: "🐤", title: "Flappy", cat: "action" },
+    { id: "asteroids",   emoji: "🚀", title: "Asteroids", cat: "action" },
     // ---- AGENT-B: games 11-20 (added by second builder; do not remove) ----
-    { id: "simon",       emoji: "🎛️", title: "Simon Says" },
-    { id: "whackamole",  emoji: "🐹", title: "Whack-a-Mole" },
-    { id: "dodge",       emoji: "🚀", title: "Dodge" },
-    { id: "reaction",    emoji: "⚡", title: "Reaction Test" },
-    { id: "guessnumber", emoji: "🔢", title: "Guess the Number" },
-    { id: "rps",         emoji: "✂️", title: "Rock Paper Scissors" },
-    { id: "hangman",     emoji: "🪢", title: "Hangman" },
-    { id: "slidepuzzle", emoji: "🧩", title: "15-Puzzle" },
-    { id: "connectfour", emoji: "⭕", title: "Connect Four" },
-    { id: "mp-tictactoe",emoji: "🌐", title: "Tic-Tac-Toe Online" },
+    { id: "simon",       emoji: "🎛️", title: "Simon Says", cat: "classics" },
+    { id: "whackamole",  emoji: "🐹", title: "Whack-a-Mole", cat: "action" },
+    { id: "dodge",       emoji: "🚀", title: "Dodge", cat: "action" },
+    { id: "reaction",    emoji: "⚡", title: "Reaction Test", cat: "action" },
+    { id: "guessnumber", emoji: "🔢", title: "Guess the Number", cat: "puzzle" },
+    { id: "rps",         emoji: "✂️", title: "Rock Paper Scissors", cat: "chill" },
+    { id: "hangman",     emoji: "🪢", title: "Hangman", cat: "puzzle" },
+    { id: "slidepuzzle", emoji: "🧩", title: "15-Puzzle", cat: "puzzle" },
+    { id: "connectfour", emoji: "⭕", title: "Connect Four", cat: "classics" },
+    { id: "mp-tictactoe",emoji: "🌐", title: "Tic-Tac-Toe Online", cat: "online" },
     // ---- END AGENT-B ----
   ];
+  const BY_ID = {};
+  GAMES.forEach(function (g) { BY_ID[g.id] = g; });
 
   const grid = document.getElementById("grid");
   const hof = document.getElementById("hof");
-  document.getElementById("pname").textContent = Arcade.playerName();
+  const me = Arcade.playerName();
+  document.getElementById("pname").textContent = me;
   document.getElementById("rename").addEventListener("click", function () {
     try { localStorage.removeItem("arcade_name"); } catch (e) {}
     document.getElementById("pname").textContent = Arcade.playerName();
   });
 
-  // Build cards first (instant), fill best scores async.
+  /* ---------- favorites + recently played (browser-local) ---------- */
+  function lsGet(key, fallback) { try { const v = JSON.parse(localStorage.getItem(key) || "null"); return v == null ? fallback : v; } catch (e) { return fallback; } }
+  function lsSet(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+  let favs = new Set(lsGet("arcade_favs", []));
+  function saveFavs() { lsSet("arcade_favs", Array.from(favs)); }
+  function pushRecent(id) {
+    let rec = lsGet("arcade_recent", []).filter(function (r) { return r && r.id !== id; });
+    rec.unshift({ id: id, t: Date.now() });
+    lsSet("arcade_recent", rec.slice(0, 8));
+  }
+  function renderRecent() {
+    const wrap = document.getElementById("recentWrap");
+    const row = document.getElementById("recentRow");
+    const rec = lsGet("arcade_recent", []).filter(function (r) { return r && BY_ID[r.id]; }).slice(0, 8);
+    if (!rec.length) { wrap.style.display = "none"; return; }
+    row.innerHTML = "";
+    rec.forEach(function (r) {
+      const g = BY_ID[r.id];
+      const a = document.createElement("a");
+      a.className = "mini"; a.href = "games/" + g.id + ".html";
+      a.innerHTML = '<img src="img/thumbs/' + g.id + '.jpg" alt="" loading="lazy"><span>' + g.emoji + " " + g.title + "</span>";
+      a.addEventListener("click", function () { pushRecent(g.id); });
+      row.appendChild(a);
+    });
+    wrap.style.display = "";
+  }
+
+  /* ---------- build cards ---------- */
+  const CARDS = [];
   const bestEls = {};
   GAMES.forEach(function (g) {
     const a = document.createElement("a");
     a.className = "card" + (g.featured ? " featured" : "");
     a.href = "games/" + g.id + ".html";
     a.innerHTML =
+      '<span class="star' + (favs.has(g.id) ? " on" : "") + '" title="favorite">★</span>' +
       (g.featured ? '<span class="badge">★ FEATURED</span>' : "") +
       (g.exp ? '<span class="expbadge">🧪 EXPERIMENTAL</span>' : "") +
       '<img class="thumb" src="img/thumbs/' + g.id + '.jpg" alt="' + g.title + '" loading="lazy">' +
@@ -250,23 +386,94 @@
       (g.sub ? '<div class="sub">' + g.sub + "</div>" : "") +
       (g.featured ? '<span class="playbtn">▶ PLAY</span>' : "") +
       '<div class="best" id="best-' + g.id + '">…</div>';
+    const star = a.querySelector(".star");
+    star.addEventListener("click", function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      if (favs.has(g.id)) { favs.delete(g.id); star.classList.remove("on"); }
+      else { favs.add(g.id); star.classList.add("on"); }
+      saveFavs();
+      applyFilter();
+    });
+    a.addEventListener("click", function () { pushRecent(g.id); });
     grid.appendChild(a);
-    bestEls[g.id] = a.querySelector(".best");
+    const card = { g: g, el: a, bestEl: a.querySelector(".best"), topScore: null };
+    CARDS.push(card);
+    bestEls[g.id] = card.bestEl;
+  });
+  renderRecent();
+
+  /* ---------- filter + sort + random ---------- */
+  const filterInput = document.getElementById("gameFilter");
+  const noResults = document.getElementById("noResults");
+  let curCat = "all";
+  function applyFilter() {
+    const q = (filterInput.value || "").trim().toLowerCase();
+    let visible = 0;
+    CARDS.forEach(function (c) {
+      const matchQ = !q || c.g.title.toLowerCase().indexOf(q) !== -1 || c.g.id.indexOf(q) !== -1;
+      const matchC = curCat === "all" || (curCat === "favs" ? favs.has(c.g.id) : c.g.cat === curCat);
+      const show = matchQ && matchC;
+      c.el.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    noResults.style.display = visible ? "none" : "";
+    return visible;
+  }
+  filterInput.addEventListener("input", applyFilter);
+  filterInput.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { filterInput.value = ""; applyFilter(); filterInput.blur(); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || "")) {
+      e.preventDefault(); filterInput.focus();
+    }
+  });
+  document.getElementById("chips").addEventListener("click", function (e) {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("active", c === b); });
+    curCat = b.getAttribute("data-cat");
+    applyFilter();
+  });
+  document.getElementById("sortSel").addEventListener("change", function () {
+    const mode = this.value;
+    grid.classList.toggle("sorted", mode !== "default");
+    const ordered = CARDS.slice();
+    if (mode === "az") ordered.sort(function (a, b) { return a.g.title.localeCompare(b.g.title); });
+    else if (mode === "top") ordered.sort(function (a, b) {
+      const d = (b.topScore == null ? -1 : b.topScore) - (a.topScore == null ? -1 : a.topScore);
+      return d !== 0 ? d : a.g.title.localeCompare(b.g.title);
+    });
+    else ordered.sort(function (a, b) { return GAMES.indexOf(a.g) - GAMES.indexOf(b.g); });
+    ordered.forEach(function (c) { grid.appendChild(c.el); });
+    applyFilter();
+  });
+  document.getElementById("randomBtn").addEventListener("click", function () {
+    const pool = CARDS.filter(function (c) { return c.el.style.display !== "none"; });
+    const pick = (pool.length ? pool : CARDS)[Math.floor(Math.random() * (pool.length ? pool.length : CARDS.length))];
+    if (pick) { pushRecent(pick.g.id); location.href = "games/" + pick.g.id + ".html"; }
   });
 
-  // Load #1 score for each card.
+  /* ---------- scores ---------- */
   GAMES.forEach(function (g) {
     Arcade.getScores(g.id, 1).then(function (rows) {
+      const card = CARDS.find(function (c) { return c.g.id === g.id; });
       const el = bestEls[g.id];
       if (rows.length) {
-        el.textContent = "🏆 " + rows[0].player_name + ": " + rows[0].score;
+        card.topScore = rows[0].score;
+        if (rows[0].player_name === me) {
+          el.textContent = "👑 YOU ARE #1: " + rows[0].score;
+          el.classList.add("champ");
+        } else {
+          el.textContent = "🏆 " + rows[0].player_name + ": " + rows[0].score;
+        }
       } else {
         el.textContent = "no scores yet — be first!";
       }
     });
   });
 
-  // Hall of fame: top score of every game, sorted.
+  /* ---------- hall of fame ---------- */
   Promise.all(
     GAMES.map(function (g) {
       return Arcade.getScores(g.id, 1).then(function (rows) {
@@ -282,10 +489,11 @@
       hof.innerHTML = "<li>no scores yet — play something!</li>";
       return;
     }
-    rows.slice(0, 10).forEach(function (r) {
+    const medals = ["🥇", "🥈", "🥉"];
+    rows.slice(0, 10).forEach(function (r, i) {
       const li = document.createElement("li");
       li.innerHTML =
-        '<span><img class="hofthumb" src="img/thumbs/' + r.id + '.jpg" alt="">' + r.game + ' <span class="who">— ' +
+        '<span><span class="rank">' + (medals[i] || (i + 1) + ".") + '</span><img class="hofthumb" src="img/thumbs/' + r.id + '.jpg" alt="">' + r.game + ' <span class="who">— ' +
         r.name + "</span></span>" +
         '<span class="pts">' + r.score + "</span>";
       hof.appendChild(li);
@@ -338,7 +546,10 @@
   var frame = document.getElementById("luaFrame");
   var hubParts = [
     document.querySelector(".searchbox"),
+    document.getElementById("recentWrap"),
+    document.querySelector(".filterbar"),
     document.getElementById("grid"),
+    document.getElementById("noResults"),
     document.querySelector(".leaders")
   ];
   var inLua = false;
@@ -360,6 +571,19 @@
     tabL.textContent = "🌙 LUA";
     tabN.classList.add("active"); tabL.classList.remove("active");
     try { history.replaceState(null, "", location.pathname); } catch (e) {}
+    renderRecentSafe();
+    applyFilterSafe();
+  }
+  function renderRecentSafe() {
+    /* re-render recents (visibility is reapplied by the hub script's state) */
+    var wrap = document.getElementById("recentWrap");
+    var has = false;
+    try { has = (JSON.parse(localStorage.getItem("arcade_recent") || "[]") || []).length > 0; } catch (e) {}
+    if (wrap) wrap.style.display = has ? "" : "none";
+  }
+  function applyFilterSafe() {
+    var inp = document.getElementById("gameFilter");
+    if (inp) inp.dispatchEvent(new Event("input"));
   }
   tabL.addEventListener("click", showLua);
   tabN.addEventListener("click", function () { if (inLua) showNormal(); });
