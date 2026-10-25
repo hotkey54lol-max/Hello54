@@ -156,6 +156,7 @@
           <option value="fixed">on a fixed date…</option>
           <option value="last_mon_may">last Monday in May (Memorial Day)</option>
           <option value="fourth_thu_nov">fourth Thursday in Nov (Thanksgiving)</option>
+          <option value="fri_13">Friday the 13th (any month)</option>
         </select>
         <div id="pdFixedRow" style="display:flex;gap:8px;margin-top:8px">
           <input type="number" id="pdMonth" placeholder="month 1-12" min="1" max="12">
@@ -469,6 +470,7 @@
   function pdDateLabel(ev) {
     if (ev.rule === "last_mon_may") return "last Monday in May";
     if (ev.rule === "fourth_thu_nov") return "fourth Thursday in Nov";
+    if (ev.rule === "fri_13") return "Friday the 13th (any month)";
     return "month " + ev.month + " / day " + ev.day;
   }
   function refreshPdList() {
