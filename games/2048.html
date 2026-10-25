@@ -9,25 +9,36 @@
   body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
          text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
   .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
-  h1 { font-size: 1.6rem; margin: 4px 0; }
+  h1 { font-size: 1.6rem; margin: 4px 0; text-shadow: 0 0 16px rgba(0,229,255,.35); }
   #score { font-size: 1.2rem; color: #ffe600; margin: 8px 0; }
+  #best { font-size: .92rem; color: #8a8aa8; margin: 2px 0 6px; min-height: 1.2em; }
   #board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: min(92vw, 400px);
-           margin: 0 auto; background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; padding: 8px; }
+           margin: 0 auto; background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; padding: 8px;
+           box-shadow: 0 8px 28px rgba(0,0,0,.5); }
   .cell { aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center;
-          font-weight: 800; font-size: clamp(1.1rem, 6vw, 1.6rem); background: #23233d; color: #e8e8f0; }
+          font-weight: 800; font-size: clamp(1.1rem, 6vw, 1.6rem); background: #23233d; color: #e8e8f0;
+          animation: cellPop .13s ease; }
+  @keyframes cellPop { from { transform: scale(.88); } to { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .cell { animation: none; } }
   #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
   button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
            padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:hover:not(:disabled) { filter: brightness(1.12); }
   button:active { transform: scale(.96); }
+  button:disabled { opacity: .38; cursor: default; }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
+  .back:hover { text-shadow: 0 0 10px rgba(0,229,255,.6); }
 </style>
 </head>
 <body>
 <a class="back" href="../index.html">← arcade</a>
 <h1>🔢 2048</h1>
 <div id="score">Score: 0</div>
+<div id="best"></div>
 <div id="board"></div>
 <div id="msg"></div>
 <button id="start">New Game</button>
+<button id="undo" disabled>↩ Undo</button>
 <script src="../js/arcade.js"></script>
 <script>
 (function () {
@@ -36,11 +47,13 @@
   const scoreEl = document.getElementById("score"), msgEl = document.getElementById("msg");
   const COLORS = { 2: "#3a3a5c", 4: "#4a4a6c", 8: "#f2b179", 16: "#f59563", 32: "#f67c5f",
     64: "#f65e3b", 128: "#edcf72", 256: "#edcc61", 512: "#edc850", 1024: "#edc53f", 2048: "#edc22e" };
-  let grid, score, over, won;
+  let grid, score, over, won, lastSnap;
+  const undoBtn = document.getElementById("undo");
 
   function empty() { const g = []; for (let i = 0; i < 16; i++) g.push(0); return g; }
   function reset() {
-    grid = empty(); score = 0; over = false; won = false;
+    grid = empty(); score = 0; over = false; won = false; lastSnap = null;
+    undoBtn.disabled = true;
     msgEl.textContent = ""; scoreEl.textContent = "Score: 0";
     spawn(); spawn(); render();
   }
@@ -65,6 +78,7 @@
   }
   function move(dx, dy) {
     if (over) return;
+    const snap = { grid: grid.slice(), score: score };
     let moved = false, gained = 0;
     for (let l = 0; l < 4; l++) {
       let idx = [];
@@ -79,6 +93,7 @@
       });
     }
     if (!moved) return;
+    lastSnap = snap; undoBtn.disabled = false;
     score += gained;
     scoreEl.textContent = "Score: " + score;
     spawn(); render();
@@ -127,7 +142,22 @@
     if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1, 0);
     else move(0, dy > 0 ? 1 : -1);
   }, { passive: true });
+  undoBtn.addEventListener("click", function () {
+    if (!lastSnap) return;
+    grid = lastSnap.grid; score = lastSnap.score;
+    over = false; lastSnap = null; undoBtn.disabled = true;
+    msgEl.textContent = "";
+    scoreEl.textContent = "Score: " + score;
+    render();
+  });
   document.getElementById("start").addEventListener("click", reset);
+  try {
+    Arcade.getScores("2048", 1).then(function (rows) {
+      if (rows && rows.length) {
+        document.getElementById("best").textContent = "🏆 Best: " + rows[0].score + " — " + rows[0].player_name;
+      }
+    });
+  } catch (e) { /* offline — best line stays empty */ }
   reset();
 })();
 </script>

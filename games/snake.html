@@ -9,13 +9,22 @@
   body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
          text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
   .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
-  h1 { font-size: 1.6rem; margin: 4px 0; }
+  h1 { font-size: 1.6rem; margin: 4px 0; text-shadow: 0 0 16px rgba(0,229,255,.35); }
   #score { font-size: 1.2rem; color: #ffe600; margin: 8px 0; }
-  canvas { background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; max-width: 94vw; }
+  #best { font-size: .92rem; color: #8a8aa8; margin: 2px 0 6px; min-height: 1.2em; }
+  canvas { background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; max-width: 94vw;
+           box-shadow: 0 8px 28px rgba(0,0,0,.5); }
   #msg { min-height: 1.6em; margin: 8px; color: #ff2d95; font-weight: 700; }
   button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
            padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:hover { filter: brightness(1.12); }
   button:active { transform: scale(.96); }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
+  .back:hover { text-shadow: 0 0 10px rgba(0,229,255,.6); }
+  #pad { display: none; grid-template-columns: repeat(3, 64px); gap: 6px; justify-content: center; margin-top: 10px; }
+  #pad button { padding: 12px 0; font-size: 1.2rem; margin: 0; }
+  @media (pointer: coarse) { #pad { display: grid; } }
+  .hint { color: #8a8aa8; font-size: .8rem; margin-top: 8px; }
 /* arcade fullscreen fit */
 :fullscreen h1,:fullscreen .back,:fullscreen .leaderboard,:fullscreen .hint{display:none!important}
 :fullscreen canvas{max-width:100vw;max-height:none;width:min(94vw,80vh);width:min(94vw,80dvh);height:auto}
@@ -25,9 +34,17 @@
 <a class="back" href="../index.html">← arcade</a>
 <h1>🐍 Snake</h1>
 <div id="score">Score: 0</div>
+<div id="best"></div>
 <canvas id="c" width="400" height="400"></canvas>
 <div id="msg"></div>
 <button id="start">Start</button>
+<div id="pad">
+  <button data-dx="0" data-dy="-1" style="grid-column: 2">▲</button>
+  <button data-dx="-1" data-dy="0" style="grid-column: 1">◀</button>
+  <button data-dx="0" data-dy="1" style="grid-column: 2">▼</button>
+  <button data-dx="1" data-dy="0" style="grid-column: 3; grid-row: 2">▶</button>
+</div>
+<div class="hint">arrows / swipe / pad to steer · space = pause</div>
 <script src="../js/arcade.js"></script>
 <script>
 (function () {
@@ -36,7 +53,7 @@
   const scoreEl = document.getElementById("score"), msgEl = document.getElementById("msg");
   const startBtn = document.getElementById("start");
   const N = 20, CELL = cv.width / N;
-  let snake, dir, nextDir, food, score, timer, speed, alive;
+  let snake, dir, nextDir, food, score, timer, speed, alive, paused;
 
   function place() {
     while (true) {
@@ -47,7 +64,8 @@
   function reset() {
     snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
     dir = nextDir = { x: 1, y: 0 };
-    score = 0; speed = 140; alive = true;
+    score = 0; speed = 140; alive = true; paused = false; timer = null;
+    startBtn.textContent = "Start";
     food = place();
     scoreEl.textContent = "Score: 0"; msgEl.textContent = "";
   }
@@ -71,9 +89,15 @@
   }
   function die() {
     alive = false;
-    clearInterval(timer);
+    clearInterval(timer); timer = null;
+    startBtn.textContent = "↻ Play again";
     msgEl.textContent = "Game over! Score: " + score;
     Arcade.saveScore("snake", Arcade.playerName(), score);
+  }
+  function togglePause() {
+    if (!alive || !timer && !paused) return;
+    if (paused) { paused = false; msgEl.textContent = ""; restartTimer(); }
+    else { paused = true; clearInterval(timer); timer = null; msgEl.textContent = "⏸ Paused — space to resume"; }
   }
   function restartTimer() { clearInterval(timer); timer = setInterval(step, speed); }
   function draw() {
@@ -90,7 +114,8 @@
     nextDir = { x: x, y: y };
   }
   document.addEventListener("keydown", function (e) {
-    if (e.key === "ArrowUp") { turn(0, -1); e.preventDefault(); }
+    if (e.key === " " || e.key === "p" || e.key === "P") { togglePause(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { turn(0, -1); e.preventDefault(); }
     else if (e.key === "ArrowDown") { turn(0, 1); e.preventDefault(); }
     else if (e.key === "ArrowLeft") { turn(-1, 0); e.preventDefault(); }
     else if (e.key === "ArrowRight") { turn(1, 0); e.preventDefault(); }
@@ -107,6 +132,17 @@
     else turn(0, dy > 0 ? 1 : -1);
     e.preventDefault();
   }, { passive: false });
+  document.getElementById("pad").addEventListener("click", function (e) {
+    const b = e.target.closest("button");
+    if (b) turn(+b.dataset.dx, +b.dataset.dy);
+  });
+  try {
+    Arcade.getScores("snake", 1).then(function (rows) {
+      if (rows && rows.length) {
+        document.getElementById("best").textContent = "🏆 Best: " + rows[0].score + " — " + rows[0].player_name;
+      }
+    });
+  } catch (e) { /* offline — best line stays empty */ }
   startBtn.addEventListener("click", function () { reset(); draw(); restartTimer(); });
   reset(); draw();
 })();

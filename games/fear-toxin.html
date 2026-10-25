@@ -65,6 +65,19 @@ button.big:disabled{opacity:.35;cursor:default}
 .leaderboard li{margin:3px 0}
 .leaderboard .me{color:#ffd94d}
 .hint{color:#556;font-size:.8rem;margin-top:12px;text-align:center;max-width:520px}
+/* ---- polish pass (hub v2, wave 3): same horror identity, finer edges ---- */
+h1{animation:ftFlicker 7s linear infinite}
+@keyframes ftFlicker{0%,100%{opacity:1}88%{opacity:1}89%{opacity:.72}90%{opacity:1}93%{opacity:1}94%{opacity:.8}95%{opacity:1}}
+button.big,.modeChip,#muteBtn,#interactBtn{transition:background .15s ease,color .15s ease,border-color .15s ease,box-shadow .15s ease,transform .05s ease}
+button.big:active:not(:disabled),.modeChip:active{transform:translateY(1px)}
+.modeChip:hover{border-color:#8a7a4a;color:#bbb}
+.back:focus-visible,button.big:focus-visible,.modeChip:focus-visible,#muteBtn:focus-visible,#interactBtn:focus-visible{outline:2px solid #ffd94d;outline-offset:2px}
+.scorebar>span{background:rgba(255,255,255,.04);border:1px solid #2b2b2b;border-radius:6px;padding:2px 9px}
+.leaderboard ol li:first-child{color:#e8e8e8;font-weight:bold}
+.leaderboard ol li:first-child::before{content:"\1F451 "}
+a.big{font-family:inherit;background:#0a0a0a;color:#cfd4cf;border:2px solid #555;border-radius:8px;padding:12px 26px;font-size:1.05rem;letter-spacing:2px;margin:4px;display:inline-block;text-decoration:none;cursor:pointer}
+a.big:hover{background:#1c1c1c;color:#fff;border-color:#999}
+@media (prefers-reduced-motion: reduce){h1{animation:none}#vignette{animation:none}}
 /* arcade fullscreen fit */
 :fullscreen body{padding:6px;height:100vh;height:100dvh;overflow:hidden;justify-content:flex-start}
 :fullscreen h1,:fullscreen .back,:fullscreen .leaderboard,:fullscreen .hint{display:none!important}
@@ -106,6 +119,7 @@ button.big:disabled{opacity:.35;cursor:default}
   <p>Escaped in <b id="finalTime">0:00</b> &mdash; best: <b id="finalBest">&mdash;</b></p>
   <p style="margin-top:6px;color:#666">Carved into the wall as <span id="who"></span></p>
   <button class="big" id="againBtn" style="margin-top:12px">&#8635; ESCAPE AGAIN</button>
+  <a class="big" href="../index.html">&#127968; HUB</a>
 </div>
 <div class="leaderboard"><h3>&#127942; FASTEST ESCAPES</h3><ol id="scores"><li>Loading&hellip;</li></ol></div>
 <p class="hint">WASD / arrows to walk &middot; click the view, then mouse to look &middot; E to take keys &amp; open doors &middot; Shift to hurry.<br>On mobile: left thumb walks, right thumb looks, gold button interacts.</p>

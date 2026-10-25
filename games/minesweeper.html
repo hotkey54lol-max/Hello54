@@ -10,19 +10,27 @@
          text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation;
          -webkit-user-select: none; user-select: none; }
   .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
-  h1 { font-size: 1.6rem; margin: 4px 0; }
+  h1 { font-size: 1.6rem; margin: 4px 0; text-shadow: 0 0 16px rgba(0,229,255,.35); }
   #hud { display: flex; justify-content: center; gap: 24px; margin: 8px 0; font-size: 1.1rem; }
   #hud span { color: #ffe600; }
   #board { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; width: min(94vw, 380px);
-           margin: 0 auto; background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; padding: 6px; }
+           margin: 0 auto; background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; padding: 6px;
+           box-shadow: 0 8px 28px rgba(0,0,0,.5); }
   .cell { aspect-ratio: 1; background: #2a2a4a; border-radius: 3px; display: flex; align-items: center;
           justify-content: center; font-weight: 700; font-size: clamp(.8rem, 4vw, 1rem); cursor: pointer; }
+  .cell:not(.open):hover { background: #3a3a5e; }
   .cell.open { background: #1a1a30; cursor: default; }
-  .cell.boom { background: #ff2d95; }
+  .cell.boom { background: #ff2d95; animation: boomPulse .5s ease; }
+  @keyframes boomPulse { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .cell.boom { animation: none; } }
   #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
   button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
            padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
+  button:hover { filter: brightness(1.12); }
   button:active { transform: scale(.96); }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
+  .back:hover { text-shadow: 0 0 10px rgba(0,229,255,.6); }
+  #flagBtn.on { box-shadow: 0 0 0 3px #ffe600 inset; }
   .hint { color: #8a8aa8; font-size: .8rem; margin-top: 6px; }
 </style>
 </head>
@@ -33,7 +41,8 @@
 <div id="board"></div>
 <div id="msg"></div>
 <button id="start">New Game</button>
-<div class="hint">click/tap = reveal · right-click / long-press = flag</div>
+<button id="flagBtn">🚩 Flag mode: OFF</button>
+<div class="hint">click/tap = reveal · right-click / long-press = flag · or flip on flag mode and tap to flag</div>
 <script src="../js/arcade.js"></script>
 <script>
 (function () {
@@ -133,7 +142,8 @@
   boardEl.addEventListener("click", function (e) {
     const t = e.target.closest(".cell");
     if (!t || dead || won) return;
-    reveal(+t.dataset.i);
+    if (flagMode) toggleFlag(+t.dataset.i);
+    else reveal(+t.dataset.i);
   });
   boardEl.addEventListener("contextmenu", function (e) {
     e.preventDefault();
@@ -150,6 +160,12 @@
   boardEl.addEventListener("touchend", function (e) {
     if (lpTimer === "fired") { e.preventDefault(); }
     clearTimeout(lpTimer); lpTimer = null;
+  });
+  const flagBtn = document.getElementById("flagBtn");
+  flagBtn.addEventListener("click", function () {
+    flagMode = !flagMode;
+    flagBtn.textContent = flagMode ? "🚩 Flag mode: ON" : "🚩 Flag mode: OFF";
+    flagBtn.classList.toggle("on", flagMode);
   });
   document.getElementById("start").addEventListener("click", reset);
   reset();
