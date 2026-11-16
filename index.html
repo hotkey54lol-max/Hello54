@@ -322,6 +322,7 @@ if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.
     { id: "demolition-day", emoji: "💥", title: "Demolition Day", cat: "action", sub: "* PROJECT NEXUS — timed demolition challenges. Towers, dominoes, bombs. Earn stars, top the boards." },
     { id: "red-light-green-legs", emoji: "🚦", title: "Red Light, Green Legs", cat: "chill", sub: "* 4 spider-bots. 0 instructions. Oliver, Aria, Sophia and Albert teach themselves to walk, run and freeze on red — you just watch." },
     { id: "the-experience", emoji: "🎧", title: "The Experience", cat: "chill", sub: "* NOT A GAME — a listening room. Upload your own music and listen, or press play on the built-in track." },
+    { id: "speedrun-crate-opener", emoji: "📦", title: "Speedrun Crate Opener", cat: "action", thumb: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/6/62/SpeedRunCrate.png/revision/latest?cb=20250223104148", sub: "* TTD Speed Run Crate — same 75% / 24% / 1% odds. Chase the 1% Godly Titan Fast Armored Cameraman." },
     { id: "snake",       emoji: "🐍", title: "Snake", cat: "classics" },
     { id: "2048",        emoji: "🔢", title: "2048", cat: "puzzle" },
     { id: "minesweeper", emoji: "💣", title: "Minesweeper", cat: "puzzle" },
@@ -377,7 +378,7 @@ if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.
       const g = BY_ID[r.id];
       const a = document.createElement("a");
       a.className = "mini"; a.href = "games/" + g.id + ".html";
-      a.innerHTML = '<img src="img/thumbs/' + g.id + '.jpg" alt="" loading="lazy"><span>' + g.emoji + " " + g.title + "</span>";
+      a.innerHTML = '<img src="' + (g.thumb || 'img/thumbs/' + g.id + '.jpg') + '" alt="" loading="lazy"><span>' + g.emoji + " " + g.title + "</span>";
       a.addEventListener("click", function () { pushRecent(g.id); });
       row.appendChild(a);
     });
@@ -395,7 +396,7 @@ if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.
       '<span class="star' + (favs.has(g.id) ? " on" : "") + '" title="favorite">★</span>' +
       (g.featured ? '<span class="badge">★ FEATURED</span>' : "") +
       (g.exp ? '<span class="expbadge">🧪 EXPERIMENTAL</span>' : "") +
-      '<img class="thumb" src="img/thumbs/' + g.id + '.jpg" alt="' + g.title + '" loading="lazy">' +
+      '<img class="thumb" src="' + (g.thumb || 'img/thumbs/' + g.id + '.jpg') + '" alt="' + g.title + '" loading="lazy">' +
       '<span class="title">' + g.title + "</span>" +
       (g.sub ? '<div class="sub">' + g.sub + "</div>" : "") +
       (g.featured ? '<span class="playbtn">▶ PLAY</span>' : "") +

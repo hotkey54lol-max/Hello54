@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Speedrun Crate Opener — Sandbox Arcade</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
+  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
+  h1 { font-size: 1.6rem; margin: 4px 0; text-shadow: 0 0 16px rgba(0,229,255,.35); }
+  .sub { color: #8a8aa8; font-size: .9rem; margin: 2px 0 10px; }
+  #crateWrap { margin: 10px auto; width: min(320px, 80vw); cursor: pointer; }
+  #crateWrap img { width: 100%; border-radius: 12px; }
+  #crateWrap.shake img { animation: shake .12s infinite; }
+  @keyframes shake { 0%{transform:rotate(-3deg) scale(1.03)} 25%{transform:rotate(3deg) scale(1.06)} 50%{transform:rotate(-2deg) scale(1.03)} 75%{transform:rotate(2deg) scale(1.06)} 100%{transform:rotate(0) scale(1)} }
+  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
+           padding: 12px 28px; font-size: 1.05rem; cursor: pointer; margin: 6px; font-weight: 700; }
+  button:hover { filter: brightness(1.12); }
+  button:active { transform: scale(.96); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.secondary { background: #2a2a4a; }
+  #result { min-height: 340px; margin: 12px auto; max-width: 420px; }
+  #result img { max-height: 240px; max-width: 90vw; border-radius: 12px; }
+  #result .name { font-size: 1.5rem; font-weight: 800; margin-top: 8px; }
+  #result .rarity { font-size: 1.05rem; font-weight: 700; margin: 4px 0; }
+  #result .ability { color: #c9c9dd; font-size: .92rem; margin-top: 6px; line-height: 1.45; }
+  .legendary { color: #ff9f1c; } .mythic { color: #c04dff; } .godly { color: #ffe600; }
+  #result.godly { animation: glow 1s infinite alternate; }
+  @keyframes glow { from { filter: drop-shadow(0 0 6px rgba(255,230,0,.4)); } to { filter: drop-shadow(0 0 26px rgba(255,230,0,.9)); } }
+  #stats { color: #8a8aa8; font-size: .92rem; margin: 10px 0; line-height: 1.6; }
+  #stats b { color: #e8e8f0; }
+  .odds { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
+  .odds div { background: #14142a; border: 1px solid #2a2a4a; border-radius: 8px; padding: 8px 10px; font-size: .85rem; }
+  #history { list-style: none; max-width: 420px; margin: 8px auto; text-align: left; font-size: .9rem; color: #c9c9dd; }
+  #history li { padding: 4px 8px; border-bottom: 1px solid #1e1e36; }
+  .hint { color: #8a8aa8; font-size: .8rem; margin-top: 10px; }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">← arcade</a>
+<h1>📦 Speedrun Crate Opener</h1>
+<div class="sub">Same odds as Toilet Tower Defense — beat Speed Run Mode in under 10 minutes, get a crate, open it here for fun. No gems, no real units, just luck.</div>
+
+<div id="crateWrap" title="Open a crate">
+  <img id="crateImg" src="https://static.wikia.nocookie.net/toilet-tower-defense-game/images/6/62/SpeedRunCrate.png/revision/latest?cb=20250223104148" alt="Speed Run Crate">
+</div>
+
+<button id="open1">Open 1 Crate</button>
+<button id="open10" class="secondary">Open 10</button>
+<button id="reset" class="secondary">Reset Collection</button>
+
+<div id="result"><div class="hint">Tap the crate or hit Open — good luck, the Godly is 1%.</div></div>
+
+<div id="stats"></div>
+
+<div class="odds">
+  <div><span class="legendary">● Legendary</span><br>Speedy Speakerman — <b>75%</b></div>
+  <div><span class="mythic">● Mythic</span><br>Tracksuit Cameraman — <b>24%</b></div>
+  <div><span class="godly">● Godly</span><br>Titan Fast Armored Cameraman — <b>1%</b></div>
+</div>
+
+<h2 style="font-size:1.05rem;margin-top:14px">Recent pulls</h2>
+<ul id="history"></ul>
+<div class="hint">Images from the TTD wiki (toilet-tower-defense-game.fandom.com). Odds from the Speed Run Crate: 75% / 24% / 1%.</div>
+
+<script>
+(function () {
+  "use strict";
+  var UNITS = [
+    { id: "speedy", name: "Speedy Speakerman", rarity: "Legendary", cls: "legendary", chance: 75,
+      img: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/6/6b/SpeedySpeakerman.png/revision/latest?cb=20250301100058",
+      ability: "Slows every toilet he hits by 40% for 3 seconds. Fast, cheap, and the one you will pull most — 3 in a row is normal, not rigged." },
+    { id: "tracksuit", name: "Tracksuit Cameraman", rarity: "Mythic", cls: "mythic", chance: 24,
+      img: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/7/7a/TracksuitCamera.png/revision/latest?cb=20250227021752",
+      ability: "Dashes at toilets super fast. Every hit slows them by 60% for 10 seconds, with a 2% chance to turn a toilet into an ally." },
+    { id: "titan", name: "Titan Fast Armored Cameraman", rarity: "Godly", cls: "godly", chance: 1,
+      img: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/0/07/Titan_Fast_Armored_Cameraman.webp/revision/latest?cb=20250225061421",
+      ability: "GODLY! Spawns Speedy Speakermen that run down the track, gains armor every upgrade, and speeds up all nearby units 2x for 30 seconds (300s cooldown)." }
+  ];
+  var KEY = "speedrun_crate_opener_v1";
+  var state = { total: 0, speedy: 0, tracksuit: 0, titan: 0, history: [] };
+  try {
+    var saved = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (saved) state = saved;
+  } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function roll() {
+    var r = Math.random() * 100;
+    if (r < 75) return UNITS[0];
+    if (r < 99) return UNITS[1];
+    return UNITS[2];
+  }
+  var resultEl = document.getElementById("result");
+  var statsEl = document.getElementById("stats");
+  var historyEl = document.getElementById("history");
+  var crateWrap = document.getElementById("crateWrap");
+  function render() {
+    statsEl.innerHTML = "Crates opened: <b>" + state.total + "</b> &nbsp;·&nbsp; " +
+      "Speedy: <b>" + state.speedy + "</b> &nbsp;·&nbsp; " +
+      "Tracksuit: <b>" + state.tracksuit + "</b> &nbsp;·&nbsp; " +
+      "Titan Fast: <b>" + state.titan + "</b>";
+    historyEl.innerHTML = "";
+    state.history.slice(0, 10).forEach(function (h) {
+      var li = document.createElement("li");
+      li.textContent = h;
+      historyEl.appendChild(li);
+    });
+  }
+  function show(unit) {
+    resultEl.className = unit.cls;
+    resultEl.innerHTML =
+      '<img src="' + unit.img + '" alt="' + unit.name + '">' +
+      '<div class="name">' + unit.name + '</div>' +
+      '<div class="rarity ' + unit.cls + '">' + unit.rarity + ' — ' + unit.chance + '%</div>' +
+      '<div class="ability">' + unit.ability + '</div>';
+  }
+  function openCrates(n) {
+    var btns = document.querySelectorAll("button");
+    btns.forEach(function (b) { b.disabled = true; });
+    crateWrap.classList.add("shake");
+    resultEl.className = "";
+    resultEl.innerHTML = '<div class="hint" style="font-size:1.2rem;margin-top:100px">🎲 Rolling…</div>';
+    var pulls = [];
+    for (var i = 0; i < n; i++) pulls.push(roll());
+    setTimeout(function () {
+      crateWrap.classList.remove("shake");
+      pulls.forEach(function (u) {
+        state.total++;
+        state[u.id]++;
+        state.history.unshift(u.name + " (" + u.rarity + ")");
+      });
+      state.history = state.history.slice(0, 50);
+      save(); render();
+      var last = pulls[pulls.length - 1];
+      show(last);
+      if (n > 1) {
+        var counts = {};
+        pulls.forEach(function (u) { counts[u.name] = (counts[u.name] || 0) + 1; });
+        var summary = Object.keys(counts).map(function (k) { return counts[k] + "× " + k; }).join(", ");
+        var div = document.createElement("div");
+        div.className = "ability";
+        div.textContent = "Opened " + n + ": " + summary;
+        resultEl.appendChild(div);
+      }
+      btns.forEach(function (b) { b.disabled = false; });
+    }, 650);
+  }
+  document.getElementById("open1").addEventListener("click", function () { openCrates(1); });
+  document.getElementById("open10").addEventListener("click", function () { openCrates(10); });
+  document.getElementById("reset").addEventListener("click", function () {
+    if (!confirm("Reset your crate collection counts?")) return;
+    state = { total: 0, speedy: 0, tracksuit: 0, titan: 0, history: [] };
+    save(); render();
+    resultEl.className = "";
+    resultEl.innerHTML = '<div class="hint">Collection reset. Tap the crate to open again.</div>';
+  });
+  crateWrap.addEventListener("click", function () { openCrates(1); });
+  render();
+})();
+</script>
+</body>
+</html>
