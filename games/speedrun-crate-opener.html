@@ -42,14 +42,17 @@
 <body>
 <a class="back" href="../index.html">← arcade</a>
 <h1>📦 Speedrun Crate Opener</h1>
-<div class="sub">Same odds as Toilet Tower Defense — beat Speed Run Mode in under 10 minutes, get a crate, open it here for fun. No gems, no real units, just luck.</div>
+<div class="sub">Same odds as Toilet Tower Defense. Crates cost <b style="color:#ffd94d">200 Gems</b> each — earn Gems by playing games: 19 per 40 score. Units you pull boost your Gem earnings.</div>
+
+<div id="gemsBar" style="font-size:1.05rem;margin:6px 0 2px">💎 <b id="gemsBal" style="color:#ffd94d">0</b> Gems &nbsp;·&nbsp; Boost: <b id="gemsBoost">1x</b></div>
+<div id="gemsNote" class="hint" style="margin-top:2px">Speedy 1.3x · Tracksuit 2x · Titan 3.3x — best unit you own applies.</div>
 
 <div id="crateWrap" title="Open a crate">
-  <img id="crateImg" src="https://static.wikia.nocookie.net/toilet-tower-defense-game/images/6/62/SpeedRunCrate.png/revision/latest?cb=20250223104148" alt="Speed Run Crate">
+  <img id="crateImg" src="../img/speedrun-crate/speed-run-crate.png" alt="Speed Run Crate">
 </div>
 
-<button id="open1">Open 1 Crate</button>
-<button id="open10" class="secondary">Open 10</button>
+<button id="open1">Open 1 Crate — 200 💎</button>
+<button id="open10" class="secondary">Open 10 — 2000 💎</button>
 <button id="reset" class="secondary">Reset Collection</button>
 
 <div id="result"><div class="hint">Tap the crate or hit Open — good luck, the Godly is 1%.</div></div>
@@ -57,9 +60,9 @@
 <div id="stats"></div>
 
 <div class="odds">
-  <div><span class="legendary">● Legendary</span><br>Speedy Speakerman — <b>75%</b></div>
-  <div><span class="mythic">● Mythic</span><br>Tracksuit Cameraman — <b>24%</b></div>
-  <div><span class="godly">● Godly</span><br>Titan Fast Armored Cameraman — <b>1%</b></div>
+  <div><span class="legendary">● Legendary</span><br>Speedy Speakerman — <b>75%</b><br>💎 Boost <b>1.3x</b></div>
+  <div><span class="mythic">● Mythic</span><br>Tracksuit Cameraman — <b>24%</b><br>💎 Boost <b>2x</b></div>
+  <div><span class="godly">● Godly</span><br>Titan Fast Armored Cameraman — <b>1%</b><br>💎 Boost <b>3.3x</b></div>
 </div>
 
 <h2 style="font-size:1.05rem;margin-top:14px">Recent pulls</h2>
@@ -71,22 +74,49 @@
   "use strict";
   var UNITS = [
     { id: "speedy", name: "Speedy Speakerman", rarity: "Legendary", cls: "legendary", chance: 75,
-      img: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/6/6b/SpeedySpeakerman.png/revision/latest?cb=20250301100058",
+      img: "../img/speedrun-crate/speedy-speakerman.png",
       ability: "Slows every toilet he hits by 40% for 3 seconds. Fast, cheap, and the one you will pull most — 3 in a row is normal, not rigged." },
     { id: "tracksuit", name: "Tracksuit Cameraman", rarity: "Mythic", cls: "mythic", chance: 24,
-      img: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/7/7a/TracksuitCamera.png/revision/latest?cb=20250227021752",
+      img: "../img/speedrun-crate/tracksuit-cameraman.png",
       ability: "Dashes at toilets super fast. Every hit slows them by 60% for 10 seconds, with a 2% chance to turn a toilet into an ally." },
     { id: "titan", name: "Titan Fast Armored Cameraman", rarity: "Godly", cls: "godly", chance: 1,
-      img: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/0/07/Titan_Fast_Armored_Cameraman.webp/revision/latest?cb=20250225061421",
+      img: "../img/speedrun-crate/titan-fast-armored-cameraman.png",
       ability: "GODLY! Spawns Speedy Speakermen that run down the track, gains armor every upgrade, and speeds up all nearby units 2x for 30 seconds (300s cooldown)." }
   ];
   var KEY = "speedrun_crate_opener_v1";
+  var GEMS_KEY = "arcade_gems_v1";
   var state = { total: 0, speedy: 0, tracksuit: 0, titan: 0, history: [] };
   try {
     var saved = JSON.parse(localStorage.getItem(KEY) || "null");
     if (saved) state = saved;
   } catch (e) {}
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  /* ---- Gems: use Arcade.gems when arcade.js loaded, else the same
+     localStorage keys directly, so this page never breaks without it. */
+  function gemsBalance() {
+    try {
+      if (window.Arcade && Arcade.gems) return Arcade.gems.get();
+      return Math.max(0, Math.floor(Number(localStorage.getItem(GEMS_KEY)) || 0)) || 0;
+    } catch (e) { return 0; }
+  }
+  function gemsBoost() {
+    try {
+      if (window.Arcade && Arcade.gems) return Arcade.gems.boost();
+      if (state.titan > 0) return 3.3;
+      if (state.tracksuit > 0) return 2;
+      if (state.speedy > 0) return 1.3;
+    } catch (e) {}
+    return 1;
+  }
+  function gemsSpend(n) {
+    try {
+      if (window.Arcade && Arcade.gems) return Arcade.gems.spend(n);
+      var bal = gemsBalance();
+      if (bal < n) return false;
+      localStorage.setItem(GEMS_KEY, String(bal - n));
+      return true;
+    } catch (e) { return false; }
+  }
   function roll() {
     var r = Math.random() * 100;
     if (r < 75) return UNITS[0];
@@ -98,6 +128,8 @@
   var historyEl = document.getElementById("history");
   var crateWrap = document.getElementById("crateWrap");
   function render() {
+    document.getElementById("gemsBal").textContent = gemsBalance();
+    document.getElementById("gemsBoost").textContent = gemsBoost() + "x";
     statsEl.innerHTML = "Crates opened: <b>" + state.total + "</b> &nbsp;·&nbsp; " +
       "Speedy: <b>" + state.speedy + "</b> &nbsp;·&nbsp; " +
       "Tracksuit: <b>" + state.tracksuit + "</b> &nbsp;·&nbsp; " +
@@ -118,6 +150,15 @@
       '<div class="ability">' + unit.ability + '</div>';
   }
   function openCrates(n) {
+    var cost = n * 200;
+    if (!gemsSpend(cost)) {
+      resultEl.className = "";
+      resultEl.innerHTML = '<div class="hint" style="font-size:1.05rem;margin-top:100px">Not enough Gems — you have <b>' + gemsBalance() +
+        '</b>, and ' + n + (n === 1 ? ' crate costs ' : ' crates cost ') + '<b>' + cost +
+        '</b>. Go play some games to earn more (19 Gems per 40 score).</div>';
+      return;
+    }
+    render();
     var btns = document.querySelectorAll("button");
     btns.forEach(function (b) { b.disabled = true; });
     crateWrap.classList.add("shake");

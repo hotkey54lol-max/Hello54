@@ -197,6 +197,7 @@ window.Arcade = (function () {
     try {
       const s = Math.round(Number(score));
       if (!isFinite(s)) return;
+      _gemsAward(String(gameId), s); // Gems are local-only, so they still pay out offline.
       await fetch(SUPABASE_URL + "/rest/v1/game_scores", {
         method: "POST",
         headers: Object.assign(baseHeaders(), { Prefer: "return=minimal" }),
@@ -228,6 +229,90 @@ window.Arcade = (function () {
     } catch (e) {
       return [];
     }
+  }
+
+  /* ================= Gems currency =================
+   * Earned by playing games: 19 Gems per 40 score (dynamic off the
+   * score a game saves). Spent in the Speedrun Crate Opener: 200 Gems
+   * for 1 crate, 2000 for 10. Units pulled from crates boost earnings:
+   * Speedy Speakerman 1.3x, Tracksuit Cameraman 2x, Titan Fast Armored
+   * Cameraman 3.3x — only the BEST unit you own applies (they do not
+   * stack). Gems live in this browser's localStorage only (same as the
+   * crate collection), so they work offline and need no Supabase table.
+   * Awarding is delta-based per game per page load: only the INCREASE
+   * in a game's saved score earns Gems. That keeps games that call
+   * saveScore more than once (Bloxtopia every 4 coins, Minesweeper on
+   * win and on loss) from paying out the same score twice.
+   */
+  const GEMS_KEY = "arcade_gems_v1";
+  const CRATE_KEY = "speedrun_crate_opener_v1";
+  const GEM_BOOSTS = { speedy: 1.3, tracksuit: 2, titan: 3.3 };
+
+  function _gemsRead() {
+    try { return Math.max(0, Math.floor(Number(localStorage.getItem(GEMS_KEY)) || 0)) || 0; }
+    catch (e) { return 0; }
+  }
+  function _gemsWrite(n) {
+    try { localStorage.setItem(GEMS_KEY, String(Math.max(0, Math.floor(n)))); } catch (e) {}
+  }
+  function getGems() { return _gemsRead(); }
+  function getGemBoost() {
+    try {
+      const c = JSON.parse(localStorage.getItem(CRATE_KEY) || "null") || {};
+      if (c.titan > 0) return GEM_BOOSTS.titan;
+      if (c.tracksuit > 0) return GEM_BOOSTS.tracksuit;
+      if (c.speedy > 0) return GEM_BOOSTS.speedy;
+    } catch (e) {}
+    return 1;
+  }
+  function gemsForScore(score) {
+    const s = Math.max(0, Math.floor(Number(score) || 0));
+    return Math.floor(Math.floor(s / 40) * 19 * getGemBoost());
+  }
+  function spendGems(n) {
+    n = Math.max(0, Math.floor(Number(n) || 0));
+    const bal = _gemsRead();
+    if (bal < n) return false;
+    _gemsWrite(bal - n);
+    return true;
+  }
+  function _gemsToast(amount) {
+    _fxSafe(function () {
+      if (typeof document === "undefined" || !document.body) return;
+      let t = document.getElementById("arcade-gems-toast");
+      if (!t) {
+        t = document.createElement("div");
+        t.id = "arcade-gems-toast";
+        t.setAttribute("style",
+          "position:fixed;right:16px;bottom:16px;z-index:999990;" +
+          "background:#000;border:3px solid #ffd94d;color:#ffd94d;" +
+          "padding:10px 14px;font-size:11px;line-height:1.6;" +
+          "font-family:'Press Start 2P',monospace;pointer-events:none;");
+        document.body.appendChild(t);
+      }
+      t.textContent = "+ " + amount + " 💎 Gems";
+      t.style.opacity = "1";
+      clearTimeout(t._timer);
+      t._timer = setTimeout(function () {
+        _fxSafe(function () { if (t.parentNode) t.parentNode.removeChild(t); });
+      }, 3500);
+    });
+  }
+  var _gemsLastScore = {};
+  function _gemsAward(gameId, score) {
+    try {
+      const s = Math.max(0, Math.floor(Number(score) || 0));
+      const prev = _gemsLastScore[gameId] || 0;
+      _gemsLastScore[gameId] = Math.max(prev, s);
+      const delta = s - prev;
+      if (delta <= 0) return 0;
+      // Gems are earned on whole 40-score chunks of the increase.
+      const earned = Math.floor(Math.floor(delta / 40) * 19 * getGemBoost());
+      if (earned <= 0) return 0;
+      _gemsWrite(_gemsRead() + earned);
+      _gemsToast(earned);
+      return earned;
+    } catch (e) { return 0; }
   }
 
   // Returns the player's arcade name, prompting once and caching in localStorage.
@@ -1971,6 +2056,12 @@ window.Arcade = (function () {
     SUPABASE_ANON: SUPABASE_ANON,
     saveScore: saveScore,
     getScores: getScores,
+    gems: {
+      get: getGems,
+      boost: getGemBoost,
+      forScore: gemsForScore,
+      spend: spendGems,
+    },
     playerName: playerName,
     events: eventsApi,
     chat: chatApi,

@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Arcade Studio — Sandbox Arcade</title>
+<style>
+  /* Serious dev-tool look, like Roblox Studio: dark greys, no arcade colours. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1e1e1e;
+    font-family: "Segoe UI", Tahoma, sans-serif; color: #d4d4d4; font-size: 13px; }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  /* ---------- top bar ---------- */
+  #topbar { background: #2d2d2d; border-bottom: 1px solid #111; flex: 0 0 auto; }
+  #titlebar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+  #titlebar .logo { font-weight: 700; color: #fff; font-size: 14px; letter-spacing: .3px; }
+  #titlebar .logo span { color: #00a2ff; }
+  #titlebar .file { color: #999; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #titlebar .spacer { flex: 1; }
+  #titlebar a { color: #999; text-decoration: none; font-size: 12px; }
+  #titlebar a:hover { color: #fff; }
+  #toolbar { display: flex; gap: 4px; padding: 6px 10px; flex-wrap: wrap; align-items: center;
+    border-top: 1px solid #3a3a3a; }
+  #toolbar .group { display: flex; gap: 4px; padding-right: 8px; margin-right: 4px;
+    border-right: 1px solid #3a3a3a; }
+  #toolbar .group:last-child { border-right: 0; }
+  button { font-family: inherit; font-size: 12px; background: #3c3c3c; color: #ddd;
+    border: 1px solid #555; padding: 6px 10px; cursor: pointer; border-radius: 2px; }
+  button:hover { background: #4a4a4a; color: #fff; }
+  button.on { background: #0078d7; border-color: #0078d7; color: #fff; }
+  button.danger { border-color: #7a2e2e; color: #e8a0a0; }
+  button:disabled { opacity: .45; cursor: default; }
+  select, input[type="text"], input[type="number"], input[type="password"] {
+    font-family: inherit; font-size: 12px; background: #252526; color: #ddd;
+    border: 1px solid #555; padding: 5px 6px; border-radius: 2px; width: 100%; }
+  input[type="color"] { width: 100%; height: 28px; background: #252526; border: 1px solid #555; padding: 1px; }
+  input[type="range"] { width: 100%; }
+  label { display: block; color: #999; font-size: 11px; margin: 10px 0 3px; }
+  /* ---------- middle: explorer / viewport / properties ---------- */
+  #middle { flex: 1; display: flex; min-height: 0; }
+  .panel { background: #252526; overflow-y: auto; flex: 0 0 auto; }
+  .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: #999;
+    padding: 8px 10px; border-bottom: 1px solid #333; position: sticky; top: 0; background: #252526; }
+  #explorer { width: 210px; border-right: 1px solid #111; }
+  #explorer ul { list-style: none; padding: 4px 0; }
+  #explorer li { padding: 5px 10px 5px 22px; cursor: pointer; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  #explorer li:hover { background: #2d2d30; }
+  #explorer li.sel { background: #094771; color: #fff; }
+  #explorer li.root { padding-left: 10px; font-weight: 700; color: #fff; cursor: default; }
+  #explorer li.root:hover { background: none; }
+  #explorer li .cls { color: #888; font-size: 11px; }
+  #explorer li.sel .cls { color: #bcd; }
+  #viewportWrap { flex: 1; position: relative; min-width: 0; background: #1e1e1e; }
+  #renderCanvas { width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+  #statusbar { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.65);
+    color: #ccc; font-size: 11px; padding: 5px 10px; pointer-events: none; }
+  #playbar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.7); color: #fff; font-size: 12px; padding: 7px 12px;
+    border: 1px solid #555; border-radius: 2px; display: none; }
+  #properties { width: 230px; border-left: 1px solid #111; padding: 0 10px 14px; }
+  #properties .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  #properties .row3 label { margin-top: 6px; }
+  #properties .hint { color: #888; font-size: 11px; line-height: 1.5; margin-top: 10px; }
+  #properties .val { color: #ddd; font-size: 12px; padding: 4px 0; }
+  .panelToggle { display: none; }
+  /* ---------- dialogs ---------- */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50;
+    display: none; align-items: center; justify-content: center; padding: 12px; }
+  .overlay.open { display: flex; }
+  .dialog { background: #252526; border: 1px solid #555; width: min(560px, 96vw);
+    max-height: 88vh; overflow-y: auto; padding: 16px; }
+  .dialog h2 { font-size: 14px; color: #fff; margin-bottom: 10px; }
+  .dialog p { color: #bbb; font-size: 12px; line-height: 1.6; margin-bottom: 10px; }
+  .dialog textarea { width: 100%; height: 120px; background: #1e1e1e; color: #ddd;
+    border: 1px solid #555; font-family: monospace; font-size: 11px; padding: 8px; }
+  .dialog .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .dialog .err { color: #ff8080; font-size: 12px; min-height: 1.2em; }
+  #subList { list-style: none; margin-top: 8px; }
+  #subList li { border: 1px solid #444; padding: 8px; margin-bottom: 8px; font-size: 12px; line-height: 1.6; }
+  #subList li b { color: #fff; }
+  #subList li .ok { color: #7ec87e; }
+  #subList li .pend { color: #e8c85a; }
+  @media (max-width: 760px) {
+    #explorer, #properties { position: absolute; top: 0; bottom: 0; z-index: 20; display: none;
+      box-shadow: 0 0 20px rgba(0,0,0,.6); }
+    #explorer { left: 0; }
+    #properties { right: 0; }
+    #explorer.open, #properties.open { display: block; }
+    .panelToggle { display: inline-block; }
+  }
+</style>
+</head>
+<body>
+<script>window.ARCADE_NO_EVENTS = true; window.ARCADE_NO_CHAT = true;</script>
+<script src="../js/arcade.js"></script>
+<script src="../lib/babylon.min.js"></script>
+<div id="app">
+  <div id="topbar">
+    <div id="titlebar">
+      <button class="panelToggle" id="toggleExplorer" title="Explorer">&#9776; Explorer</button>
+      <div class="logo">Arcade <span>Studio</span></div>
+      <div class="file" id="fileName">Untitled Place</div>
+      <div class="spacer"></div>
+      <button id="playBtn" title="Test your place">▶ Play</button>
+      <button class="panelToggle" id="toggleProps" title="Properties">Properties</button>
+      <a href="../index.html">← Arcade</a>
+    </div>
+    <div id="toolbar">
+      <div class="group">
+        <button id="toolSelect" class="on" title="Select (click a part)">Select</button>
+        <button id="toolMove" title="Move the selected part">Move</button>
+        <button id="toolRotate" title="Rotate the selected part">Rotate</button>
+        <button id="toolScale" title="Scale the selected part">Scale</button>
+      </div>
+      <div class="group">
+        <button id="addBlock" title="Insert a block">+ Block</button>
+        <button id="addSphere" title="Insert a sphere">+ Sphere</button>
+        <button id="addCylinder" title="Insert a cylinder">+ Cylinder</button>
+        <button id="addSpawn" title="Insert a spawn point">+ Spawn</button>
+      </div>
+      <div class="group">
+        <button id="dupBtn" title="Duplicate the selected part">Duplicate</button>
+        <button id="delBtn" class="danger" title="Delete the selected part">Delete</button>
+      </div>
+      <div class="group">
+        <button id="saveBtn" title="Save to this browser">Save</button>
+        <button id="exportBtn" title="Download your place as a file">Export</button>
+        <button id="importBtn" title="Load a place file">Import</button>
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      </div>
+      <div class="group">
+        <button id="submitBtn" title="Send your place to Hamza for approval">Submit for approval</button>
+        <button id="adminBtn" title="Admin: review submitted places">Review queue</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="middle">
+    <div class="panel" id="explorer">
+      <h2>Explorer</h2>
+      <ul id="tree"></ul>
+    </div>
+    <div id="viewportWrap">
+      <canvas id="renderCanvas"></canvas>
+      <div id="playbar">PLAY TEST — WASD to walk, mouse to look, click to lock the mouse. <button id="stopPlay">■ Stop</button></div>
+      <div id="statusbar">Drag to orbit · Scroll to zoom · Click a part to select it</div>
+    </div>
+    <div class="panel" id="properties">
+      <h2>Properties</h2>
+      <div id="propsEmpty"><p class="hint">Nothing selected.<br>Click a part in the viewport or in the Explorer.</p></div>
+      <div id="propsBody" style="display:none">
+        <label>Name</label>
+        <input type="text" id="pName">
+        <label>Class</label>
+        <div class="val" id="pClass">Part</div>
+        <label>Position</label>
+        <div class="row3">
+          <div><label>X</label><input type="number" step="0.5" id="pX"></div>
+          <div><label>Y</label><input type="number" step="0.5" id="pY"></div>
+          <div><label>Z</label><input type="number" step="0.5" id="pZ"></div>
+        </div>
+        <label>Size</label>
+        <div class="row3">
+          <div><label>X</label><input type="number" step="0.5" min="0.2" id="sX"></div>
+          <div><label>Y</label><input type="number" step="0.5" min="0.2" id="sY"></div>
+          <div><label>Z</label><input type="number" step="0.5" min="0.2" id="sZ"></div>
+        </div>
+        <label>Rotation (degrees)</label>
+        <div class="row3">
+          <div><label>X</label><input type="number" step="15" id="rX"></div>
+          <div><label>Y</label><input type="number" step="15" id="rY"></div>
+          <div><label>Z</label><input type="number" step="15" id="rZ"></div>
+        </div>
+        <label>Color</label>
+        <input type="color" id="pColor" value="#ff0000">
+        <label>Material</label>
+        <select id="pMat">
+          <option value="plastic">Plastic</option>
+          <option value="smooth">SmoothPlastic</option>
+          <option value="neon">Neon</option>
+          <option value="metal">Metal</option>
+          <option value="wood">Wood</option>
+        </select>
+        <label>Transparency: <span id="transVal">0</span></label>
+        <input type="range" id="pTrans" min="0" max="0.9" step="0.1" value="0">
+        <p class="hint">Tip: drag the arrows on a selected part to move it, or type numbers here. The green baseplate cannot be deleted or moved.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Submit dialog -->
+<div class="overlay" id="submitOverlay">
+  <div class="dialog">
+    <h2>Submit for approval</h2>
+    <p>Your place is saved in this browser and added to the review queue on this device.
+    Copy the share code below and send it to Hamza — he approves it with his admin password,
+    and then it gets added to the arcade homepage on the next update.</p>
+    <label>Your name</label>
+    <input type="text" id="subAuthor" placeholder="e.g. Lyncookie2345" maxlength="24">
+    <label style="margin-top:10px">Share code (your whole place in one code)</label>
+    <textarea id="subCode" readonly></textarea>
+    <div class="btnrow">
+      <button id="copyCode">Copy share code</button>
+      <button id="closeSubmit">Done</button>
+    </div>
+    <p class="err" id="submitErr"></p>
+  </div>
+</div>
+
+<!-- Admin / review queue dialog -->
+<div class="overlay" id="adminOverlay">
+  <div class="dialog">
+    <h2>Review queue — admin only</h2>
+    <div id="adminGate">
+      <p>This uses the same admin password as the arcade admin panel. It is checked
+      server-side — the password is not stored in this page.</p>
+      <label>Admin password</label>
+      <input type="password" id="adminPw" autocomplete="off">
+      <div class="btnrow"><button id="adminUnlock">Unlock</button><button id="closeAdmin">Close</button></div>
+      <p class="err" id="adminErr"></p>
+    </div>
+    <div id="adminPanel" style="display:none">
+      <p>Approved places are marked below. Adding one to the homepage still needs its
+      file and one line in the homepage game list — that happens at the next arcade update.</p>
+      <ul id="subList"></ul>
+      <div class="btnrow"><button id="closeAdmin2">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var SAVE_KEY = "arcade_studio_build_v1";
+  var SUB_KEY = "arcade_studio_submissions_v1";
+  var statusEl = document.getElementById("statusbar");
+  function status(msg) { statusEl.textContent = msg; }
+
+  if (!window.BABYLON) {
+    status("Babylon.js did not load (../lib/babylon.min.js). Check the file is deployed.");
+    return;
+  }
+
+  /* ================= scene ================= */
+  var canvas = document.getElementById("renderCanvas");
+  var engine = new BABYLON.Engine(canvas, true, { stencil: false });
+  var scene = new BABYLON.Scene(engine);
+  scene.clearColor = new BABYLON.Color3(0.12, 0.12, 0.13);
+  var camera = new BABYLON.ArcRotateCamera("editorCam", -Math.PI / 2, 1.05, 42,
+    new BABYLON.Vector3(0, 1, 0), scene);
+  camera.attachControl(canvas, true);
+  camera.lowerRadiusLimit = 6; camera.upperRadiusLimit = 120;
+  camera.wheelPrecision = 12;
+  var hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0, 1, 0.2), scene);
+  hemi.intensity = 0.9;
+  var sun = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-0.4, -1, 0.3), scene);
+  sun.position = new BABYLON.Vector3(20, 30, -14);
+  sun.intensity = 0.7;
+
+  /* Baseplate: 64 x 64 green plate with stud dots drawn on a canvas texture. */
+  function studTexture() {
+    var c = document.createElement("canvas"); c.width = 512; c.height = 512;
+    var g = c.getContext("2d");
+    g.fillStyle = "#4b974b"; g.fillRect(0, 0, 512, 512);
+    g.fillStyle = "#5da85d";
+    for (var x = 0; x < 16; x++) for (var y = 0; y < 16; y++) {
+      g.beginPath(); g.arc(x * 32 + 16, y * 32 + 16, 9, 0, Math.PI * 2); g.fill();
+    }
+    var tex = new BABYLON.DynamicTexture("baseTex", c, scene, true);
+    return tex;
+  }
+  var baseMat = new BABYLON.StandardMaterial("baseMat", scene);
+  baseMat.diffuseTexture = studTexture();
+  var baseplate = BABYLON.MeshBuilder.CreateBox("Baseplate", { width: 64, height: 1, depth: 64 }, scene);
+  baseplate.position.y = -0.5;
+  baseplate.material = baseMat;
+  baseplate.isPickable = true;
+  baseplate.metadata = { locked: true, type: "baseplate" };
+
+  /* ================= parts ================= */
+  var parts = [];          // meshes, excluding the baseplate
+  var selected = null;
+  var counter = { Part: 0, SpawnLocation: 0 };
+
+  function hexToColor3(hex) {
+    var h = String(hex || "#ff0000").replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16);
+    if (isNaN(n)) n = 0xff0000;
+    return new BABYLON.Color3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+  }
+  function color3ToHex(c) {
+    function v(x) { var s = Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16); return s.length === 1 ? "0" + s : s; }
+    return "#" + v(c.r) + v(c.g) + v(c.b);
+  }
+  function applyMaterial(mesh) {
+    var m = mesh.metadata;
+    var mat = mesh.material || new BABYLON.StandardMaterial("mat_" + mesh.name, scene);
+    mat.diffuseColor = hexToColor3(m.color);
+    mat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+    mat.emissiveColor = new BABYLON.Color3(0, 0, 0);
+    if (m.material === "neon") { mat.emissiveColor = hexToColor3(m.color); mat.disableLighting = true; }
+    else if (m.material === "metal") { mat.specularColor = new BABYLON.Color3(0.9, 0.9, 0.9); mat.specularPower = 64; }
+    else if (m.material === "smooth") { mat.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5); mat.specularPower = 32; }
+    else if (m.material === "wood") { mat.diffuseColor = hexToColor3(m.color).scale(0.8); }
+    mat.alpha = 1 - (m.transparency || 0);
+    mesh.material = mat;
+  }
+  function makePart(type, opts) {
+    opts = opts || {};
+    var name = opts.name || (type === "SpawnLocation" ? "SpawnLocation" : "Part");
+    if (!opts.name) {
+      counter[type === "SpawnLocation" ? "SpawnLocation" : "Part"]++;
+      name = type === "SpawnLocation" ? "SpawnLocation" : "Part" + counter.Part;
+      if (type === "SpawnLocation") name = "SpawnLocation";
+    }
+    var mesh;
+    var size = opts.size || { x: 4, y: 2, z: 4 };
+    if (type === "sphere") mesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 1 }, scene);
+    else if (type === "cylinder") mesh = BABYLON.MeshBuilder.CreateCylinder(name, { height: 1, diameter: 1 }, scene);
+    else mesh = BABYLON.MeshBuilder.CreateBox(name, { width: 1, height: 1, depth: 1 }, scene);
+    mesh.scaling = new BABYLON.Vector3(size.x, size.y, size.z);
+    mesh.position = new BABYLON.Vector3(
+      opts.position ? opts.position.x : 0,
+      opts.position ? opts.position.y : size.y / 2 + 0.5,
+      opts.position ? opts.position.z : 0);
+    if (opts.rotation) mesh.rotation = new BABYLON.Vector3(opts.rotation.x, opts.rotation.y, opts.rotation.z);
+    mesh.metadata = {
+      type: type === "SpawnLocation" ? "spawn" : type,
+      className: type === "SpawnLocation" ? "SpawnLocation" : "Part",
+      color: opts.color || "#ff0000",
+      material: opts.material || "plastic",
+      transparency: opts.transparency || 0,
+      locked: false
+    };
+    if (type === "SpawnLocation") { mesh.metadata.color = "#00a2ff"; mesh.metadata.className = "SpawnLocation"; }
+    applyMaterial(mesh);
+    mesh.isPickable = true;
+    parts.push(mesh);
+    return mesh;
+  }
+
+  /* ================= gizmos ================= */
+  var gizmoManager = new BABYLON.GizmoManager(scene);
+  gizmoManager.positionGizmoEnabled = true;
+  gizmoManager.rotationGizmoEnabled = false;
+  gizmoManager.scaleGizmoEnabled = false;
+  gizmoManager.usePointerToAttachGizmos = false;
+  gizmoManager.clearGizmoOnEmptyPointerEvent = true;
+  gizmoManager.attachableMeshes = null; // any mesh; baseplate filtered below
+  gizmoManager.onAttachedToMeshObservable.add(function (mesh) {
+    if (mesh && mesh.metadata && mesh.metadata.locked) { gizmoManager.attachToMesh(null); }
+  });
+
+  function setTool(tool) {
+    ["toolSelect", "toolMove", "toolRotate", "toolScale"].forEach(function (id) {
+      document.getElementById(id).classList.remove("on");
+    });
+    gizmoManager.positionGizmoEnabled = false;
+    gizmoManager.rotationGizmoEnabled = false;
+    gizmoManager.scaleGizmoEnabled = false;
+    if (tool === "select") document.getElementById("toolSelect").classList.add("on");
+    if (tool === "move") { document.getElementById("toolMove").classList.add("on"); gizmoManager.positionGizmoEnabled = true; }
+    if (tool === "rotate") { document.getElementById("toolRotate").classList.add("on"); gizmoManager.rotationGizmoEnabled = true; }
+    if (tool === "scale") { document.getElementById("toolScale").classList.add("on"); gizmoManager.scaleGizmoEnabled = true; }
+    if (selected) gizmoManager.attachToMesh(selected);
+  }
+  document.getElementById("toolSelect").onclick = function () { setTool("select"); };
+  document.getElementById("toolMove").onclick = function () { setTool("move"); };
+  document.getElementById("toolRotate").onclick = function () { setTool("rotate"); };
+  document.getElementById("toolScale").onclick = function () { setTool("scale"); };
+
+  /* ================= selection + explorer + properties ================= */
+  var treeEl = document.getElementById("tree");
+  function refreshTree() {
+    treeEl.innerHTML = "";
+    var root = document.createElement("li");
+    root.className = "root"; root.textContent = "Workspace"; treeEl.appendChild(root);
+    function addItem(mesh, label) {
+      var li = document.createElement("li");
+      li.textContent = label + "  ";
+      var cls = document.createElement("span"); cls.className = "cls";
+      cls.textContent = mesh.metadata.className || "Part"; li.appendChild(cls);
+      if (mesh === selected) li.classList.add("sel");
+      li.onclick = function () { select(mesh); };
+      treeEl.appendChild(li);
+    }
+    addItem(baseplate, "Baseplate");
+    parts.forEach(function (m) { addItem(m, m.name); });
+  }
+  function select(mesh) {
+    if (mesh && mesh.metadata && mesh.metadata.locked && mesh !== baseplate) mesh = null;
+    selected = mesh || null;
+    if (selected && selected !== baseplate) gizmoManager.attachToMesh(selected);
+    else gizmoManager.attachToMesh(null);
+    refreshTree(); refreshProps();
+    status(selected ? "Selected: " + selected.name + " — drag the gizmo or edit Properties"
+      : "Drag to orbit · Scroll to zoom · Click a part to select it");
+  }
+  /* Click (not drag) to select: record the pointer-down position, and only
+     select/deselect on pointer-up when the pointer barely moved. This keeps
+     dragging a gizmo handle from deselecting the part mid-drag, because
+     gizmo handles live in the utility layer and the main scene sees no hit
+     under them. */
+  var downX = 0, downY = 0;
+  scene.onPointerObservable.add(function (info) {
+    if (playing) return;
+    if (info.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+      downX = scene.pointerX; downY = scene.pointerY;
+      return;
+    }
+    if (info.type !== BABYLON.PointerEventTypes.POINTERUP) return;
+    var moved = Math.abs(scene.pointerX - downX) + Math.abs(scene.pointerY - downY);
+    if (moved > 6) return;
+    if (info.pickInfo && info.pickInfo.hit && info.pickInfo.pickedMesh &&
+        (info.pickInfo.pickedMesh === baseplate || parts.indexOf(info.pickInfo.pickedMesh) >= 0)) {
+      select(info.pickInfo.pickedMesh);
+    } else if (info.pickInfo && !info.pickInfo.hit) {
+      select(null);
+    }
+  });
+
+  var propsEmpty = document.getElementById("propsEmpty");
+  var propsBody = document.getElementById("propsBody");
+  function num(id) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : v; }
+  function refreshProps() {
+    if (!selected) { propsEmpty.style.display = "block"; propsBody.style.display = "none"; return; }
+    propsEmpty.style.display = "none"; propsBody.style.display = "block";
+    var m = selected.metadata;
+    document.getElementById("pName").value = selected.name;
+    document.getElementById("pClass").textContent = m.className || "Part";
+    document.getElementById("pX").value = selected.position.x.toFixed(1);
+    document.getElementById("pY").value = selected.position.y.toFixed(1);
+    document.getElementById("pZ").value = selected.position.z.toFixed(1);
+    document.getElementById("sX").value = Math.abs(selected.scaling.x).toFixed(1);
+    document.getElementById("sY").value = Math.abs(selected.scaling.y).toFixed(1);
+    document.getElementById("sZ").value = Math.abs(selected.scaling.z).toFixed(1);
+    document.getElementById("rX").value = Math.round(selected.rotation.x * 180 / Math.PI);
+    document.getElementById("rY").value = Math.round(selected.rotation.y * 180 / Math.PI);
+    document.getElementById("rZ").value = Math.round(selected.rotation.z * 180 / Math.PI);
+    document.getElementById("pColor").value = color3ToHex(m.color);
+    document.getElementById("pMat").value = m.material || "plastic";
+    document.getElementById("pTrans").value = m.transparency || 0;
+    document.getElementById("transVal").textContent = String(m.transparency || 0);
+    var locked = !!m.locked;
+    ["pName", "pX", "pY", "pZ", "sX", "sY", "sZ", "rX", "rY", "rZ", "pColor", "pMat", "pTrans"]
+      .forEach(function (id) { document.getElementById(id).disabled = locked; });
+  }
+  function applyProps() {
+    if (!selected || selected.metadata.locked) return;
+    var m = selected.metadata;
+    var newName = document.getElementById("pName").value.trim();
+    if (newName && newName !== selected.name) { selected.name = newName; }
+    selected.position.set(num("pX"), num("pY"), num("pZ"));
+    selected.scaling.set(Math.max(0.2, num("sX")), Math.max(0.2, num("sY")), Math.max(0.2, num("sZ")));
+    selected.rotation.set(num("rX") * Math.PI / 180, num("rY") * Math.PI / 180, num("rZ") * Math.PI / 180);
+    m.color = document.getElementById("pColor").value;
+    m.material = document.getElementById("pMat").value;
+    m.transparency = parseFloat(document.getElementById("pTrans").value) || 0;
+    document.getElementById("transVal").textContent = String(m.transparency);
+    applyMaterial(selected);
+    refreshTree();
+  }
+  ["pName", "pX", "pY", "pZ", "sX", "sY", "sZ", "rX", "rY", "rZ", "pColor", "pMat", "pTrans"]
+    .forEach(function (id) {
+      document.getElementById(id).addEventListener("change", applyProps);
+      document.getElementById(id).addEventListener("input", function () {
+        if (id === "pColor" || id === "pTrans" || id === "pMat") applyProps();
+      });
+    });
+  /* Keep the Properties panel honest while a gizmo is dragged. */
+  scene.onBeforeRenderObservable.add(function () {
+    if (selected && gizmoManager.attachedMesh === selected) {
+      var px = document.getElementById("pX");
+      if (document.activeElement !== px) px.value = selected.position.x.toFixed(1);
+      var py = document.getElementById("pY");
+      if (document.activeElement !== py) py.value = selected.position.y.toFixed(1);
+      var pz = document.getElementById("pZ");
+      if (document.activeElement !== pz) pz.value = selected.position.z.toFixed(1);
+    }
+  });
+
+  /* ================= insert / duplicate / delete ================= */
+  function insertPart(type) {
+    var target = camera.target || new BABYLON.Vector3(0, 1, 0);
+    var mesh = makePart(type, {
+      position: { x: Math.round(target.x), y: 1.5, z: Math.round(target.z) },
+      color: type === "sphere" ? "#00a2ff" : type === "cylinder" ? "#ffff00" : "#ff0000"
+    });
+    select(mesh); setTool("move");
+    status("Inserted " + mesh.name + " — drag the arrows to move it.");
+  }
+  document.getElementById("addBlock").onclick = function () { insertPart("box"); };
+  document.getElementById("addSphere").onclick = function () { insertPart("sphere"); };
+  document.getElementById("addCylinder").onclick = function () { insertPart("cylinder"); };
+  document.getElementById("addSpawn").onclick = function () { insertPart("SpawnLocation"); };
+  document.getElementById("dupBtn").onclick = function () {
+    if (!selected || selected.metadata.locked) { status("Select a part first to duplicate it."); return; }
+    var m = selected.metadata;
+    var copy = makePart(m.type, {
+      position: { x: selected.position.x + 2, y: selected.position.y, z: selected.position.z },
+      size: { x: selected.scaling.x, y: selected.scaling.y, z: selected.scaling.z },
+      rotation: { x: selected.rotation.x, y: selected.rotation.y, z: selected.rotation.z },
+      color: m.color, material: m.material, transparency: m.transparency
+    });
+    select(copy); setTool("move");
+  };
+  document.getElementById("delBtn").onclick = function () {
+    if (!selected || selected.metadata.locked) { status("The baseplate cannot be deleted. Select a part first."); return; }
+    var i = parts.indexOf(selected);
+    if (i >= 0) parts.splice(i, 1);
+    selected.dispose();
+    select(null);
+    status("Part deleted.");
+  };
+
+  /* ================= save / load / export / import ================= */
+  function serialize() {
+    return {
+      app: "arcade-studio", version: 1,
+      name: document.getElementById("fileName").textContent,
+      parts: parts.map(function (m) {
+        return {
+          type: m.metadata.type, name: m.name,
+          position: { x: +m.position.x.toFixed(2), y: +m.position.y.toFixed(2), z: +m.position.z.toFixed(2) },
+          size: { x: +Math.abs(m.scaling.x).toFixed(2), y: +Math.abs(m.scaling.y).toFixed(2), z: +Math.abs(m.scaling.z).toFixed(2) },
+          rotation: { x: +m.rotation.x.toFixed(3), y: +m.rotation.y.toFixed(3), z: +m.rotation.z.toFixed(3) },
+          color: m.metadata.color, material: m.metadata.material, transparency: m.metadata.transparency || 0
+        };
+      })
+    };
+  }
+  function loadData(data) {
+    if (!data || !Array.isArray(data.parts)) throw new Error("Not an Arcade Studio place file.");
+    parts.slice().forEach(function (m) { m.dispose(); });
+    parts.length = 0; counter = { Part: 0, SpawnLocation: 0 };
+    data.parts.forEach(function (p) {
+      var mesh = makePart(p.type === "spawn" ? "SpawnLocation" : p.type, {
+        name: p.name, position: p.position, size: p.size, rotation: p.rotation,
+        color: p.color, material: p.material, transparency: p.transparency
+      });
+      if (p.name && /^Part(\d+)$/.test(p.name)) counter.Part = Math.max(counter.Part, parseInt(p.name.slice(4), 10));
+    });
+    if (data.name) document.getElementById("fileName").textContent = data.name;
+    select(null);
+  }
+  function saveLocal() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); status("Saved to this browser."); }
+    catch (e) { status("Could not save: " + e.message); }
+  }
+  document.getElementById("saveBtn").onclick = saveLocal;
+  document.getElementById("exportBtn").onclick = function () {
+    var blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "arcade-studio-place.json";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    status("Exported arcade-studio-place.json — send that file, or the share code, to Hamza.");
+  };
+  document.getElementById("importBtn").onclick = function () { document.getElementById("importFile").click(); };
+  document.getElementById("importFile").addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try { loadData(JSON.parse(r.result)); status("Place loaded: " + parts.length + " part(s)."); }
+      catch (e) { status("Could not load that file: " + e.message); }
+    };
+    r.readAsText(f);
+    ev.target.value = "";
+  });
+
+  /* ================= submit for approval ================= */
+  function getSubs() {
+    try { return JSON.parse(localStorage.getItem(SUB_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function setSubs(list) { try { localStorage.setItem(SUB_KEY, JSON.stringify(list)); } catch (e) {} }
+  var submitOverlay = document.getElementById("submitOverlay");
+  document.getElementById("submitBtn").onclick = function () {
+    saveLocal();
+    var author = (window.Arcade && Arcade.playerName) ? Arcade.playerName() : "anon";
+    document.getElementById("subAuthor").value = author;
+    var data = serialize();
+    document.getElementById("subCode").value = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    document.getElementById("submitErr").textContent = "";
+    submitOverlay.classList.add("open");
+  };
+  document.getElementById("copyCode").onclick = function () {
+    var code = document.getElementById("subCode");
+    code.select();
+    var done = function () { document.getElementById("submitErr").textContent = "Copied."; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code.value).then(done, function () { document.execCommand("copy"); done(); });
+    } else { document.execCommand("copy"); done(); }
+    var author = document.getElementById("subAuthor").value.trim() || "anon";
+    var list = getSubs();
+    list.push({ author: author, name: document.getElementById("fileName").textContent,
+      date: new Date().toISOString(), parts: parts.length, approved: false,
+      code: document.getElementById("subCode").value });
+    setSubs(list);
+    status("Submitted for approval — " + list.length + " place(s) in the queue on this device.");
+  };
+  document.getElementById("closeSubmit").onclick = function () { submitOverlay.classList.remove("open"); };
+
+  /* ================= admin review queue ================= */
+  var adminOverlay = document.getElementById("adminOverlay");
+  document.getElementById("adminBtn").onclick = function () {
+    document.getElementById("adminGate").style.display = "block";
+    document.getElementById("adminPanel").style.display = "none";
+    document.getElementById("adminErr").textContent = "";
+    document.getElementById("adminPw").value = "";
+    adminOverlay.classList.add("open");
+  };
+  function renderSubs() {
+    var list = getSubs();
+    var ul = document.getElementById("subList");
+    ul.innerHTML = "";
+    if (!list.length) { ul.innerHTML = "<li>No submitted places on this device yet.</li>"; return; }
+    list.forEach(function (s, i) {
+      var li = document.createElement("li");
+      var b = document.createElement("b"); b.textContent = s.name || "Untitled Place"; li.appendChild(b);
+      li.appendChild(document.createTextNode(" — by " + (s.author || "anon") + ", " + s.parts + " part(s), " +
+        (s.date || "").slice(0, 10) + " "));
+      var st = document.createElement("span");
+      st.className = s.approved ? "ok" : "pend";
+      st.textContent = s.approved ? "APPROVED" : "pending";
+      li.appendChild(st);
+      li.appendChild(document.createElement("br"));
+      var load = document.createElement("button"); load.textContent = "Open in studio";
+      load.onclick = function () {
+        try { loadData(JSON.parse(decodeURIComponent(escape(atob(s.code))))); adminOverlay.classList.remove("open"); status("Opened submitted place: " + (s.name || "")); }
+        catch (e) { status("Could not open that submission: " + e.message); }
+      };
+      li.appendChild(load);
+      var ap = document.createElement("button"); ap.textContent = s.approved ? "Unapprove" : "Approve";
+      ap.style.marginLeft = "6px";
+      ap.onclick = function () {
+        var l = getSubs(); l[i].approved = !l[i].approved; setSubs(l); renderSubs();
+      };
+      li.appendChild(ap);
+      ul.appendChild(li);
+    });
+  }
+  document.getElementById("adminUnlock").onclick = async function () {
+    var guess = document.getElementById("adminPw").value;
+    var err = document.getElementById("adminErr");
+    if (!window.Arcade || !Arcade.checkAdmin) { err.textContent = "Admin check is not available (arcade.js did not load)."; return; }
+    err.textContent = "Checking…";
+    var ok = await Arcade.checkAdmin(guess);
+    if (ok === true) {
+      document.getElementById("adminGate").style.display = "none";
+      document.getElementById("adminPanel").style.display = "block";
+      renderSubs();
+    } else if (ok === null) {
+      err.textContent = "Could not reach the admin check. Try again when online.";
+    } else {
+      err.textContent = "Wrong password.";
+    }
+  };
+  document.getElementById("closeAdmin").onclick = function () { adminOverlay.classList.remove("open"); };
+  document.getElementById("closeAdmin2").onclick = function () { adminOverlay.classList.remove("open"); };
+
+  /* ================= play test ================= */
+  var playing = false;
+  var playCam = null;
+  var keys = {};
+  var playBtn = document.getElementById("playBtn");
+  var playbar = document.getElementById("playbar");
+  function spawnPoint() {
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].metadata.type === "spawn") return parts[i].position.clone();
+    }
+    return new BABYLON.Vector3(0, 2, -10);
+  }
+  function startPlay() {
+    playing = true;
+    gizmoManager.attachToMesh(null);
+    if (selected) select(null);
+    playCam = new BABYLON.UniversalCamera("playCam", spawnPoint(), scene);
+    playCam.setTarget(new BABYLON.Vector3(0, 2, 10));
+    playCam.attachControl(canvas, true);
+    playCam.speed = 0.6;
+    playCam.keysUp = [87]; playCam.keysDown = [83]; playCam.keysLeft = [65]; playCam.keysRight = [68];
+    scene.activeCamera = playCam;
+    playbar.style.display = "block";
+    playBtn.textContent = "■ Stop";
+    status("Play test — WASD to walk, mouse to look.");
+  }
+  function stopPlay() {
+    playing = false;
+    if (playCam) { playCam.detachControl(canvas); playCam.dispose(); playCam = null; }
+    scene.activeCamera = camera;
+    camera.attachControl(canvas, true);
+    playbar.style.display = "none";
+    playBtn.textContent = "▶ Play";
+    status("Back in edit mode.");
+  }
+  playBtn.onclick = function () { if (playing) stopPlay(); else startPlay(); };
+  document.getElementById("stopPlay").onclick = stopPlay;
+  window.addEventListener("keydown", function (e) { keys[e.key.toLowerCase()] = true; if (e.key === "Escape" && playing) stopPlay(); });
+  window.addEventListener("keyup", function (e) { keys[e.key.toLowerCase()] = false; });
+
+  /* ================= mobile panel toggles ================= */
+  document.getElementById("toggleExplorer").onclick = function () {
+    document.getElementById("explorer").classList.toggle("open");
+    document.getElementById("properties").classList.remove("open");
+  };
+  document.getElementById("toggleProps").onclick = function () {
+    document.getElementById("properties").classList.toggle("open");
+    document.getElementById("explorer").classList.remove("open");
+  };
+
+  /* ================= boot ================= */
+  try {
+    var saved = localStorage.getItem(SAVE_KEY);
+    if (saved) loadData(JSON.parse(saved));
+    else {
+      /* Starter scene so the first open is not an empty plate. */
+      makePart("box", { name: "Part1", position: { x: -6, y: 1.5, z: 0 }, size: { x: 4, y: 3, z: 4 }, color: "#ff0000" });
+      makePart("box", { name: "Part2", position: { x: 6, y: 1, z: -4 }, size: { x: 4, y: 2, z: 4 }, color: "#ffff00" });
+      makePart("sphere", { name: "Part3", position: { x: 0, y: 1.5, z: 6 }, size: { x: 3, y: 3, z: 3 }, color: "#00a2ff" });
+      makePart("SpawnLocation", { position: { x: 0, y: 0.6, z: -12 }, size: { x: 4, y: 1, z: 4 } });
+    }
+  } catch (e) { status("Could not load the saved place: " + e.message); }
+  refreshTree(); refreshProps(); setTool("move");
+  engine.runRenderLoop(function () { scene.render(); });
+  window.addEventListener("resize", function () { engine.resize(); });
+  status("Arcade Studio ready — Babylon.js " + (BABYLON.Engine.Version || "") + ". Baseplate is 64×64. Insert a part to start building.");
+})();
+</script>
+</body>
+</html>

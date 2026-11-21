@@ -237,7 +237,7 @@ if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.
   <h1>* SANDBOX ARCADE</h1>
   <p>* 25 games. The air is filled with determination.</p>
 </header>
-<div class="name-row">Playing as <strong id="pname">…</strong><button id="rename">change</button></div>
+<div class="name-row">Playing as <strong id="pname">…</strong><button id="rename">change</button> &nbsp;·&nbsp; 💎 <strong id="gemsBal">0</strong> Gems</div>
 
 <div class="tabs">
   <button id="tabNormal" class="active">🏠 NORMAL PAGE</button>
@@ -322,7 +322,8 @@ if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.
     { id: "demolition-day", emoji: "💥", title: "Demolition Day", cat: "action", sub: "* PROJECT NEXUS — timed demolition challenges. Towers, dominoes, bombs. Earn stars, top the boards." },
     { id: "red-light-green-legs", emoji: "🚦", title: "Red Light, Green Legs", cat: "chill", sub: "* 4 spider-bots. 0 instructions. Oliver, Aria, Sophia and Albert teach themselves to walk, run and freeze on red — you just watch." },
     { id: "the-experience", emoji: "🎧", title: "The Experience", cat: "chill", sub: "* NOT A GAME — a listening room. Upload your own music and listen, or press play on the built-in track." },
-    { id: "speedrun-crate-opener", emoji: "📦", title: "Speedrun Crate Opener", cat: "action", thumb: "https://static.wikia.nocookie.net/toilet-tower-defense-game/images/6/62/SpeedRunCrate.png/revision/latest?cb=20250223104148", sub: "* TTD Speed Run Crate — same 75% / 24% / 1% odds. Chase the 1% Godly Titan Fast Armored Cameraman." },
+    { id: "speedrun-crate-opener", emoji: "📦", title: "Speedrun Crate Opener", cat: "action", thumb: "img/thumbs/speedrun-crate-opener.jpg", sub: "* TTD Speed Run Crate — same 75% / 24% / 1% odds. Crates cost 200 Gems. Chase the 1% Godly Titan Fast Armored Cameraman." },
+    { id: "arcade-studio", emoji: "🛠️", title: "Arcade Studio", cat: "action", sub: "* Build your own game in 3D — start on a baseplate, submit it, and Hamza approves the best ones for the homepage." },
     { id: "snake",       emoji: "🐍", title: "Snake", cat: "classics" },
     { id: "2048",        emoji: "🔢", title: "2048", cat: "puzzle" },
     { id: "minesweeper", emoji: "💣", title: "Minesweeper", cat: "puzzle" },
@@ -353,6 +354,7 @@ if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.
   const hof = document.getElementById("hof");
   const me = Arcade.playerName();
   document.getElementById("pname").textContent = me;
+  try { document.getElementById("gemsBal").textContent = (Arcade.gems ? Arcade.gems.get() : 0); } catch (e) {}
   document.getElementById("rename").addEventListener("click", function () {
     try { localStorage.removeItem("arcade_name"); } catch (e) {}
     document.getElementById("pname").textContent = Arcade.playerName();
