@@ -4,48 +4,59 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Speedrun Crate Opener — Sandbox Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
-         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
-  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
-  h1 { font-size: 1.6rem; margin: 4px 0; text-shadow: 0 0 16px rgba(0,229,255,.35); }
-  .sub { color: #8a8aa8; font-size: .9rem; margin: 2px 0 10px; }
+  body { background: #000; color: #fff; font-family: "Press Start 2P", monospace;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation;
+         font-size: 11px; line-height: 1.7; }
+  .back { display: inline-block; color: #fff; text-decoration: none; margin: 8px; font-size: 10px; }
+  .back:hover { color: #ffff00; }
+  h1 { font-size: 18px; margin: 8px 0; line-height: 1.6; }
+  h1 .heart { color: #ff0000; }
+  #msg { min-height: 1.6em; margin: 8px; color: #fff; }
+  button { background: #000; color: #fff; border: 3px solid #fff; border-radius: 0;
+           padding: 10px 16px; font-size: 11px; cursor: pointer; margin: 6px;
+           font-family: "Press Start 2P", monospace; }
+  button:hover:not(:disabled) { border-color: #ffff00; color: #ffff00; }
+  button:active { background: #ffff00; color: #000; border-color: #ffff00; }
+  button:disabled { opacity: .38; cursor: default; }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #ffff00; outline-offset: 2px; }
+  .hint { color: #808080; font-size: 10px; margin-top: 6px; }
+  .sub { color: #808080; font-size: 10px; margin: 2px 0 10px; line-height: 1.7; }
+  #gemsBar { font-size: 12px; margin: 6px 0 2px; }
+  #gemsBal { color: #ffff00; }
   #crateWrap { margin: 10px auto; width: min(320px, 80vw); cursor: pointer; }
-  #crateWrap img { width: 100%; border-radius: 12px; }
+  #crateWrap img { width: 100%; border-radius: 0; border: 3px solid #fff; }
   #crateWrap.shake img { animation: shake .12s infinite; }
   @keyframes shake { 0%{transform:rotate(-3deg) scale(1.03)} 25%{transform:rotate(3deg) scale(1.06)} 50%{transform:rotate(-2deg) scale(1.03)} 75%{transform:rotate(2deg) scale(1.06)} 100%{transform:rotate(0) scale(1)} }
-  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
-           padding: 12px 28px; font-size: 1.05rem; cursor: pointer; margin: 6px; font-weight: 700; }
-  button:hover { filter: brightness(1.12); }
-  button:active { transform: scale(.96); }
-  button:disabled { opacity: .5; cursor: default; }
-  button.secondary { background: #2a2a4a; }
+  button.secondary { border-color: #808080; color: #808080; }
+  button.secondary:hover { border-color: #ffff00; color: #ffff00; }
   #result { min-height: 340px; margin: 12px auto; max-width: 420px; }
-  #result img { max-height: 240px; max-width: 90vw; border-radius: 12px; }
-  #result .name { font-size: 1.5rem; font-weight: 800; margin-top: 8px; }
-  #result .rarity { font-size: 1.05rem; font-weight: 700; margin: 4px 0; }
-  #result .ability { color: #c9c9dd; font-size: .92rem; margin-top: 6px; line-height: 1.45; }
-  .legendary { color: #ff9f1c; } .mythic { color: #c04dff; } .godly { color: #ffe600; }
+  #result img { max-height: 240px; max-width: 90vw; border-radius: 0; border: 3px solid #fff; }
+  #result .name { font-size: 16px; margin-top: 8px; }
+  #result .rarity { font-size: 12px; margin: 4px 0; }
+  #result .ability { color: #fff; font-size: 10px; margin-top: 6px; line-height: 1.7; }
+  .legendary { color: #ff9f1c; } .mythic { color: #c04dff; } .godly { color: #ffff00; }
   #result.godly { animation: glow 1s infinite alternate; }
-  @keyframes glow { from { filter: drop-shadow(0 0 6px rgba(255,230,0,.4)); } to { filter: drop-shadow(0 0 26px rgba(255,230,0,.9)); } }
-  #stats { color: #8a8aa8; font-size: .92rem; margin: 10px 0; line-height: 1.6; }
-  #stats b { color: #e8e8f0; }
+  @keyframes glow { from { filter: drop-shadow(0 0 6px rgba(255,255,0,.4)); } to { filter: drop-shadow(0 0 26px rgba(255,255,0,.9)); } }
+  #stats { color: #808080; font-size: 10px; margin: 10px 0; line-height: 1.7; }
+  #stats b { color: #ffff00; }
   .odds { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
-  .odds div { background: #14142a; border: 1px solid #2a2a4a; border-radius: 8px; padding: 8px 10px; font-size: .85rem; }
-  #history { list-style: none; max-width: 420px; margin: 8px auto; text-align: left; font-size: .9rem; color: #c9c9dd; }
-  #history li { padding: 4px 8px; border-bottom: 1px solid #1e1e36; }
-  .hint { color: #8a8aa8; font-size: .8rem; margin-top: 10px; }
-  button:focus-visible, .back:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
+  .odds div { background: #111; border: 3px solid #fff; border-radius: 0; padding: 8px 10px; font-size: 10px; line-height: 1.7; }
+  #history { list-style: none; max-width: 420px; margin: 8px auto; text-align: left; font-size: 10px; color: #fff; }
+  #history li { padding: 4px 8px; border-bottom: 1px solid #333; }
 </style>
 </head>
 <body>
 <a class="back" href="../index.html">← arcade</a>
-<h1>📦 Speedrun Crate Opener</h1>
-<div class="sub">Same odds as Toilet Tower Defense. Crates cost <b style="color:#ffd94d">200 Gems</b> each — earn Gems by playing games: 19 per 40 score. Units you pull boost your Gem earnings.</div>
+<h1>📦 Speedrun Crate Opener <span class="heart">♥</span></h1>
+<div class="sub">* Same odds as Toilet Tower Defense. Crates cost <b style="color:#ffd94d">200 Gems</b> each — earn Gems by playing games: 19 per 40 score. Units you pull boost your Gem earnings.</div>
 
-<div id="gemsBar" style="font-size:1.05rem;margin:6px 0 2px">💎 <b id="gemsBal" style="color:#ffd94d">0</b> Gems &nbsp;·&nbsp; Boost: <b id="gemsBoost">1x</b></div>
-<div id="gemsNote" class="hint" style="margin-top:2px">Speedy 1.3x · Tracksuit 2x · Titan 3.3x — best unit you own applies.</div>
+<div id="gemsBar" style="font-size:1.05rem;margin:6px 0 2px">💎 <b id="gemsBal">0</b> Gems &nbsp;·&nbsp; Boost: <b id="gemsBoost">1x</b></div>
+<div id="gemsNote" class="hint" style="margin-top:2px">* Speedy 1.3x · Tracksuit 2x · Titan 3.3x — best unit you own applies.</div>
 
 <div id="crateWrap" title="Open a crate">
   <img id="crateImg" src="../img/speedrun-crate/speed-run-crate.png" alt="Speed Run Crate">
@@ -67,7 +78,7 @@
 
 <h2 style="font-size:1.05rem;margin-top:14px">Recent pulls</h2>
 <ul id="history"></ul>
-<div class="hint">Images from the TTD wiki (toilet-tower-defense-game.fandom.com). Odds from the Speed Run Crate: 75% / 24% / 1%.</div>
+<div class="hint">* Images from the TTD wiki (toilet-tower-defense-game.fandom.com). Odds from the Speed Run Crate: 75% / 24% / 1%.</div>
 
 <script>
 (function () {

@@ -4,32 +4,43 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Tic-Tac-Toe — Sandbox Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
-         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
-  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
-  h1 { font-size: 1.6rem; margin: 4px 0; }
-  #hud { display: flex; justify-content: center; gap: 24px; margin: 8px 0; font-size: 1.05rem; }
-  #hud span { color: #ffe600; font-weight: 700; }
+  body { background: #000; color: #fff; font-family: "Press Start 2P", monospace;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation;
+         font-size: 11px; line-height: 1.7; }
+  .back { display: inline-block; color: #fff; text-decoration: none; margin: 8px; font-size: 10px; }
+  .back:hover { color: #ffff00; }
+  h1 { font-size: 18px; margin: 8px 0; line-height: 1.6; }
+  h1 .heart { color: #ff0000; }
+  #msg { min-height: 1.6em; margin: 8px; color: #fff; }
+  button { background: #000; color: #fff; border: 3px solid #fff; border-radius: 0;
+           padding: 10px 16px; font-size: 11px; cursor: pointer; margin: 6px;
+           font-family: "Press Start 2P", monospace; }
+  button:hover:not(:disabled) { border-color: #ffff00; color: #ffff00; }
+  button:active { background: #ffff00; color: #000; border-color: #ffff00; }
+  button:disabled { opacity: .38; cursor: default; }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #ffff00; outline-offset: 2px; }
+  .hint { color: #808080; font-size: 10px; margin-top: 6px; }
+  #hud { display: flex; justify-content: center; gap: 24px; margin: 8px 0; font-size: 11px; }
+  #hud span { color: #ffff00; }
   #board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(92vw, 340px); margin: 0 auto; }
-  .cell { aspect-ratio: 1; background: #14142a; border: 2px solid #2a2a4a; border-radius: 10px;
+  .cell { aspect-ratio: 1; background: #000; border: 3px solid #fff; border-radius: 0;
           display: flex; align-items: center; justify-content: center;
-          font-size: clamp(2.4rem, 14vw, 3.4rem); cursor: pointer; font-weight: 800; }
-  .cell.x { color: #00e5ff; } .cell.o { color: #ff2d95; }
-  .cell:not(.x):not(.o):active { background: #1e1e3a; }
-  #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
-  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
-           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
-  button:active { transform: scale(.96); }
+          font-size: clamp(2.4rem, 14vw, 3.4rem); cursor: pointer; }
+  .cell.x { color: #ffff00; } .cell.o { color: #ff0000; }
+  .cell:not(.x):not(.o):active { background: #111; }
 </style>
 </head>
 <body>
 <a class="back" href="../index.html">← arcade</a>
-<h1>⭕ Tic-Tac-Toe</h1>
+<h1>⭕ Tic-Tac-Toe <span class="heart">♥</span></h1>
 <div id="hud"><div>You <span id="w">0</span></div><div>Draws <span id="d">0</span></div><div>AI <span id="l">0</span></div></div>
 <div id="board"></div>
-<div id="msg">You are ❌ — go first!</div>
+<div id="msg">* You are ❌ — go first!</div>
 <button id="start">New Round</button>
 <script src="../js/arcade.js"></script>
 <script>
@@ -45,7 +56,7 @@
     b = ["", "", "", "", "", "", "", "", ""];
     over = false;
     clearTimeout(aiTimer);
-    msgEl.textContent = "You are ❌ — go first!";
+    msgEl.textContent = "* You are ❌ — go first!";
     render();
   }
   function winner(bd) {
@@ -98,15 +109,15 @@
     over = true;
     if (result === "X") {
       w++; wEl.textContent = w;
-      msgEl.textContent = "🏆 You beat the AI!";
+      msgEl.textContent = "* You beat the AI!";
       Arcade.saveScore("tictactoe", Arcade.playerName(), 100);
     } else if (result === "O") {
       l++; lEl.textContent = l;
-      msgEl.textContent = "🤖 AI wins. Try again!";
+      msgEl.textContent = "* AI wins. Try again!";
       Arcade.saveScore("tictactoe", Arcade.playerName(), 0);
     } else {
       d++; dEl.textContent = d;
-      msgEl.textContent = "🤝 Draw!";
+      msgEl.textContent = "* Draw!";
       Arcade.saveScore("tictactoe", Arcade.playerName(), 25);
     }
   }

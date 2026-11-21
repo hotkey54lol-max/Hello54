@@ -4,27 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Snake — Sandbox Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
-         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation; }
-  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
-  h1 { font-size: 1.6rem; margin: 4px 0; text-shadow: 0 0 16px rgba(0,229,255,.35); }
-  #score { font-size: 1.2rem; color: #ffe600; margin: 8px 0; }
-  #best { font-size: .92rem; color: #8a8aa8; margin: 2px 0 6px; min-height: 1.2em; }
-  canvas { background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; max-width: 94vw;
-           box-shadow: 0 8px 28px rgba(0,0,0,.5); }
-  #msg { min-height: 1.6em; margin: 8px; color: #ff2d95; font-weight: 700; }
-  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
-           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
-  button:hover { filter: brightness(1.12); }
-  button:active { transform: scale(.96); }
-  button:focus-visible, .back:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
-  .back:hover { text-shadow: 0 0 10px rgba(0,229,255,.6); }
+  body { background: #000; color: #fff; font-family: "Press Start 2P", monospace;
+         text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation;
+         font-size: 11px; line-height: 1.7; }
+  .back { display: inline-block; color: #fff; text-decoration: none; margin: 8px; font-size: 10px; }
+  .back:hover { color: #ffff00; }
+  h1 { font-size: 18px; margin: 8px 0; line-height: 1.6; }
+  h1 .heart { color: #ff0000; }
+  #msg { min-height: 1.6em; margin: 8px; color: #fff; }
+  button { background: #000; color: #fff; border: 3px solid #fff; border-radius: 0;
+           padding: 10px 16px; font-size: 11px; cursor: pointer; margin: 6px;
+           font-family: "Press Start 2P", monospace; }
+  button:hover:not(:disabled) { border-color: #ffff00; color: #ffff00; }
+  button:active { background: #ffff00; color: #000; border-color: #ffff00; }
+  button:disabled { opacity: .38; cursor: default; }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #ffff00; outline-offset: 2px; }
+  .hint { color: #808080; font-size: 10px; margin-top: 6px; }
+  #score { font-size: 12px; color: #ffff00; margin: 8px 0; }
+  #best { font-size: 10px; color: #808080; margin: 2px 0 6px; min-height: 1.2em; }
+  canvas { background: #000; border: 3px solid #fff; border-radius: 0; max-width: 94vw; }
   #pad { display: none; grid-template-columns: repeat(3, 64px); gap: 6px; justify-content: center; margin-top: 10px; }
-  #pad button { padding: 12px 0; font-size: 1.2rem; margin: 0; }
+  #pad button { padding: 12px 0; font-size: 14px; margin: 0; }
   @media (pointer: coarse) { #pad { display: grid; } }
-  .hint { color: #8a8aa8; font-size: .8rem; margin-top: 8px; }
 /* arcade fullscreen fit */
 :fullscreen h1,:fullscreen .back,:fullscreen .leaderboard,:fullscreen .hint{display:none!important}
 :fullscreen canvas{max-width:100vw;max-height:none;width:min(94vw,80vh);width:min(94vw,80dvh);height:auto}
@@ -32,7 +38,7 @@
 </head>
 <body>
 <a class="back" href="../index.html">← arcade</a>
-<h1>🐍 Snake</h1>
+<h1>🐍 Snake <span class="heart">♥</span></h1>
 <div id="score">Score: 0</div>
 <div id="best"></div>
 <canvas id="c" width="400" height="400"></canvas>
@@ -44,7 +50,7 @@
   <button data-dx="0" data-dy="1" style="grid-column: 2">▼</button>
   <button data-dx="1" data-dy="0" style="grid-column: 3; grid-row: 2">▶</button>
 </div>
-<div class="hint">arrows / swipe / pad to steer · space = pause</div>
+<div class="hint">* arrows / swipe / pad to steer · space = pause</div>
 <script src="../js/arcade.js"></script>
 <script>
 (function () {
@@ -91,13 +97,13 @@
     alive = false;
     clearInterval(timer); timer = null;
     startBtn.textContent = "↻ Play again";
-    msgEl.textContent = "Game over! Score: " + score;
+    msgEl.textContent = "* Game over! Score: " + score;
     Arcade.saveScore("snake", Arcade.playerName(), score);
   }
   function togglePause() {
     if (!alive || !timer && !paused) return;
     if (paused) { paused = false; msgEl.textContent = ""; restartTimer(); }
-    else { paused = true; clearInterval(timer); timer = null; msgEl.textContent = "⏸ Paused — space to resume"; }
+    else { paused = true; clearInterval(timer); timer = null; msgEl.textContent = "* Paused — space to resume"; }
   }
   function restartTimer() { clearInterval(timer); timer = setInterval(step, speed); }
   function draw() {

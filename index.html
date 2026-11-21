@@ -39,6 +39,7 @@
   }
   @keyframes starDrift { from { transform: translateY(0); } to { transform: translateY(240px); } }
   header { text-align: center; margin: 28px 0 10px; }
+  header h1::before { content: "♥ "; color: var(--ut-red); }
   header h1 {
     font-size: clamp(1.1rem, 5vw, 1.7rem);
     letter-spacing: 2px;
@@ -49,6 +50,7 @@
   header p { color: var(--ut-white); margin-top: 16px; font-size: 10px; }
   .name-row { text-align: center; margin: 18px 0 6px; font-size: 10px; }
   .name-row strong { color: var(--ut-yellow); }
+  #gemsBal { color: var(--ut-yellow); }
   .name-row button {
     background: #000; border: 2px solid var(--ut-white); color: var(--ut-white);
     border-radius: 0; padding: 6px 10px; cursor: pointer;
@@ -153,9 +155,8 @@
     font-size: 9px; letter-spacing: 1px; padding: 5px 10px; margin-bottom: 12px;
   }
   .card .expbadge {
-    display: inline-block; background: #c0392b; color: #fff;
+    display: inline-block; background: var(--ut-red); color: #fff;
     font-size: 9px; letter-spacing: 1px; padding: 5px 10px; margin-bottom: 12px;
-    box-shadow: 0 0 10px #c0392b88;
   }
   .card .sub { margin-top: 8px; font-size: 9px; color: var(--ut-gray); line-height: 1.8; }
   .card .playbtn {
@@ -317,7 +318,7 @@ if (new Date().getMonth() === 11) { document.getElementById("arcadeVeil").style.
 (function () {
   "use strict";
   const GAMES = [
-    { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin", cat: "story", featured: true, sub: "* FEAR TOXIN: ESCAPE — a haunted mansion. Find the keys. Get out." },
+    { id: "fear-toxin",  emoji: "☠️", title: "Fear Toxin", cat: "story", sub: "* FEAR TOXIN: ESCAPE — a haunted mansion. Find the keys. Get out." },
     { id: "sandbox-of-nexus", emoji: "🏝", title: "Sandbox Of Nexus", cat: "action", sub: "* PROJECT NEXUS — the new engine's playground. Real physics. Bend time. Make weather." },
     { id: "demolition-day", emoji: "💥", title: "Demolition Day", cat: "action", sub: "* PROJECT NEXUS — timed demolition challenges. Towers, dominoes, bombs. Earn stars, top the boards." },
     { id: "red-light-green-legs", emoji: "🚦", title: "Red Light, Green Legs", cat: "chill", sub: "* 4 spider-bots. 0 instructions. Oliver, Aria, Sophia and Albert teach themselves to walk, run and freeze on red — you just watch." },

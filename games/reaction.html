@@ -3,32 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reaction Test — Neon Arcade</title>
+<title>Reaction Test — Sandbox Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#05051a radial-gradient(ellipse at top,#101040 0%,#05051a 70%);color:#dfe6ff;font-family:'Courier New',Courier,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
-.back{align-self:flex-start;color:#0ff;text-decoration:none;border:1px solid #0ff;border-radius:6px;padding:6px 12px;margin-bottom:10px;box-shadow:0 0 8px #0ff3;font-size:.9rem}
-.back:hover{background:#0ff;color:#001}
-h1{color:#0ff;text-shadow:0 0 12px #0ff,0 0 40px #0ff8;margin:6px 0 12px;font-size:1.7rem;letter-spacing:2px;text-align:center}
-.scorebar{display:flex;gap:22px;margin-bottom:14px;font-size:1.15rem;flex-wrap:wrap;justify-content:center}
-.scorebar b{color:#ffe14d;text-shadow:0 0 8px #ffe14d}
-button{font-family:inherit;background:transparent;color:#0ff;border:2px solid #0ff;border-radius:8px;padding:10px 22px;font-size:1rem;cursor:pointer;text-shadow:0 0 6px #0ff;box-shadow:0 0 10px #0ff4,inset 0 0 8px #0ff2;transition:all .15s;margin:4px}
-button:hover:not(:disabled){background:#0ff;color:#001;text-shadow:none;box-shadow:0 0 22px #0ff}
+body{background:#000;color:#fff;font-family:"Press Start 2P",monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px;font-size:12px;line-height:1.7}
+.back{align-self:flex-start;color:#fff;text-decoration:none;border:2px solid #fff;border-radius:0;padding:8px 12px;margin-bottom:10px;font-size:.7rem}
+.back:hover{border-color:#ffff00;color:#ffff00}
+h1{color:#fff;margin:6px 0 12px;font-size:1.2rem;letter-spacing:1px;text-align:center}
+.scorebar{display:flex;gap:22px;margin-bottom:14px;font-size:.8rem;flex-wrap:wrap;justify-content:center}
+.scorebar b{color:#ffff00}
+.scorebar .heart{color:#ff0000}
+button{font-family:inherit;background:#000;color:#fff;border:2px solid #fff;border-radius:0;padding:10px 18px;font-size:.8rem;cursor:pointer;margin:4px}
+button:hover:not(:disabled){border-color:#ffff00;color:#ffff00}
+button:active:not(:disabled){background:#ffff00;color:#000}
 button:disabled{opacity:.35;cursor:default}
-#gameover{background:#0a0a24;border:2px solid #f0f;border-radius:12px;padding:20px 30px;text-align:center;box-shadow:0 0 24px #f0f6;margin-top:14px}
-#gameover h2{color:#f0f;text-shadow:0 0 12px #f0f;margin-bottom:8px}
+.msg{min-height:1.6em;margin:10px;color:#fff;text-align:center}
+#gameover{background:#111;border:3px solid #fff;border-radius:0;padding:20px 30px;text-align:center;margin-top:14px}
+#gameover h2{color:#fff;margin-bottom:8px}
 .hidden{display:none!important}
-.leaderboard{margin-top:18px;width:min(420px,92vw);border:1px solid #334;border-radius:10px;padding:12px 16px;background:#080818}
-.leaderboard h3{color:#ffe14d;font-size:1rem;margin-bottom:8px;text-shadow:0 0 8px #ffe14d88}
-.leaderboard ol{margin-left:20px;font-size:.95rem}
+.leaderboard{margin-top:18px;width:min(420px,92vw);border:3px solid #fff;border-radius:0;padding:12px 16px;background:#111}
+.leaderboard h3{color:#ffff00;font-size:.85rem;margin-bottom:8px}
+.leaderboard ol{margin-left:20px;font-size:.8rem}
 .leaderboard li{margin:3px 0}
-.hint{color:#889;font-size:.85rem;margin-top:10px;text-align:center;max-width:480px}
-#pad{width:min(420px,92vw);height:240px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;text-align:center;cursor:pointer;user-select:none;margin:8px 0;border:3px solid #334;background:#101024;transition:background .1s;padding:16px}
-#pad.waiting{background:#3a0a0a;border-color:#f66;color:#fcc}
-#pad.ready{background:#0a3a0a;border-color:#0f0;color:#cfc;box-shadow:0 0 30px #0f06}
+.hint{color:#808080;font-size:.7rem;margin-top:10px;text-align:center;max-width:480px}
+#pad{width:min(420px,92vw);height:240px;border-radius:0;display:flex;align-items:center;justify-content:center;font-size:1rem;text-align:center;cursor:pointer;user-select:none;margin:8px 0;border:3px solid #fff;background:#111;transition:background .1s;padding:16px}
+#pad.waiting{background:#3a0a0a;border-color:#ff0000;color:#fff}
+#pad.ready{background:#0a3a0a;border-color:#00ff00;color:#fff}
 #rounds{display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;justify-content:center}
-.rchip{border:1px solid #448;border-radius:8px;padding:6px 12px;font-size:.9rem;background:#0a0a20}
-.rchip b{color:#ffe14d}
+.rchip{border:2px solid #fff;border-radius:0;padding:6px 12px;font-size:.7rem;background:#111}
+.rchip b{color:#ffff00}
 /* arcade fullscreen fit */
 :fullscreen h1,:fullscreen .back,:fullscreen .leaderboard,:fullscreen .hint{display:none!important}
 :fullscreen #pad{width:min(94vw,900px);height:56vh;height:56dvh}
@@ -37,19 +43,19 @@ button:disabled{opacity:.35;cursor:default}
 <body>
 <a class="back" href="../index.html">← HUB</a>
 <h1>⚡ REACTION TEST</h1>
-<div class="scorebar"><span>Round: <b id="round">0</b>/5</span><span>Best: <b id="best">—</b></span></div>
+<div class="scorebar"><span class="heart">♥</span><span>Round: <b id="round">0</b>/5</span><span>Best: <b id="best">—</b></span></div>
 <div id="pad">Press START, then click when it turns GREEN</div>
 <div id="rounds"></div>
 <button id="startBtn">▶ Start</button>
 <div id="gameover" class="hidden">
   <h2>RESULTS</h2>
-  <p>Best reaction: <b id="finalMs" style="color:#ffe14d">—</b> ms</p>
-  <p>Score: <b id="finalScore" style="color:#ffe14d">0</b> <span style="color:#889;font-size:.85rem">(10000 − ms)</span></p>
-  <p style="margin-top:6px;color:#889">Saved to leaderboard as <span id="who"></span></p>
+  <p>Best reaction: <b id="finalMs" style="color:#ffff00">—</b> ms</p>
+  <p>Score: <b id="finalScore" style="color:#ffff00">0</b> <span style="color:#808080;font-size:.85rem">(10000 − ms)</span></p>
+  <p style="margin-top:6px;color:#808080">Saved to leaderboard as <span id="who"></span></p>
   <button id="againBtn" style="margin-top:12px">↻ Try Again</button>
 </div>
-<div class="leaderboard"><h3>🏆 TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
-<p class="hint">5 rounds. Click too early = 0 for that round. Score = 10000 − your best ms.</p>
+<div class="leaderboard"><h3>* TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
+<p class="hint">* 5 rounds. Click too early = 0 for that round. Score = 10000 − your best ms.</p>
 <script src="../js/arcade.js"></script>
 <script>
 if(!window.Arcade){window.Arcade={SUPABASE_URL:'',SUPABASE_ANON:'',playerName:()=>'Player',saveScore(){},getScores:async()=>[]};}

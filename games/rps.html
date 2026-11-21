@@ -3,62 +3,68 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rock Paper Scissors — Neon Arcade</title>
+<title>Rock Paper Scissors — Sandbox Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#05051a radial-gradient(ellipse at top,#101040 0%,#05051a 70%);color:#dfe6ff;font-family:'Courier New',Courier,monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
-.back{align-self:flex-start;color:#0ff;text-decoration:none;border:1px solid #0ff;border-radius:6px;padding:6px 12px;margin-bottom:10px;box-shadow:0 0 8px #0ff3;font-size:.9rem}
-.back:hover{background:#0ff;color:#001}
-h1{color:#0ff;text-shadow:0 0 12px #0ff,0 0 40px #0ff8;margin:6px 0 12px;font-size:1.7rem;letter-spacing:2px;text-align:center}
-.scorebar{display:flex;gap:18px;margin-bottom:14px;font-size:1.05rem;flex-wrap:wrap;justify-content:center}
-.scorebar b{color:#ffe14d;text-shadow:0 0 8px #ffe14d}
-button{font-family:inherit;background:transparent;color:#0ff;border:2px solid #0ff;border-radius:8px;padding:10px 22px;font-size:1rem;cursor:pointer;text-shadow:0 0 6px #0ff;box-shadow:0 0 10px #0ff4,inset 0 0 8px #0ff2;transition:all .15s;margin:4px}
-button:hover:not(:disabled){background:#0ff;color:#001;text-shadow:none;box-shadow:0 0 22px #0ff}
+body{background:#000;color:#fff;font-family:"Press Start 2P",monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px;font-size:12px;line-height:1.7}
+.back{align-self:flex-start;color:#fff;text-decoration:none;border:2px solid #fff;border-radius:0;padding:8px 12px;margin-bottom:10px;font-size:.7rem}
+.back:hover{border-color:#ffff00;color:#ffff00}
+h1{color:#fff;margin:6px 0 12px;font-size:1.2rem;letter-spacing:1px;text-align:center}
+.scorebar{display:flex;gap:22px;margin-bottom:14px;font-size:.8rem;flex-wrap:wrap;justify-content:center}
+.scorebar b{color:#ffff00}
+.scorebar .heart{color:#ff0000}
+button{font-family:inherit;background:#000;color:#fff;border:2px solid #fff;border-radius:0;padding:10px 18px;font-size:.8rem;cursor:pointer;margin:4px}
+button:hover:not(:disabled){border-color:#ffff00;color:#ffff00}
+button:active:not(:disabled){background:#ffff00;color:#000}
 button:disabled{opacity:.35;cursor:default}
-.msg{min-height:1.6em;margin:10px;color:#ff7bff;text-shadow:0 0 8px #f0f;text-align:center;font-size:1.1rem}
-#gameover{background:#0a0a24;border:2px solid #f0f;border-radius:12px;padding:20px 30px;text-align:center;box-shadow:0 0 24px #f0f6;margin-top:14px}
-#gameover h2{color:#f0f;text-shadow:0 0 12px #f0f;margin-bottom:8px}
+.msg{min-height:1.6em;margin:10px;color:#fff;text-align:center}
+#gameover{background:#111;border:3px solid #fff;border-radius:0;padding:20px 30px;text-align:center;margin-top:14px}
+#gameover h2{color:#fff;margin-bottom:8px}
 .hidden{display:none!important}
-.leaderboard{margin-top:18px;width:min(420px,92vw);border:1px solid #334;border-radius:10px;padding:12px 16px;background:#080818}
-.leaderboard h3{color:#ffe14d;font-size:1rem;margin-bottom:8px;text-shadow:0 0 8px #ffe14d88}
-.leaderboard ol{margin-left:20px;font-size:.95rem}
+.leaderboard{margin-top:18px;width:min(420px,92vw);border:3px solid #fff;border-radius:0;padding:12px 16px;background:#111}
+.leaderboard h3{color:#ffff00;font-size:.85rem;margin-bottom:8px}
+.leaderboard ol{margin-left:20px;font-size:.8rem}
 .leaderboard li{margin:3px 0}
-.hint{color:#889;font-size:.85rem;margin-top:10px;text-align:center;max-width:480px}
+.hint{color:#808080;font-size:.7rem;margin-top:10px;text-align:center;max-width:480px}
+.msg{font-size:.9rem}
 #arena{display:flex;gap:26px;align-items:center;margin:12px 0}
-.fighter{font-size:4rem;background:#0a0a24;border:2px solid #335;border-radius:14px;width:120px;height:120px;display:flex;align-items:center;justify-content:center}
-.fighter.you{border-color:#0ff;box-shadow:0 0 16px #0ff4}
-.fighter.cpu{border-color:#f0f;box-shadow:0 0 16px #f0f4}
-.vs{font-size:1.6rem;color:#ffe14d;text-shadow:0 0 10px #ffe14d}
+.fighter{font-size:4rem;background:#111;border:3px solid #fff;border-radius:0;width:120px;height:120px;display:flex;align-items:center;justify-content:center}
+.fighter.you{border-color:#fff}
+.fighter.cpu{border-color:#ffff00}
+.vs{font-size:1.2rem;color:#ffff00}
 #choices{display:flex;gap:12px;margin:8px 0}
 #choices button{font-size:2.2rem;padding:10px 18px}
-#log{max-width:440px;margin-top:6px;font-size:.9rem;color:#99a;text-align:center;min-height:2.2em}
+#log{max-width:440px;margin-top:6px;font-size:.7rem;color:#808080;text-align:center;min-height:2.2em}
 </style>
 </head>
 <body>
 <a class="back" href="../index.html">← HUB</a>
 <h1>✂️ ROCK PAPER SCISSORS</h1>
-<div class="scorebar"><span>Round <b id="round">0</b>/5</span><span>Wins <b id="w">0</b></span><span>Losses <b id="l">0</b></span><span>Ties <b id="t">0</b></span></div>
+<div class="scorebar"><span class="heart">♥</span><span>Round <b id="round">0</b>/5</span><span>Wins <b id="w">0</b></span><span>Losses <b id="l">0</b></span><span>Ties <b id="t">0</b></span></div>
 <div id="arena">
-  <div><div class="fighter you" id="youPick">❔</div><div style="text-align:center;color:#0ff;margin-top:4px">YOU</div></div>
+  <div><div class="fighter you" id="youPick">❔</div><div style="text-align:center;color:#fff;margin-top:4px">YOU</div></div>
   <div class="vs">VS</div>
-  <div><div class="fighter cpu" id="cpuPick">❔</div><div style="text-align:center;color:#f0f;margin-top:4px">CPU</div></div>
+  <div><div class="fighter cpu" id="cpuPick">❔</div><div style="text-align:center;color:#ffff00;margin-top:4px">CPU</div></div>
 </div>
 <div id="choices">
   <button data-c="rock" title="Rock">🪨</button>
   <button data-c="paper" title="Paper">📄</button>
   <button data-c="scissors" title="Scissors">✂️</button>
 </div>
-<div class="msg" id="msg">Best of 5 — pick your weapon!</div>
+<div class="msg" id="msg">* Best of 5 — pick your weapon!</div>
 <div id="log"></div>
 <div id="gameover" class="hidden">
   <h2 id="endTitle">MATCH OVER</h2>
-  <p><b id="finalWL" style="color:#ffe14d"></b></p>
-  <p>Score: <b id="finalScore" style="color:#ffe14d">0</b> <span style="color:#889;font-size:.85rem">(wins×100 + ties×10)</span></p>
-  <p style="margin-top:6px;color:#889">Saved to leaderboard as <span id="who"></span></p>
+  <p><b id="finalWL" style="color:#ffff00"></b></p>
+  <p>Score: <b id="finalScore" style="color:#ffff00">0</b> <span style="color:#808080;font-size:.85rem">(wins×100 + ties×10)</span></p>
+  <p style="margin-top:6px;color:#808080">Saved to leaderboard as <span id="who"></span></p>
   <button id="againBtn" style="margin-top:12px">↻ Play Again</button>
 </div>
-<div class="leaderboard"><h3>🏆 TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
-<p class="hint">Win = 100 pts, tie = 10 pts. The CPU is gloriously random.</p>
+<div class="leaderboard"><h3>* TOP SCORES</h3><ol id="scores"><li>Loading…</li></ol></div>
+<p class="hint">* Win = 100 pts, tie = 10 pts. The CPU is gloriously random.</p>
 <script src="../js/arcade.js"></script>
 <script>
 if(!window.Arcade){window.Arcade={SUPABASE_URL:'',SUPABASE_ANON:'',playerName:()=>'Player',saveScore(){},getScores:async()=>[]};}

@@ -4,45 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Minesweeper — Sandbox Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0a0a14; color: #e8e8f0; font-family: "Segoe UI", system-ui, sans-serif;
+  body { background: #000; color: #fff; font-family: "Press Start 2P", monospace;
          text-align: center; min-height: 100vh; padding: 12px; touch-action: manipulation;
-         -webkit-user-select: none; user-select: none; }
-  .back { display: inline-block; color: #00e5ff; text-decoration: none; margin: 8px; font-size: .95rem; }
-  h1 { font-size: 1.6rem; margin: 4px 0; text-shadow: 0 0 16px rgba(0,229,255,.35); }
-  #hud { display: flex; justify-content: center; gap: 24px; margin: 8px 0; font-size: 1.1rem; }
-  #hud span { color: #ffe600; }
+         font-size: 11px; line-height: 1.7; }
+  .back { display: inline-block; color: #fff; text-decoration: none; margin: 8px; font-size: 10px; }
+  .back:hover { color: #ffff00; }
+  h1 { font-size: 18px; margin: 8px 0; line-height: 1.6; }
+  h1 .heart { color: #ff0000; }
+  #msg { min-height: 1.6em; margin: 8px; color: #fff; }
+  button { background: #000; color: #fff; border: 3px solid #fff; border-radius: 0;
+           padding: 10px 16px; font-size: 11px; cursor: pointer; margin: 6px;
+           font-family: "Press Start 2P", monospace; }
+  button:hover:not(:disabled) { border-color: #ffff00; color: #ffff00; }
+  button:active { background: #ffff00; color: #000; border-color: #ffff00; }
+  button:disabled { opacity: .38; cursor: default; }
+  button:focus-visible, .back:focus-visible { outline: 2px solid #ffff00; outline-offset: 2px; }
+  .hint { color: #808080; font-size: 10px; margin-top: 6px; }
+  #hud { display: flex; justify-content: center; gap: 24px; margin: 8px 0; font-size: 11px; }
+  #hud span { color: #ffff00; }
   #board { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; width: min(94vw, 380px);
-           margin: 0 auto; background: #14142a; border: 2px solid #2a2a4a; border-radius: 8px; padding: 6px;
-           box-shadow: 0 8px 28px rgba(0,0,0,.5); }
-  .cell { aspect-ratio: 1; background: #2a2a4a; border-radius: 3px; display: flex; align-items: center;
-          justify-content: center; font-weight: 700; font-size: clamp(.8rem, 4vw, 1rem); cursor: pointer; }
-  .cell:not(.open):hover { background: #3a3a5e; }
-  .cell.open { background: #1a1a30; cursor: default; }
-  .cell.boom { background: #ff2d95; animation: boomPulse .5s ease; }
+           margin: 0 auto; background: #111; border: 3px solid #fff; border-radius: 0; padding: 6px; }
+  .cell { aspect-ratio: 1; background: #111; border: 1px solid #333; border-radius: 0; display: flex; align-items: center;
+          justify-content: center; font-size: clamp(.8rem, 4vw, 1rem); cursor: pointer; }
+  .cell:not(.open):hover { background: #222; }
+  .cell.open { background: #000; cursor: default; }
+  .cell.boom { background: #ff0000; animation: boomPulse .5s ease; }
   @keyframes boomPulse { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
   @media (prefers-reduced-motion: reduce) { .cell.boom { animation: none; } }
-  #msg { min-height: 1.6em; margin: 10px; color: #ff2d95; font-weight: 700; }
-  button { background: #ff2d95; color: #fff; border: none; border-radius: 8px;
-           padding: 10px 28px; font-size: 1rem; cursor: pointer; margin: 6px; }
-  button:hover { filter: brightness(1.12); }
-  button:active { transform: scale(.96); }
-  button:focus-visible, .back:focus-visible { outline: 2px solid #00e5ff; outline-offset: 2px; }
-  .back:hover { text-shadow: 0 0 10px rgba(0,229,255,.6); }
-  #flagBtn.on { box-shadow: 0 0 0 3px #ffe600 inset; }
-  .hint { color: #8a8aa8; font-size: .8rem; margin-top: 6px; }
+  #flagBtn.on { box-shadow: 0 0 0 3px #ffff00 inset; }
 </style>
 </head>
 <body>
 <a class="back" href="../index.html">← arcade</a>
-<h1>💣 Minesweeper</h1>
+<h1>💣 Minesweeper <span class="heart">♥</span></h1>
 <div id="hud"><div>💣 <span id="flags">10</span></div><div>⏱️ <span id="time">0</span>s</div></div>
 <div id="board"></div>
 <div id="msg"></div>
 <button id="start">New Game</button>
 <button id="flagBtn">🚩 Flag mode: OFF</button>
-<div class="hint">click/tap = reveal · right-click / long-press = flag · or flip on flag mode and tap to flag</div>
+<div class="hint">* click/tap = reveal · right-click / long-press = flag · or flip on flag mode and tap to flag</div>
 <script src="../js/arcade.js"></script>
 <script>
 (function () {
@@ -128,14 +133,14 @@
       c.textContent = "💣";
     });
     const secs = ((Date.now() - t0) / 1000) | 0;
-    msgEl.textContent = "💥 Boom! " + secs + "s survived.";
+    msgEl.textContent = "* Boom! " + secs + "s survived.";
     Arcade.saveScore("minesweeper", Arcade.playerName(), Math.max(0, 10000 - secs));
   }
   function checkWin() {
     if (open === SIZE * SIZE - MINES) {
       won = true; clearInterval(tick);
       const secs = ((Date.now() - t0) / 1000) | 0;
-      msgEl.textContent = "🏆 Cleared in " + secs + "s!";
+      msgEl.textContent = "* Cleared in " + secs + "s!";
       Arcade.saveScore("minesweeper", Arcade.playerName(), Math.max(0, 10000 - secs));
     }
   }
